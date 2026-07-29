@@ -5,6 +5,24 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>crux_analyzer</title>
+    <script>
+      // Applies the theme before first paint, so no light flash on reload.
+      // The storage key must match THEME_STORAGE_KEY in src/theme/theme.ts.
+      (function () {
+        var stored = null;
+        try {
+          stored = localStorage.getItem('crux-analyzer:theme');
+        } catch (error) {
+          /* storage disabled: fall back to the OS preference */
+        }
+        document.documentElement.dataset.theme =
+          stored === 'light' || stored === 'dark'
+            ? stored
+            : window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light';
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

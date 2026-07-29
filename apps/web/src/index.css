@@ -1,3 +1,86 @@
+/**
+ * Color tokens per theme + component styles.
+ *
+ * Every color below comes from a token, so adding a theme means adding one
+ * `:root[data-theme='...']` block — no component or JS change. The active
+ * theme is the `data-theme` attribute on <html> (see src/theme/theme.ts).
+ */
+
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #f6f7f9;
+  --bg-panel: #ffffff;
+  --bg-subtle: #f3f4f6;
+  --bg-hover: #f3f4f6;
+
+  --text: #1f2430;
+  --text-muted: #6b7280;
+  --text-faint: #9ca3af;
+
+  --border: #e2e5ea;
+  --border-strong: #d1d5db;
+
+  --accent: #6366f1;
+  --accent-strong: #4338ca;
+  --accent-soft: #eef2ff;
+  --accent-hover-border: #a5b4fc;
+
+  --sim: #059669;
+  --sim-text: #047857;
+  --sim-soft: #ecfdf5;
+  --sim-border: #d1fae5;
+  --sim-ring: rgba(5, 150, 105, 0.2);
+  --accent-ring: rgba(99, 102, 241, 0.18);
+
+  --node-bg: #ffffff;
+  --node-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --group-bg: rgba(255, 255, 255, 0.55);
+
+  --edge-stroke: #8792a2;
+  --edge-stroke-selected: #6366f1;
+  --edge-stroke-highlighted: #059669;
+  --edge-label-text: #4b5563;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0f1218;
+  --bg-panel: #161b22;
+  --bg-subtle: #1e2531;
+  --bg-hover: #232b38;
+
+  --text: #e6e9ef;
+  --text-muted: #9aa5b4;
+  --text-faint: #6b7684;
+
+  --border: #262d3a;
+  --border-strong: #3a4351;
+
+  --accent: #818cf8;
+  --accent-strong: #b4bcff;
+  --accent-soft: #232a45;
+  --accent-hover-border: #4c56b8;
+
+  --sim: #34d399;
+  --sim-text: #6ee7b7;
+  --sim-soft: #122c26;
+  --sim-border: #1d4d40;
+  --sim-ring: rgba(52, 211, 153, 0.22);
+  --accent-ring: rgba(129, 140, 248, 0.24);
+
+  --node-bg: #1b2230;
+  --node-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --group-bg: rgba(255, 255, 255, 0.03);
+
+  --edge-stroke: #7c8798;
+  --edge-stroke-selected: #818cf8;
+  --edge-stroke-highlighted: #34d399;
+  --edge-label-text: #aab3c2;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -13,8 +96,8 @@ body,
 body {
   font-family: system-ui, -apple-system, sans-serif;
   font-size: 14px;
-  color: #1f2430;
-  background: #f6f7f9;
+  color: var(--text);
+  background: var(--bg);
 }
 
 .app {
@@ -28,7 +111,7 @@ body {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .toolbar {
@@ -37,8 +120,8 @@ body {
   justify-content: space-between;
   padding: 0 16px;
   height: 48px;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e5ea;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
 }
 
 .toolbar-title {
@@ -47,30 +130,51 @@ body {
 
 .toolbar-core {
   font-weight: 400;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .toolbar-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
 }
 
 .toolbar button {
   padding: 4px 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--bg-panel);
+  color: var(--text);
   cursor: pointer;
 }
 
 .toolbar button:hover {
-  background: #f3f4f6;
+  background: var(--bg-hover);
 }
 
 .toolbar button.active {
-  background: #ecfdf5;
-  border-color: #059669;
-  color: #047857;
+  background: var(--sim-soft);
+  border-color: var(--sim);
+  color: var(--sim-text);
+}
+
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  color: var(--text-muted);
+}
+
+.theme-toggle:hover {
+  color: var(--text);
+}
+
+.theme-toggle svg {
+  width: 16px;
+  height: 16px;
 }
 
 .app-body {
@@ -83,17 +187,17 @@ body {
 .inspector {
   width: 220px;
   padding: 16px;
-  background: #ffffff;
+  background: var(--bg-panel);
   overflow-y: auto;
 }
 
 .sidebar {
-  border-right: 1px solid #e2e5ea;
+  border-right: 1px solid var(--border);
 }
 
 .inspector {
   width: 260px;
-  border-left: 1px solid #e2e5ea;
+  border-left: 1px solid var(--border);
 }
 
 .panel-title {
@@ -101,7 +205,7 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #6b7280;
+  color: var(--text-muted);
   margin-bottom: 12px;
 }
 
@@ -118,17 +222,18 @@ body {
   border: none;
   border-radius: 6px;
   background: transparent;
+  color: var(--text);
   font-size: 14px;
   cursor: pointer;
 }
 
 .core-item:hover {
-  background: #f3f4f6;
+  background: var(--bg-hover);
 }
 
 .core-item.active {
-  background: #eef2ff;
-  color: #4338ca;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
   font-weight: 600;
 }
 
@@ -139,7 +244,7 @@ body {
 
 .inspector h4 {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-muted);
   margin: 12px 0 4px;
 }
 
@@ -149,7 +254,7 @@ body {
 }
 
 .inspector-empty {
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .event-list {
@@ -159,7 +264,7 @@ body {
 .event-list li {
   padding: 4px 8px;
   margin-bottom: 4px;
-  background: #f3f4f6;
+  background: var(--bg-subtle);
   border-radius: 4px;
   font-family: ui-monospace, monospace;
   font-size: 12px;
@@ -170,14 +275,14 @@ body {
   flex-direction: column;
   gap: 4px;
   padding: 8px;
-  background: #f3f4f6;
+  background: var(--bg-subtle);
   border-radius: 6px;
   font-family: ui-monospace, monospace;
   font-size: 13px;
 }
 
 .transition-arrow {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 /* --- Simulation --------------------------------------------------------- */
@@ -187,21 +292,21 @@ body {
   width: 100%;
   text-align: left;
   padding: 6px 8px;
-  border: 1px solid #d1fae5;
+  border: 1px solid var(--sim-border);
   border-radius: 4px;
-  background: #ecfdf5;
+  background: var(--sim-soft);
   font-family: ui-monospace, monospace;
   font-size: 12px;
-  color: #047857;
+  color: var(--sim-text);
   cursor: pointer;
 }
 
 .event-button:hover {
-  border-color: #059669;
+  border-color: var(--sim);
 }
 
 .event-target {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .trail-list {
@@ -213,38 +318,39 @@ body {
   counter-increment: trail;
   padding: 4px 8px;
   margin-bottom: 4px;
-  background: #f3f4f6;
+  background: var(--bg-subtle);
   border-radius: 4px;
   font-size: 12px;
 }
 
 .trail-list li::before {
   content: counter(trail) '. ';
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .trail-event {
   font-family: ui-monospace, monospace;
-  color: #1f2430;
+  color: var(--text);
 }
 
 .trail-states {
   display: block;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 11px;
 }
 
 .restart-button {
   margin-top: 16px;
   padding: 4px 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--bg-panel);
+  color: var(--text);
   cursor: pointer;
 }
 
 .restart-button:hover {
-  background: #f3f4f6;
+  background: var(--bg-hover);
 }
 
 /* --- Graph: nodes ------------------------------------------------------- */
@@ -256,24 +362,24 @@ body {
   width: 100%;
   height: 100%;
   padding: 0 12px;
-  background: #ffffff;
-  border: 1px solid #d1d5db;
+  background: var(--node-bg);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+  box-shadow: var(--node-shadow);
   font-size: 14px;
   font-weight: 500;
-  color: #1f2430;
+  color: var(--text);
   cursor: pointer;
 }
 
 .state-node:hover {
-  border-color: #a5b4fc;
+  border-color: var(--accent-hover-border);
 }
 
 .state-node.selected {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
-  color: #4338ca;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+  color: var(--accent-strong);
 }
 
 .state-node-handle {
@@ -283,8 +389,8 @@ body {
 
 .state-node.highlighted,
 .react-flow__node.highlighted .state-node {
-  border-color: #059669;
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.2);
+  border-color: var(--sim);
+  box-shadow: 0 0 0 3px var(--sim-ring);
 }
 
 .any-state-node {
@@ -295,18 +401,18 @@ body {
   height: 100%;
   padding: 0 12px;
   background: transparent;
-  border: 1.5px dashed #b3b9c4;
+  border: 1.5px dashed var(--border-strong);
   border-radius: 999px;
   font-size: 12px;
   font-style: italic;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .machine-group {
   width: 100%;
   height: 100%;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid #e2e5ea;
+  background: var(--group-bg);
+  border: 1px solid var(--border);
   border-radius: 12px;
 }
 
@@ -315,14 +421,14 @@ body {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: #6b7280;
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
 .inspector-machine {
   margin: -4px 0 8px;
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -330,12 +436,12 @@ body {
 /* --- Graph: edges ------------------------------------------------------- */
 
 .routed-edge {
-  stroke: #8792a2;
+  stroke: var(--edge-stroke);
   stroke-width: 1.5;
 }
 
 .routed-edge.selected {
-  stroke: #6366f1;
+  stroke: var(--edge-stroke-selected);
   stroke-width: 2.25;
 }
 
@@ -344,37 +450,37 @@ body {
 }
 
 .edge-label-box {
-  fill: #ffffff;
-  stroke: #e2e5ea;
+  fill: var(--bg-panel);
+  stroke: var(--border);
 }
 
 .edge-label-text {
   font-family: ui-monospace, monospace;
   font-size: 11px;
-  fill: #4b5563;
+  fill: var(--edge-label-text);
   text-anchor: middle;
   dominant-baseline: central;
 }
 
 .edge-label.selected .edge-label-box {
-  fill: #eef2ff;
-  stroke: #6366f1;
+  fill: var(--accent-soft);
+  stroke: var(--accent);
 }
 
 .edge-label.selected .edge-label-text {
-  fill: #4338ca;
+  fill: var(--accent-strong);
 }
 
 .react-flow__edge.highlighted .routed-edge {
-  stroke: #059669;
+  stroke: var(--edge-stroke-highlighted);
   stroke-width: 2.25;
 }
 
 .react-flow__edge.highlighted .edge-label-box {
-  stroke: #059669;
-  fill: #ecfdf5;
+  stroke: var(--sim);
+  fill: var(--sim-soft);
 }
 
 .react-flow__edge.highlighted .edge-label-text {
-  fill: #047857;
+  fill: var(--sim-text);
 }

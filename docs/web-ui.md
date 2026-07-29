@@ -42,6 +42,17 @@ Select a state (optional) and hit **Simulate**:
 The engine (`src/simulation/engine.ts`) is pure domain logic; it drives the
 Graph exclusively through highlight props.
 
+## Theming
+
+The toolbar's theme toggle switches between light and dark. The active theme
+is the `data-theme` attribute on `<html>`; every color is a CSS custom
+property defined per theme in `src/index.css`, so adding a theme is one
+`:root[data-theme='...']` block. The choice persists in `localStorage`
+(a pre-paint script in `index.html` applies it before first render — no
+flash), and with no explicit choice the app follows the OS preference live.
+SVG-only colors (edge arrowheads) are read back from the same tokens
+(`src/theme/theme.ts`), keeping CSS the single source of truth.
+
 ## Layout
 
 All geometry comes from the `LayoutEngine` interface

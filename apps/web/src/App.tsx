@@ -14,6 +14,7 @@ import { Sidebar } from './components/Sidebar/Sidebar';
 import { Inspector } from './components/Inspector/Inspector';
 import { SimulationPanel } from './components/Simulation/SimulationPanel';
 import { Toolbar } from './components/Toolbar/Toolbar';
+import { useTheme } from './theme/useTheme';
 
 const layoutEngine: LayoutEngine = new ElkLayoutEngine();
 
@@ -24,6 +25,7 @@ export default function App() {
   const [simulation, setSimulation] = useState<Simulation | null>(null);
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [layouted, setLayouted] = useState<LayoutResult>({ nodes: [], edges: [] });
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     let cancelled = false;
@@ -111,8 +113,10 @@ export default function App() {
         projectName={project.name}
         coreName={activeCore?.name ?? null}
         simulating={simulation !== null}
+        theme={theme}
         onToggleSimulation={toggleSimulation}
         onRelayout={() => setLayoutVersion((v) => v + 1)}
+        onToggleTheme={toggleTheme}
       />
       <div className="app-body">
         <Sidebar
@@ -127,6 +131,7 @@ export default function App() {
             selection={selection}
             onSelect={setSelection}
             highlight={highlight}
+            theme={theme}
           />
         </main>
         {simulation && simulatedMachine ? (
