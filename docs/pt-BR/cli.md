@@ -19,10 +19,15 @@ crux-analyzer generate --src <dir> [--name <projeto>] [--out <arquivo>] [--watch
 | `--out` | Arquivo de saída. Por padrão, stdout. |
 | `--watch` | Continua observando `--src` e regenera a cada mudança em `.rs` (com debounce). |
 | `--locale` | `en` ou `pt-BR`. Idioma da saída da própria CLI e da prosa gerada — veja abaixo. |
+| `--deny-warnings` | Sai com código diferente de zero se o parser reportou algo. Global: funciona em todos os subcomandos. |
 
 Avisos (veja a [referência de avisos](parser.md#referência-de-avisos)) vão para
 stderr; o JSON vai para `--out`/stdout. O código de saída é diferente de zero
 quando o parsing falha (por exemplo, nenhum `impl App` encontrado).
+
+O `--deny-warnings` ainda escreve a saída — o código de saída é o sinal, para que
+um pipeline falhe enquanto uma pessoa ainda recebe o artefato para olhar. Sob
+`--watch` ele reporta sem encerrar a sessão.
 
 O **modelo JSON emitido é independente de locale** — tudo nele é lido da fonte
 analisada, tanto identificadores quanto a prosa dos comentários de documentação
@@ -99,6 +104,37 @@ curinga são renderizados como um pseudo-estado `qualquer estado`.
 
 Ambos os comandos aceitam `--watch`: combinado com um arquivo `--out` versionado
 ou com o `model.json` da UI web, a documentação se regenera a cada save.
+
+## `coverage` — quanto está documentado
+
+```sh
+crux-analyzer coverage --src <dir> [--name <projeto>] [--min <porcentagem>] [--list] [--locale <locale>]
+```
+
+| Flag | Significado |
+| --- | --- |
+| `--min` | Sai com código diferente de zero quando a fração de estados descritos está abaixo desta porcentagem. |
+| `--list` | Também nomeia os estados que não têm descrição. |
+
+```
+$ crux-analyzer coverage --src crates/parser/fixtures/mini_recorder --name "Mini Recorder" --locale pt-BR
+MiniRecorder / RecorderState                 100%  6 de 6 estados descritos
+MiniRecorder / UploadState                     0%  0 de 3 estados descritos
+total                                         67%  6 de 9 estados descritos
+```
+
+**"Documentado" significa que o estado tem uma descrição.** Um estado que carrega
+apenas um marcador ou uma etiqueta está classificado, não explicado, então não
+conta — o objetivo da medida é prosa da qual um leitor consiga aprender algo. Uma
+máquina cujo enum de estado não tem descrição própria recebe uma nota sob a sua
+linha.
+
+O `--min` compara **exatamente**, não contra a porcentagem exibida: 2 de 3 estados
+aparece como 67% e *não* satisfaz `--min 67`. Uma máquina sem estados conta como
+completa, então um projeto vazio nunca falha.
+
+Esta é a catraca: coloque no CI com um `--min` no número de hoje, e a documentação
+pode subir mas não descer. `just coverage <src> <nome> [min]` embrulha o comando.
 
 ## Escolhendo o locale
 

@@ -27,7 +27,10 @@ just            # lists every recipe
 | Everything | `just check` | — |
 | Model for the UI | `just model <src> <name>` | `cargo run -p crux-analyzer-cli -- generate ...` |
 | Docs | `just docs <src> <name> [format] [locale]` | `cargo run -p crux-analyzer-cli -- docs ...` |
+| Documentation coverage | `just coverage <src> <name> [min]` | `cargo run -p crux-analyzer-cli -- coverage ...` |
 | Example docs refresh (all locales) | `just example-docs` | — |
+| Committed examples are current | `just docs-current` | — |
+| Fixture extracts cleanly | `just fixture-guard` | — |
 
 ## Test layers
 
@@ -69,6 +72,25 @@ re-laid out, not just re-rendered.
 For parser changes that alter extraction semantics, add an adversarial
 cross-check: independently derive the expected transitions from the corpus
 source and compare against the CLI output before trusting the tests.
+
+### What CI enforces
+
+`.github/workflows/ci.yml` runs `just check` (which now includes
+`fixture-guard`) plus `just docs-current`. Between them they cover the three
+ways this project can silently rot:
+
+| Guard | Catches |
+| --- | --- |
+| `just check` | broken tests, clippy, a missing message-catalog key (`tsc`) |
+| `fixture-guard` | the fixture starting to warn, or its documentation regressing below the floor |
+| `docs-current` | a committed generated example that no longer matches the generator |
+
+The corpus test gates itself on `CORPUS_SRC`, and that source is not public — so
+CI proves the fixture path and the corpus stays a local gate. Keep it that way
+when adding guards: anything CI cannot run is not a guard.
+
+A guard that cannot fail is decoration. When you add one, break it on purpose
+once and watch it go red before trusting it.
 
 ## Conventions
 

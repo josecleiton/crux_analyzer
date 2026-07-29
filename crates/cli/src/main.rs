@@ -25,6 +25,11 @@ struct Cli {
     /// translated.
     #[arg(long, global = true, value_name = "LOCALE")]
     locale: Option<Locale>,
+
+    /// Exit non-zero if the parser reports any warning. Output is still
+    /// written — the failure is the signal, for CI.
+    #[arg(long, global = true)]
+    deny_warnings: bool,
 }
 
 #[derive(Subcommand)]
@@ -54,6 +59,18 @@ enum Command {
         #[arg(long)]
         watch: bool,
     },
+    /// Report how much of the analyzed app's states carry a description.
+    Coverage {
+        #[command(flatten)]
+        input: InputArgs,
+        /// Exit non-zero when the share of described states is below this
+        /// percentage.
+        #[arg(long, value_name = "PERCENT")]
+        min: Option<u8>,
+        /// List the states that have no description.
+        #[arg(long)]
+        list: bool,
+    },
 }
 
 #[derive(clap::Args)]
@@ -75,6 +92,22 @@ enum DocsFormat {
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let messages = Messages::new(cli.locale.unwrap_or_else(Locale::from_env));
+    let deny_warnings = cli.deny_warnings;
+
+    // `coverage` reports on the model rather than emitting it, so it has no
+    // renderer, no output file and nothing to watch.
+    if let Command::Coverage { input, min, list } = cli.command {
+        let project_name = input.name.unwrap_or_else(|| directory_name(&input.src));
+        return report_coverage(
+            &input.src,
+            &project_name,
+            min,
+            list,
+            deny_warnings,
+            &messages,
+        );
+    }
+
     let (input, out, watching, render): (InputArgs, Option<PathBuf>, bool, Renderer) =
         match cli.command {
             Command::Generate { input, out, watch } => (input, out, watch, render_json),
@@ -92,12 +125,24 @@ fn main() -> ExitCode {
                     DocsFormat::Mermaid => render_mermaid,
                 },
             ),
+            Command::Coverage { .. } => unreachable!("handled above"),
         };
 
     let project_name = input.name.clone().unwrap_or_else(|| directory_name(&input.src));
-    let run = || run_once(&input.src, &project_name, out.as_deref(), render, &messages);
+    let run = || {
+        run_once(
+            &input.src,
+            &project_name,
+            out.as_deref(),
+            render,
+            deny_warnings,
+            &messages,
+        )
+    };
 
     if watching {
+        // The watcher ignores each run's exit code, so `--deny-warnings`
+        // reports without ending the session.
         watch::watch(&input.src, &messages, run)
     } else {
         run()
@@ -131,6 +176,7 @@ fn run_once(
     project_name: &str,
     out: Option<&Path>,
     render: Renderer,
+    deny_warnings: bool,
     messages: &Messages,
 ) -> ExitCode {
     let locale = messages.locale();
@@ -169,7 +215,69 @@ fn run_once(
         None => print!("{rendered}"),
     }
 
+    // Output is written either way: the exit code is the signal, so a pipeline
+    // fails while a human still gets the artifact to look at.
+    if deny_warnings && !outcome.warnings.is_empty() {
+        eprintln!(
+            "{}: {}",
+            messages.error_prefix(),
+            messages.warnings_denied(outcome.warnings.len())
+        );
+        return ExitCode::FAILURE;
+    }
+
     ExitCode::SUCCESS
+}
+
+/// Prints the documentation-coverage report and applies `--min`.
+fn report_coverage(
+    src: &Path,
+    project_name: &str,
+    min: Option<u8>,
+    list: bool,
+    deny_warnings: bool,
+    messages: &Messages,
+) -> ExitCode {
+    let locale = messages.locale();
+    let outcome = match crux_analyzer_parser::parse_project(src, project_name) {
+        Ok(outcome) => outcome,
+        Err(err) => {
+            eprintln!("{}: {}", messages.error_prefix(), err.message(locale));
+            return ExitCode::FAILURE;
+        }
+    };
+    for warning in &outcome.warnings {
+        eprintln!("{}: {}", messages.warning_prefix(), warning.render(locale));
+    }
+
+    let report = crux_analyzer_docgen::coverage(&outcome.project);
+    print!("{}", messages.coverage_report(&report, list));
+
+    let mut failed = false;
+    if let Some(min) = min {
+        if !report.states.meets(min) {
+            eprintln!(
+                "{}: {}",
+                messages.error_prefix(),
+                messages.coverage_below_minimum(report.states.percent(), min)
+            );
+            failed = true;
+        }
+    }
+    if deny_warnings && !outcome.warnings.is_empty() {
+        eprintln!(
+            "{}: {}",
+            messages.error_prefix(),
+            messages.warnings_denied(outcome.warnings.len())
+        );
+        failed = true;
+    }
+
+    if failed {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
 }
 
 fn directory_name(src: &Path) -> String {

@@ -19,10 +19,15 @@ crux-analyzer generate --src <dir> [--name <project>] [--out <file>] [--watch] [
 | `--out` | Output file. Defaults to stdout. |
 | `--watch` | Keep watching `--src` and regenerate on every `.rs` change (debounced). |
 | `--locale` | `en` or `pt-BR`. Language of the CLI's own output and of generated prose — see below. |
+| `--deny-warnings` | Exit non-zero if the parser reported anything. Global: works on every subcommand. |
 
 Warnings (see the [warnings reference](parser.md#warnings-reference)) go to
 stderr; the JSON goes to `--out`/stdout. Exit code is non-zero when parsing
 fails (e.g. no `impl App` found).
+
+`--deny-warnings` still writes the output — the exit code is the signal, so a
+pipeline fails while a human still gets the artifact to look at. Under
+`--watch` it reports without ending the session.
 
 The emitted **model JSON is locale-independent** — everything in it is read out
 of the analyzed source, identifiers and the author's own doc-comment prose
@@ -98,6 +103,37 @@ an `any state` pseudo-state.
 
 Both commands accept `--watch`: combined with a committed `--out` file or the
 web UI's `model.json`, the documentation regenerates on every save.
+
+## `coverage` — how much is documented
+
+```sh
+crux-analyzer coverage --src <dir> [--name <project>] [--min <percent>] [--list] [--locale <locale>]
+```
+
+| Flag | Meaning |
+| --- | --- |
+| `--min` | Exit non-zero when the share of described states is below this percentage. |
+| `--list` | Also name the states that have no description. |
+
+```
+$ crux-analyzer coverage --src crates/parser/fixtures/mini_recorder --name "Mini Recorder"
+MiniRecorder / RecorderState                 100%  6 of 6 states described
+MiniRecorder / UploadState                     0%  0 of 3 states described
+total                                         67%  6 of 9 states described
+```
+
+**"Documented" means the state has a description.** A state carrying only a
+marker or a tag is classified, not explained, so it does not count — the point
+of the measure is prose a reader can learn something from. A machine whose state
+enum has no description of its own gets a note under its line.
+
+`--min` compares **exactly**, not against the displayed percentage: 2 of 3
+states shows as 67% and does *not* satisfy `--min 67`. A machine with no states
+counts as complete, so an empty project never fails.
+
+This is the ratchet: put it in CI with a `--min` at today's number, and the
+documentation can go up but not down. `just coverage <src> <name> [min]` wraps
+it.
 
 ## Choosing the locale
 

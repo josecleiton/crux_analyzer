@@ -24,43 +24,35 @@ ela vem depois das garantias, não antes.
 
 ---
 
-## 1. A catraca — dar dentes à documentação
+## 1. A catraca — dar dentes à documentação ✅ **feito**
 
-O trabalho de maior alavancagem, e o mais barato. Hoje não existe CI nenhum no
-repositório.
+O trabalho de maior alavancagem, e o mais barato. Entregue como três incrementos
+independentes; veja [cli.md](cli.md) e
+[development.md](development.md#o-que-o-ci-garante).
 
-### 1.1 CI rodando `just check`
+- **CI rodando `just check`** — `.github/workflows/ci.yml`. O `just check` já
+  fazia a coisa certa; ele só nunca rodava a menos que uma pessoa digitasse. O
+  teste do corpus se auto-restringe por `CORPUS_SRC` e essa fonte não é pública,
+  então o CI comprova o caminho do fixture e o corpus continua sendo uma guarda
+  local.
+- **`--deny-warnings`** — uma flag global que sai com código diferente de zero
+  quando o parser reportou algo. Transforma "o corpus extrai limpo" de uma
+  observação no `parser.md` em algo que um pipeline garante. A saída ainda é
+  escrita: o código de saída é o sinal.
+- **`crux-analyzer coverage`** — a fração de estados que carregam uma
+  *descrição*, por máquina e no total, falhando abaixo de `--min`. A documentação
+  de estados tornou isso mensurável pela primeira vez. Documentação que se pode
+  adicionar é boa; documentação que se pode *medir* é a que de fato é escrita.
 
-O `just check` já faz a coisa certa (corpus + clippy + testes web + build web).
-Ele só nunca roda a menos que uma pessoa digite. Um workflow fecha a maior
-lacuna do projeto.
+Duas guardas saíram disso e vale mantê-las honestas: `just fixture-guard` (o
+fixture precisa extrair com zero avisos e não perder documentação) e
+`just docs-current` (um exemplo gerado versionado precisa corresponder ao
+gerador). As duas foram quebradas de propósito uma vez e observadas ficando
+vermelhas — uma guarda que não pode falhar é decoração.
 
-Precisa de: toolchain Rust + pnpm + `just`, e uma decisão sobre o corpus — o
-teste do Corpus depende de `CORPUS_SRC` e essa fonte não é pública, então o CI roda
-os testes de fixture e pula o corpus (o gate já trata disso por construção).
-
-### 1.2 `--deny-warnings`
-
-O `crux-analyzer` já conta os avisos e os imprime em stderr; nada age sobre eles.
-Uma flag `--deny-warnings` que sai com código diferente de zero quando a contagem
-é maior que zero transforma "o corpus extrai limpo" de uma observação no
-`parser.md` em algo que um pipeline garante.
-
-Pequeno, autocontido, e o companheiro natural do 1.1.
-
-### 1.3 `crux-analyzer coverage`
-
-O trabalho de documentação de estados tornou isso mensurável pela primeira vez:
-`doc` está no modelo, então o modelo pode ser perguntado *quanto dele está
-documentado*.
-
-Um subcomando `coverage` que reporta, por core e por máquina, a fração de estados
-que carregam descrição — e falha abaixo de um limite `--min`. É isso que
-transforma a ferramenta de visualizador em catraca: um time adota, o número sobe,
-e o CI impede que desça.
-
-É também a contraparte honesta da feature que acabou de sair. Documentação que se
-pode adicionar é boa; documentação que se pode *medir* é a que de fato é escrita.
+**O que sobrou aqui:** colocar um `--min` sobre o corpus no pipeline que analisa
+uma aplicação real. O `RecordingState` está em 13% e sem descrição no próprio
+enum, que é exatamente o tipo de número para o qual uma catraca serve.
 
 ---
 

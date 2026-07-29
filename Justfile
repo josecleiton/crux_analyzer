@@ -38,24 +38,45 @@ clippy:
 
 # --- Everything ------------------------------------------------------------
 
-# Full validation: Rust + corpus + clippy + web tests + web build
-check: corpus clippy web-test web-build
+# Full validation: Rust + corpus + clippy + web tests + web build + fixture
+check: corpus clippy web-test web-build fixture-guard
+
+# The fixture is the public corpus: it must extract with zero warnings, and the
+# documentation it declares must not regress. The floor sits below today's 67%
+# on purpose — `UploadState`'s variants are deliberately bare, so the point is
+# to catch a drop, not to chase 100%.
+fixture-guard:
+    cargo run -q -p crux-analyzer-cli -- generate \
+      --src crates/parser/fixtures/mini_recorder --name "Mini Recorder" \
+      --out /dev/null --deny-warnings
+    cargo run -q -p crux-analyzer-cli -- coverage \
+      --src crates/parser/fixtures/mini_recorder --name "Mini Recorder" --min 60
+
+# The committed example docs must be what the generator produces right now.
+docs-current: example-docs
+    @git diff --exit-code -- docs/examples docs/pt-BR/examples \
+      || { echo "docs/examples is stale — commit the regenerated files"; exit 1; }
 
 # --- Analyzer --------------------------------------------------------------
 
 # Emit the model JSON for a crate: just generate path/to/app/src MyApp
 generate src name out="/dev/stdout":
-    cargo run -q -p crux-analyzer-cli -- generate --src {{src}} --name {{name}} --out {{out}}
+    cargo run -q -p crux-analyzer-cli -- generate --src {{src}} --name "{{name}}" --out {{out}}
 
 # Feed the web UI with a real model: just model path/to/app/src MyApp
 model src name:
-    cargo run -q -p crux-analyzer-cli -- generate --src {{src}} --name {{name}} \
+    cargo run -q -p crux-analyzer-cli -- generate --src {{src}} --name "{{name}}" \
       --out apps/web/public/model.json
 
 # Same as `model`, but regenerating on every save (living documentation)
 model-watch src name:
-    cargo run -q -p crux-analyzer-cli -- generate --src {{src}} --name {{name}} \
+    cargo run -q -p crux-analyzer-cli -- generate --src {{src}} --name "{{name}}" \
       --out apps/web/public/model.json --watch
+
+# Documentation coverage of a crate: just coverage path/to/app/src MyApp [min]
+coverage src name min="0":
+    cargo run -q -p crux-analyzer-cli -- coverage --src {{src}} --name "{{name}}" \
+      --min {{min}} --list
 
 # Static documentation site in apps/web/dist: analyze, then build the UI with
 # the model baked in. `base` is the path the site will be served from —
@@ -67,7 +88,7 @@ site src name base="/":
 
 # Generate docs: just docs path/to/app/src MyApp [markdown|mermaid] [en|pt-BR]
 docs src name format="markdown" locale="en":
-    cargo run -q -p crux-analyzer-cli -- docs --src {{src}} --name {{name}} \
+    cargo run -q -p crux-analyzer-cli -- docs --src {{src}} --name "{{name}}" \
       --format {{format}} --locale {{locale}}
 
 # Analyze the private corpus into the web UI (CORPUS_SRC to override the path)
