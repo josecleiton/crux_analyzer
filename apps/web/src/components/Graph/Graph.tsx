@@ -1,14 +1,19 @@
 /**
- * Pure graph renderer: receives already-positioned nodes/edges and the
- * selection via props, and only emits selection events. It knows nothing
- * about domain, layout or data source — the future Simulation Engine will
- * drive highlights through props.
+ * Pure graph renderer: receives nodes and edges with geometry already
+ * computed by the LayoutEngine, plus the selection, and only emits selection
+ * events. It knows nothing about domain, layout or data source — the future
+ * Simulation Engine drives highlights through props.
  */
 
 import { ReactFlow, Background, Controls } from '@xyflow/react';
 import type { Edge, Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { Selection } from '../../state/selection';
+import { StateNode } from './StateNode';
+import { RoutedEdge } from './RoutedEdge';
+
+const nodeTypes = { state: StateNode };
+const edgeTypes = { routed: RoutedEdge };
 
 interface GraphProps {
   nodes: Node[];
@@ -22,28 +27,36 @@ export function Graph({ nodes, edges, selection, onSelect }: GraphProps) {
     ...node,
     selected: selection?.kind === 'state' && selection.id === node.id,
   }));
-  const styledEdges = edges.map((edge) => ({
-    ...edge,
-    selected: selection?.kind === 'transition' && selection.id === edge.id,
-  }));
+  const styledEdges = edges.map((edge) => {
+    const selected = selection?.kind === 'transition' && selection.id === edge.id;
+    return {
+      ...edge,
+      selected,
+      // keep the arrowhead in sync with the selected stroke color
+      markerEnd:
+        selected && typeof edge.markerEnd === 'object'
+          ? { ...edge.markerEnd, color: '#6366f1' }
+          : edge.markerEnd,
+    };
+  });
 
   return (
     <ReactFlow
       nodes={styledNodes}
       edges={styledEdges}
+      nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       onNodeClick={(_, node) => onSelect({ kind: 'state', id: node.id })}
       onEdgeClick={(_, edge) => onSelect({ kind: 'transition', id: edge.id })}
       onPaneClick={() => onSelect(null)}
-      nodesDraggable
+      nodesDraggable={false}
       nodesConnectable={false}
       fitView
-      // extra padding keeps back-edge routes (which run around the
-      // outermost nodes) inside the initial viewport
-      fitViewOptions={{ padding: 0.25 }}
+      fitViewOptions={{ padding: 0.15 }}
       proOptions={{ hideAttribution: true }}
     >
-      <Background />
-      <Controls />
+      <Background gap={20} />
+      <Controls showInteractive={false} />
     </ReactFlow>
   );
 }

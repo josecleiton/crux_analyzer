@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Node } from '@xyflow/react';
 import { loadProject } from './data/loadProject';
 import type { DomainProject } from './domain/types';
 import { toFlowModel } from './flow/toFlowModel';
-import type { LayoutEngine } from './layout/LayoutEngine';
+import type { LayoutEngine, LayoutResult } from './layout/LayoutEngine';
 import { ElkLayoutEngine } from './layout/ElkLayoutEngine';
 import type { Selection } from './state/selection';
 import { Graph } from './components/Graph/Graph';
@@ -18,7 +17,7 @@ export default function App() {
   const [activeCoreId, setActiveCoreId] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const [layoutVersion, setLayoutVersion] = useState(0);
-  const [positionedNodes, setPositionedNodes] = useState<Node[]>([]);
+  const [layouted, setLayouted] = useState<LayoutResult>({ nodes: [], edges: [] });
 
   useEffect(() => {
     let cancelled = false;
@@ -44,8 +43,8 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    layoutEngine.layout(flowModel.nodes, flowModel.edges).then((nodes) => {
-      if (!cancelled) setPositionedNodes(nodes);
+    layoutEngine.layout(flowModel.nodes, flowModel.edges).then((result) => {
+      if (!cancelled) setLayouted(result);
     });
     return () => {
       cancelled = true;
@@ -76,8 +75,8 @@ export default function App() {
         />
         <main className="graph-area">
           <Graph
-            nodes={positionedNodes}
-            edges={flowModel.edges}
+            nodes={layouted.nodes}
+            edges={layouted.edges}
             selection={selection}
             onSelect={setSelection}
           />
