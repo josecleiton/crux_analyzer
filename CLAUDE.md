@@ -4,28 +4,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-Working end-to-end: the real parser (`crates/parser`, syn-based) extracts states/transitions from Crux apps, the CLI (`crates/cli`, binary `crux-analyzer`) emits the model JSON, and the web UI renders it (falling back to the bundled fake example when no `apps/web/public/model.json` exists). Corpus test against a real app is gated on `CORPUS_SRC`. `init.md` is the original project spec (in Portuguese).
+The original roadmap is fully implemented: syn-based parser (predicate guards, `==`/closure guards, `Default` resets, wildcard sources, per-transition effects, multiple state machines per core), CLI (`crux-analyzer generate | docs`, both with `--watch`), doc generators (Mermaid, Markdown), and the web UI (machine sections, inspector with effects, Simulation Engine). The corpus test against a real app is gated on `CORPUS_SRC`. `init.md` is the original project spec (in Portuguese).
 
 ## Conventions
 
 - **English everywhere**: all git commit messages and all code — identifiers, comments, doc comments, error messages, UI strings, schema descriptions — must be written in English.
+- **Parser honesty rule**: what cannot be inferred statically is surfaced as a `Warning` (never silently dropped, never guessed). An assignment with *no* state evidence legitimately fires from any state (`"*"`).
 
 ## Commands
 
 ```sh
 pnpm install && pnpm dev   # web UI (Vite, apps/web)
-pnpm test                  # vitest on the mapping layers
-cargo check && cargo test  # Rust crates (parser unit + fixture tests)
+pnpm test                  # vitest: mapping layers + simulation engine
+cargo check && cargo test  # Rust crates (parser unit + fixture + docgen tests)
 CORPUS_SRC=<corpus>/shared/src cargo test          # + real-app corpus test
 cargo run -p crux-analyzer-cli -- generate \
-  --src <app>/src --out apps/web/public/model.json  # feed the UI a real model
+  --src <app>/src --out apps/web/public/model.json   # feed the UI a real model
+cargo run -p crux-analyzer-cli -- docs --src <app>/src --format mermaid
 ```
 
 ## What Crux Analyzer Is
 
 The project is named **crux_analyzer** (the spec in `init.md` uses the older working name "Crux Studio").
 
-A **semantic analyzer** (not a diagram generator) that turns Rust + Crux applications into living documentation. It parses Rust source via the `syn` AST and builds an intermediate semantic model. The React web app is just one client of that model — a CLI, VS Code extension, and doc generators (Markdown, Mermaid, PlantUML, HTML) are planned future clients.
+A **semantic analyzer** (not a diagram generator) that turns Rust + Crux applications into living documentation. It parses Rust source via the `syn` AST and builds an intermediate semantic model. The React web app is just one client of that model — the CLI doc generators are another; a VS Code extension and more formats (PlantUML, HTML) are planned future clients.
 
 The project must **not** depend on Crux itself — it only analyzes Rust code statically.
 
@@ -36,26 +38,23 @@ Monorepo layout:
 ```
 crux_analyzer/
   apps/
-    web/          # React + TypeScript + React Flow + ELKJS — visualization only
+    web/          # React + TypeScript + React Flow + ELKJS — visualization + simulation
   crates/
-    parser/       # Rust lib: reads files, walks syn AST, identifies Core/State/Event/Effect/transitions, emits the model. Never knows about React.
-    model/        # Rust lib: semantic structs only (Project, Core, State, Event, Effect, Transition, Capability). No parsing logic, no UI logic.
+    parser/       # Rust lib: walks syn AST, identifies Core/State/Event/Effect/transitions, emits the model. Never knows about React.
+    docgen/       # Rust lib: Mermaid/Markdown generators. Consume only the model.
+    cli/          # `crux-analyzer` binary: generate | docs, --watch. Reuses parser + model + docgen.
+    model/        # Rust lib: semantic structs only (Project, Core, Machine, State, Event, Effect, Transition). No parsing logic, no UI logic.
   shared/
-    schema/       # Serialized contract (preferably JSON Schema). The UI depends ONLY on this.
+    schema/       # JSON Schema contract. Every client depends ONLY on this.
 ```
 
 Hard rules:
-- The UI never accesses the AST or the parser's original format. It consumes only the intermediate model via the schema contract.
+- The UI never accesses the AST or the parser's original format. It consumes only the intermediate model via the schema contract (`apps/web/src/schema/` is the only layer that knows the raw format).
 - Layered UI data flow: `Parser JSON → Domain Model → React Flow Model → Components`. Swapping the parser must never require UI changes.
-- UI components are independent: `Graph`, `Sidebar`, `Inspector`, `Toolbar`, `LayoutEngine`. Swapping ELK for another layout algorithm must only touch `LayoutEngine`.
-- The architecture must accommodate a future "Simulation Engine" (replaying events through states) without modifying the graph component.
+- Graph geometry (node positions AND edge routes/labels) is owned by the `LayoutEngine`; swapping ELK only touches `apps/web/src/layout/`. The `Graph` component is a pure renderer driven by props — the Simulation Engine highlights through props, never by modifying the graph.
+- Cores contain `machines[]` (statechart-style orthogonal regions); each machine is one state enum detected by assignment analysis, no naming convention required.
 
-## MVP Scope
+## Known future work
 
-- Do **not** parse Rust code yet — the UI reads a fake JSON model (see the example in `init.md` with the "Audio Recorder" project: cores, states, transitions with `from`/`event`/`to`).
-- Web UI only, three areas:
-  - **Sidebar**: list of Cores
-  - **Main area**: React Flow diagram with automatic ELK layout — each state is a node, each transition an edge labeled with its event
-  - **Right panel (Inspector)**: selecting a state shows incoming/outgoing events; selecting a transition shows `event: from → to`
-- Layout inspired by LangGraph Studio / Trigger.dev.
-- Priorities: clean architecture, parser/visualization separation, low coupling, small components, evolvable code. Do not spend time on visual identity — the MVP validates architecture and navigation, not a final visual tool.
+- Value-flow analysis for dynamic transition targets (`draft.status = event_payload`) — currently a warning.
+- Hierarchical (composite) states; PlantUML/HTML generators; VS Code extension.
