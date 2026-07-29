@@ -91,6 +91,16 @@ describe('fromParserJson', () => {
     expect(project.cores[0].machines[0].doc).toBeUndefined();
   });
 
+  it('carries documented events and effects as per-core lookup maps', () => {
+    const recorder = project.cores[0];
+    expect(recorder.eventDocs).toEqual({
+      RecordPressed: 'The user hit the record button on the main screen.',
+    });
+    expect(recorder.effectDocs['AudioOperation::Start']).toMatch(/Begins capturing/);
+    // cores that document nothing get empty maps, not absent ones
+    expect(project.cores[1].eventDocs).toEqual({});
+  });
+
   it('generates the same id and graph for a state however it was authored', () => {
     // `Failed` is written as an object and `Authenticating` as a bare string in
     // the same machine: the authored form must not leak into ids or wiring.

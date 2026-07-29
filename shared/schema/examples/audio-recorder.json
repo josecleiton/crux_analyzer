@@ -24,6 +24,12 @@
             { "from": "*", "event": "InputsInvalidated", "to": "Ready" }
           ]
         }
+      ],
+      "events": [
+        { "name": "RecordPressed", "doc": "The user hit the record button on the main screen." }
+      ],
+      "effects": [
+        { "name": "AudioOperation::Start", "doc": "Begins capturing from the selected input device." }
       ]
     },
     {

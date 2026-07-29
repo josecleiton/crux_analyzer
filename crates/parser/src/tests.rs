@@ -783,6 +783,58 @@ fn effects_attach_to_their_event_arm() {
 }
 
 #[test]
+fn documented_events_and_effects_reach_the_core_catalogs() {
+    let code = format!(
+        r#"{PREAMBLE}
+        pub enum Operation {{
+            /// Starts the capture pipeline.
+            Start,
+            Stop,
+        }}
+        pub enum Effect {{ Render(RenderOperation), Op(Operation) }}
+        pub enum Event {{
+            /// The user pressed the record button.
+            Go,
+            /// Never fires a transition, so it must stay out of the catalog.
+            Unused,
+            Halt,
+        }}
+        impl App for App1 {{
+            type Event = Event;
+            type Effect = Effect;
+            fn update(&self, event: Event, model: &mut Model) {{
+                match event {{
+                    Event::Go if matches!(model.state, State::Idle) => {{
+                        model.state = State::Running;
+                        Self::op(Operation::Start)
+                    }}
+                    Event::Halt if matches!(model.state, State::Running) => {{
+                        model.state = State::Done;
+                        Self::op(Operation::Stop)
+                    }}
+                    _ => {{}}
+                }}
+            }}
+        }}
+    "#
+    );
+    let sources = sources_from_str(&[("lib.rs", &code)]);
+    let outcome = parse_sources(&sources, "test").unwrap();
+    let core = &outcome.project.cores[0];
+
+    // Only documented AND used names enter the catalogs: `Unused` is
+    // documented but fires nothing, `Halt` fires but says nothing.
+    let events: Vec<(&str, &str)> =
+        core.events.iter().map(|e| (e.name.as_str(), e.doc.as_str())).collect();
+    assert_eq!(events, [("Go", "The user pressed the record button.")]);
+
+    let effects: Vec<(&str, &str)> =
+        core.effects.iter().map(|e| (e.name.as_str(), e.doc.as_str())).collect();
+    assert_eq!(effects, [("Operation::Start", "Starts the capture pipeline.")]);
+    assert!(outcome.warnings.is_empty(), "{:?}", outcome.warnings);
+}
+
+#[test]
 fn same_enum_in_two_fields_is_two_machines() {
     let code = r#"
         pub enum State { Idle, Running }

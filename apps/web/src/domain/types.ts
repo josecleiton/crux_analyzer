@@ -14,6 +14,14 @@ export interface DomainCore {
   name: string;
   /** State machines (orthogonal regions / "modules") of this core. */
   machines: DomainMachine[];
+  /**
+   * Documentation authored on event enum variants, by the event name
+   * transitions carry. Only documented events appear. Author prose — never
+   * translated.
+   */
+  eventDocs: Record<string, string>;
+  /** Same for effects, by the label transitions carry (`Enum::Variant`). */
+  effectDocs: Record<string, string>;
 }
 
 export interface DomainMachine {

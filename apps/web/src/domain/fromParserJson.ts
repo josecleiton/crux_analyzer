@@ -15,6 +15,8 @@ export function fromParserJson(json: ParserProjectJson): DomainProject {
       id: core.name,
       name: core.name,
       machines: core.machines.map((machine) => mapMachine(core.name, machine)),
+      eventDocs: Object.fromEntries(core.events.map((entry) => [entry.name, entry.doc])),
+      effectDocs: Object.fromEntries(core.effects.map((entry) => [entry.name, entry.doc])),
     })),
   };
 }

@@ -30,6 +30,31 @@
           "type": "array",
           "description": "State machines (orthogonal regions) of this Core — one per state enum, statechart style.",
           "items": { "$ref": "#/$defs/machine" }
+        },
+        "events": {
+          "type": "array",
+          "description": "Documentation authored on the Core's event enum variants, for events that appear in this Core's transitions. Only documented events are listed (the transition tables already enumerate the vocabulary), so an undocumented app emits exactly the JSON it emitted before this field existed.",
+          "items": { "$ref": "#/$defs/documentedName" }
+        },
+        "effects": {
+          "type": "array",
+          "description": "Same as `events`, for effects — keyed by the label transitions use (`AudioOperation::Start`, `Render`).",
+          "items": { "$ref": "#/$defs/documentedName" }
+        }
+      }
+    },
+    "documentedName": {
+      "type": "object",
+      "required": ["name", "doc"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The identifier as transitions reference it. Data from the analyzed application — never translated."
+        },
+        "doc": {
+          "type": "string",
+          "description": "Documentation authored on it in the analyzed source (`///`, annotation lines removed). Author prose — never translated."
         }
       }
     },

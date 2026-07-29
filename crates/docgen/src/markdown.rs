@@ -2,7 +2,7 @@
 //! and a transition table per machine.
 
 use crux_analyzer_i18n::Locale;
-use crux_analyzer_model::{Machine, Project, State, StateDecl};
+use crux_analyzer_model::{DocumentedName, Machine, Project, State, StateDecl};
 
 use crate::{effects_cell, has_documented_states, machine_diagram, marker_label, Labels};
 
@@ -64,9 +64,41 @@ pub fn markdown(project: &Project, locale: Locale) -> String {
                 );
             }
         }
+
+        // The core's documented events and effects close its section: the
+        // vocabulary already appears in the transition tables above, so these
+        // catalogs only exist where an author explained something.
+        push_catalog(&mut out, labels.events, labels.event, &core.events, &labels);
+        push_catalog(&mut out, labels.effects, labels.effect, &core.effects, &labels);
     }
 
     out
+}
+
+/// A name/description table for documented events or effects. Names are
+/// monospace — identifiers from the analyzed app — and the whole description
+/// is flattened into the cell (nothing dropped, just unwrapped).
+fn push_catalog(
+    out: &mut String,
+    heading: &str,
+    name_column: &str,
+    entries: &[DocumentedName],
+    labels: &Labels,
+) {
+    if entries.is_empty() {
+        return;
+    }
+    push_line(out, "");
+    push_line(out, &format!("### {heading}"));
+    push_line(out, "");
+    push_line(out, &format!("| {} | {} |", name_column, labels.description));
+    push_line(out, "| --- | --- |");
+    for entry in entries {
+        push_line(
+            out,
+            &format!("| `{}` | {} |", entry.name, table_cell(&entry.doc)),
+        );
+    }
 }
 
 /// Markers and tags declared on the state enum itself. They describe the whole

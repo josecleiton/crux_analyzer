@@ -43,9 +43,9 @@ function InspectorBody({ core, selection }: InspectorProps) {
         {state.doc ? <DocText doc={state.doc} /> : null}
         <StateTags tags={state.tags} />
         <h4>{t('inspector.incoming')}</h4>
-        <EventList events={state.incoming.map((transition) => transition.event)} />
+        <EventList events={state.incoming.map((transition) => transition.event)} docs={core.eventDocs} />
         <h4>{t('inspector.outgoing')}</h4>
-        <EventList events={state.outgoing.map((transition) => transition.event)} />
+        <EventList events={state.outgoing.map((transition) => transition.event)} docs={core.eventDocs} />
         {/* Context rather than the selection, so it comes last. */}
         <MachineDoc machine={machine} />
       </div>
@@ -54,10 +54,13 @@ function InspectorBody({ core, selection }: InspectorProps) {
 
   const transition = machine.transitions.find((candidate) => candidate.id === selection.id);
   if (!transition) return null;
+  const eventDoc = core.eventDocs[transition.event];
   return (
     <div>
       <h3 className="inspector-name">{transition.event}</h3>
       <MachineTag machine={machine} core={core} />
+      {/* What the author wrote on the event variant — when it fires. */}
+      {eventDoc ? <DocText doc={eventDoc} /> : null}
       <div className="transition-flow">
         <span>
           {transition.fromName === ANY_STATE_NAME
@@ -74,7 +77,7 @@ function InspectorBody({ core, selection }: InspectorProps) {
       {transition.effects.length > 0 ? (
         <>
           <h4>{t('inspector.effects')}</h4>
-          <EventList events={transition.effects} />
+          <EventList events={transition.effects} docs={core.effectDocs} />
         </>
       ) : null}
       <MachineDoc machine={machine} />
@@ -87,13 +90,20 @@ function MachineTag({ machine, core }: { machine: DomainMachine; core: DomainCor
   return <p className="inspector-machine">{machine.name}</p>;
 }
 
-function EventList({ events }: { events: string[] }) {
+/**
+ * Names with optional authored documentation as a native tooltip — the same
+ * quiet affordance the canvas gives documented states.
+ */
+function EventList({ events, docs }: { events: string[]; docs?: Record<string, string> }) {
   const t = useTranslate();
   if (events.length === 0) return <p className="inspector-empty">{t('inspector.none')}</p>;
   return (
     <ul className="event-list">
       {events.map((event, i) => (
-        <li key={`${event}-${i}`}>{event}</li>
+        <li key={`${event}-${i}`} title={docs?.[event]}>
+          {event}
+          {docs?.[event] ? <span className="state-doc-mark" aria-hidden="true" /> : null}
+        </li>
       ))}
     </ul>
   );

@@ -24,12 +24,31 @@ pub struct Project {
 }
 
 /// A Core (Crux app) identified in the source code.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Core {
     pub name: String,
     /// State machines (orthogonal regions) of this Core, statechart style —
     /// one per state enum found in the Core's model.
     pub machines: Vec<Machine>,
+    /// Documentation authored on the Core's event enum variants, for the
+    /// events that appear in this Core's transitions. Only documented events
+    /// are listed — the transition tables already enumerate the vocabulary —
+    /// so an undocumented app emits exactly the JSON it emitted before.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<DocumentedName>,
+    /// Same for effects, keyed by the label transitions use
+    /// (`AudioOperation::Start`, `Render`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub effects: Vec<DocumentedName>,
+}
+
+/// A name from the analyzed source paired with the documentation its author
+/// wrote on it (`///` with annotation lines removed). Both halves are data
+/// from the analyzed application — never translated.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DocumentedName {
+    pub name: String,
+    pub doc: String,
 }
 
 /// One state machine of a Core.
@@ -295,6 +314,19 @@ mod tests {
         assert_eq!(inputs.transitions[2].from.0, State::ANY);
         // Absent `effects` deserializes as empty and is skipped when empty.
         assert!(inputs.transitions[2].effects.is_empty());
+
+        // The documented-events/effects catalogs round-trip; cores without
+        // them (Authentication, Sync) deserialize as empty and stay skipped.
+        assert_eq!(
+            recorder.events,
+            [DocumentedName {
+                name: "RecordPressed".into(),
+                doc: "The user hit the record button on the main screen.".into(),
+            }]
+        );
+        assert_eq!(recorder.effects.len(), 1);
+        assert_eq!(recorder.effects[0].name, "AudioOperation::Start");
+        assert!(project.cores[1].events.is_empty());
 
         let reserialized = serde_json::to_string(&project).expect("must serialize");
         assert!(!reserialized.contains("\"effects\":[]"));

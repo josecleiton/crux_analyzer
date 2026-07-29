@@ -41,6 +41,12 @@ and a round-trip test in `crates/model` keeps the Rust structs aligned with it.
             }
           ]
         }
+      ],
+      "events": [
+        { "name": "RecordPressed", "doc": "The user hit the record button." }
+      ],
+      "effects": [
+        { "name": "AudioOperation::Start", "doc": "Begins capturing audio." }
       ]
     }
   ]
@@ -66,6 +72,8 @@ and a round-trip test in `crates/model` keeps the Rust structs aligned with it.
 | `transitions[].event` | Leaf event variant name that triggers the transition. |
 | `transitions[].to` | Target state, or `"*"` — the target is decided at **runtime** (e.g. carried by the event payload). |
 | `transitions[].effects[]` | Optional. Effects requested when the transition fires: `"Render"`, `"AudioOperation::Start"`, ... Omitted when empty. |
+| `cores[].events[]` | Optional. `{ name, doc }` pairs: documentation authored on event enum variants, **only** for events that appear in this core's transitions and **only** when documented — the transition tables already enumerate the vocabulary. Omitted when empty, so an undocumented app emits exactly the JSON it emitted before this field existed. |
+| `cores[].effects[]` | Optional. Same for effects, keyed by the label transitions carry (`AudioOperation::Start`, `Render`). |
 
 ## Documented states
 

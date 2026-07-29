@@ -116,8 +116,16 @@ An arm that produces several transitions shares its effect set among them
 ## Documentation and annotations
 
 Doc comments on a state enum reach the model: the enum's own `///` becomes the
-machine's description, and each variant's becomes its state's. Events and
-effects are not covered yet.
+machine's description, and each variant's becomes its state's.
+
+Doc comments on **event and effect enum variants** reach the model too, as
+per-core `events` / `effects` catalogs (`{ name, doc }`). Two restrictions
+keep the catalogs honest: only names that appear in the core's transitions
+enter (a documented delegating wrapper like `Event::Recorder(RecorderEvent)`
+is not an event a transition can carry), and only documented names enter —
+the transition tables already enumerate the vocabulary. Annotations (`@…`
+lines) are not read on events or effects; there is nothing for a marker to
+mean there yet.
 
 ```rust
 /// Where a recording session lives.
