@@ -79,8 +79,12 @@ Hard rules:
 deliberately *not* being done and why. Keep it updated instead of starting a
 list here; the pt-BR twin is `docs/pt-BR/roadmap.md`.
 
-The short version: everything planned is done — the parser against `init.md`,
-the adoption fronts (ratchet, tag filtering, VS Code extension), and the §4
-smaller gaps (composite nesting, URL selection, event/effect docs, per-state
-effects, wildcard-target notes, Markdown rendering). What remains is the
-deliberate "not yet" list (§5) and whatever adoption teaches next.
+The short version: everything *built* is done — the parser against `init.md`, the
+adoption fronts (ratchet, tag filtering, VS Code extension), and the §4 smaller
+gaps (composite nesting, URL selection, event/effect docs, per-state effects,
+wildcard-target notes, Markdown rendering). The open front is **§5
+distribution**: nothing outside this checkout can install the tool, so the plan
+there covers crates.io, prebuilt binaries and the Marketplace, in that order —
+plus two license obligations (§5.5) that are already overdue rather than
+planned. After that, the deliberate "not yet" list (§6) and whatever adoption
+teaches next.
