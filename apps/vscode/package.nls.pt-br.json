@@ -1,0 +1,8 @@
+{
+  "extension.description": "Documentação viva de máquinas de estado para aplicações Rust + Crux, ao lado do código.",
+  "command.show.title": "Mostrar máquinas de estado",
+  "config.binary": "Caminho do binário crux-analyzer (padrão: resolvido no PATH).",
+  "config.src": "Diretório com os fontes Rust a analisar, relativo à raiz do workspace. Vazio tenta shared/src, depois src.",
+  "config.projectName": "Nome do projeto mostrado no painel. Vazio usa o nome da pasta do workspace.",
+  "config.watch": "Regenera o modelo sempre que um arquivo .rs sob o diretório analisado é salvo."
+}

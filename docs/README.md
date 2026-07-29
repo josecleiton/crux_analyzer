@@ -14,7 +14,8 @@ Mermaid/Markdown docs).
 | [Parser](parser.md) | How extraction works: detection, guards, value-flow, composites, warnings |
 | [Schema](schema.md) | The JSON contract every client consumes |
 | [CLI](cli.md) | `crux-analyzer generate | docs`, `--watch`, formats |
-| [Web UI](web-ui.md) | Sections, inspector, simulation, layout engine |
+| [Web UI](web-ui.md) | Sections, inspector, filtering, simulation, layout engine |
+| [VS Code extension](vscode.md) | The state machines beside the code, regenerating on save |
 | [Internationalization](i18n.md) | Locales, catalogs, what must never be translated |
 | [Development](development.md) | Setup, tests, corpus, conventions, validation pipeline |
 | [Roadmap](roadmap.md) | Planned work, in order, and what is deliberately not being done |
@@ -33,6 +34,6 @@ looking.
 
 crux_analyzer reads the source (via the `syn` AST — it never depends on Crux
 itself), reconstructs the machines, and emits a small JSON model. Everything
-else — the web UI, the doc generators, future clients (VS Code extension,
-PlantUML/HTML) — consumes only that model. Run it with `--watch` and the
+else — the web UI, the doc generators, the VS Code extension, future clients
+(PlantUML/HTML) — consumes only that model. Run it with `--watch` and the
 documentation stays alive as the code changes.

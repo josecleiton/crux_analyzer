@@ -19,7 +19,26 @@ import type { DomainProject } from '../domain/types';
 // domain root's. `/` in dev and in a default build.
 const GENERATED_MODEL_URL = `${import.meta.env.BASE_URL}model.json`;
 
+// A host embedding the built bundle — the VS Code extension's webview — has
+// no HTTP origin to serve model.json from, so it injects the model as a
+// global before the bundle boots. This is the embedding contract: injection
+// outranks fetching, and an invalid injection falls through the same ladder
+// as a stale artifact.
+declare global {
+  interface Window {
+    __CRUX_MODEL__?: unknown;
+  }
+}
+
 export async function loadProject(): Promise<DomainProject> {
+  const injected = typeof window !== 'undefined' ? window.__CRUX_MODEL__ : undefined;
+  if (injected !== undefined) {
+    try {
+      return fromParserJson(parseProjectJson(injected));
+    } catch (error) {
+      console.warn('Ignoring invalid injected model:', error);
+    }
+  }
   const raw = await fetchGeneratedModel();
   if (raw !== null) {
     try {

@@ -22,6 +22,27 @@ web-test:
 web-build:
     pnpm --filter web build
 
+# --- VS Code extension -------------------------------------------------------
+
+# Unit tests of the extension's pure modules (webview HTML, source resolution)
+ext-test:
+    pnpm --filter crux-analyzer-vscode test
+
+# Compile the extension and embed the built web bundle as its webview UI.
+# The copied dist must not carry a baked model.json: the webview injects the
+# freshly analyzed model instead, and a stale artifact would shadow nothing
+# but confuse a reader of the package.
+ext-build: web-build
+    pnpm --filter crux-analyzer-vscode build
+    rm -rf apps/vscode/media/web
+    mkdir -p apps/vscode/media
+    cp -R apps/web/dist apps/vscode/media/web
+    rm -f apps/vscode/media/web/model.json
+
+# Package the extension into a .vsix (installable via code --install-extension)
+ext-package: ext-build
+    cd apps/vscode && pnpm dlx @vscode/vsce package --no-dependencies
+
 # --- Rust ------------------------------------------------------------------
 
 # All Rust tests (parser unit + fixtures + docgen)
@@ -50,8 +71,8 @@ clippy:
 # --- Everything ------------------------------------------------------------
 
 # Full validation: Rust + corpus (tests + coverage ratchet) + clippy + web
-# tests + web build + fixture
-check: corpus quipu-coverage clippy web-test web-build fixture-guard
+# tests + extension tests + builds (ext-build includes web-build) + fixture
+check: corpus quipu-coverage clippy web-test ext-test ext-build fixture-guard
 
 # The fixture is the public corpus: it must extract with zero warnings, and the
 # documentation it declares must not regress. The floor sits below today's 67%

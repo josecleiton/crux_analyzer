@@ -14,7 +14,8 @@ documentação viva (UI web interativa, documentos Mermaid/Markdown).
 | [Parser](parser.md) | Como a extração funciona: detecção, guardas, fluxo de valores, compostos, avisos |
 | [Schema](schema.md) | O contrato JSON que todo cliente consome |
 | [CLI](cli.md) | `crux-analyzer generate` / `docs`, `--watch`, formatos |
-| [UI Web](web-ui.md) | Seções, inspetor, simulação, motor de layout |
+| [UI Web](web-ui.md) | Seções, inspetor, filtros, simulação, motor de layout |
+| [Extensão do VS Code](vscode.md) | As máquinas de estado ao lado do código, regenerando ao salvar |
 | [Internacionalização](i18n.md) | Locales, catálogos, o que nunca deve ser traduzido |
 | [Desenvolvimento](development.md) | Setup, testes, corpus, convenções, pipeline de validação |
 | [Roadmap](roadmap.md) | Trabalho planejado, em ordem, e o que deliberadamente não será feito |
@@ -33,6 +34,6 @@ está olhando.
 
 O crux_analyzer lê o código-fonte (via a AST do `syn` — ele nunca depende do
 Crux em si), reconstrói as máquinas e emite um pequeno modelo JSON. Todo o
-resto — a UI web, os geradores de documentação, clientes futuros (extensão do
-VS Code, PlantUML/HTML) — consome apenas esse modelo. Rode com `--watch` e a
+resto — a UI web, os geradores de documentação, a extensão do VS Code,
+clientes futuros (PlantUML/HTML) — consome apenas esse modelo. Rode com `--watch` e a
 documentação se mantém viva conforme o código muda.

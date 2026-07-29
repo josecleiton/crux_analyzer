@@ -20,6 +20,9 @@ just            # lista todas as receitas
 | Servidor de dev web | `just dev` | `pnpm --filter web dev` |
 | Testes web | `just web-test` | `pnpm --filter web test` |
 | Build web (tsc + vite) | `just web-build` | `pnpm --filter web build` |
+| Testes da extensão | `just ext-test` | `pnpm --filter crux-analyzer-vscode test` |
+| Build da extensão (embute o dist web) | `just ext-build` | — |
+| Pacote `.vsix` da extensão | `just ext-package` | — |
 | Site estático de docs | `just site <src> <nome> [base]` | `CRUX_BASE=<base> pnpm --filter web build` |
 | Testes Rust | `just rust-test` | `cargo test --workspace` |
 | Testes de corpus | `just corpus` | `QUIPU_SRC=<caminho> cargo test --workspace` |
@@ -55,6 +58,10 @@ just            # lista todas as receitas
    entrada vazia ou não traduzida). Componentes de UI deliberadamente não têm
    testes unitários; as camadas ao redor deles têm. A paridade dos catálogos
    também é garantida pelo `tsc`, então `just web-build` faz parte dessa garantia.
+6. **Testes da extensão** (vitest, `apps/vscode`) — os módulos puros: a
+   transformação do HTML do webview e a resolução do diretório de fontes. As
+   partes do host de extensão são encanamento fino em volta deles e são
+   exercitadas manualmente (veja [vscode.md](vscode.md)).
 
 ## Pipeline de validação de um incremento
 

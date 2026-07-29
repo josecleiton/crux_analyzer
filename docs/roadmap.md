@@ -78,17 +78,20 @@ halves shipped as one increment; see
 
 ---
 
-## 3. Reach — the VS Code extension
+## 3. Reach — the VS Code extension ✅ **done**
 
-The largest audience and the largest build: the state machine beside the code,
-without leaving the editor. Every layer it needs already exists — it is another
-client of the same JSON contract, which is exactly what the architecture was
-shaped for.
+The largest audience: the state machine beside the code, without leaving the
+editor. It landed exactly as the architecture predicted — another client of
+the same JSON contract, and a small one, because every layer it needed already
+existed. See [vscode.md](vscode.md).
 
-`just site` already covers the "share it with the team" path (a static build
-with the model baked in), so the extension is about the *authoring* loop rather
-than the reading one. That is why it sits after the ratchet: it widens reach, it
-does not protect quality.
+`apps/vscode` embeds the built web bundle in a webview and spawns the CLI; the
+model is injected as `window.__CRUX_MODEL__` (the embedding contract
+`loadProject` honors), a watcher regenerates on every `.rs` save — the
+*authoring* loop, complementing the `just site` reading one — and parser
+warnings land in an output channel instead of being dropped. The webview
+adaptation (asset re-rooting, nonce CSP, model injection) is one pure,
+unit-tested module; the extension host part is thin plumbing.
 
 ---
 

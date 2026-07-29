@@ -20,6 +20,9 @@ just            # lists every recipe
 | Web dev server | `just dev` | `pnpm --filter web dev` |
 | Web tests | `just web-test` | `pnpm --filter web test` |
 | Web build (tsc + vite) | `just web-build` | `pnpm --filter web build` |
+| Extension tests | `just ext-test` | `pnpm --filter crux-analyzer-vscode test` |
+| Extension build (embeds web dist) | `just ext-build` | — |
+| Extension `.vsix` package | `just ext-package` | — |
 | Static doc site | `just site <src> <name> [base]` | `CRUX_BASE=<base> pnpm --filter web build` |
 | Rust tests | `just rust-test` | `cargo test --workspace` |
 | Corpus tests | `just corpus` | `QUIPU_SRC=<path> cargo test --workspace` |
@@ -54,6 +57,10 @@ just            # lists every recipe
    untranslated entries). UI components are deliberately not unit-tested; the
    layers around them are. Catalog parity is also enforced by `tsc`, so
    `just web-build` is part of that guarantee.
+6. **Extension tests** (vitest, `apps/vscode`) — the pure modules: the
+   webview HTML transformation and source-directory resolution. The extension
+   host pieces are thin plumbing around them and are exercised manually
+   (see [vscode.md](vscode.md)).
 
 ## Validation pipeline for an increment
 

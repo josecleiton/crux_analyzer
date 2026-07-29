@@ -80,17 +80,21 @@ ferramenta. As duas metades saíram em um incremento só; veja
 
 ---
 
-## 3. Alcance — a extensão do VS Code
+## 3. Alcance — a extensão do VS Code ✅ **feito**
 
-O maior público e a maior construção: a máquina de estados ao lado do código, sem
-sair do editor. Toda camada de que ela precisa já existe — é outro cliente do
-mesmo contrato JSON, que é exatamente o formato que a arquitetura foi desenhada
-para permitir.
+O maior público: a máquina de estados ao lado do código, sem sair do editor.
+Ela chegou exatamente como a arquitetura previa — outro cliente do mesmo
+contrato JSON, e um cliente pequeno, porque toda camada de que ela precisava já
+existia. Veja [vscode.md](vscode.md).
 
-O `just site` já cobre o caminho "compartilhar com o time" (um build estático com
-o modelo embutido), então a extensão é sobre o loop de *escrita*, não sobre o de
-leitura. É por isso que ela fica depois da catraca: amplia o alcance, não protege
-a qualidade.
+`apps/vscode` embute o bundle web compilado em um webview e executa a CLI; o
+modelo é injetado como `window.__CRUX_MODEL__` (o contrato de embutimento que o
+`loadProject` honra), um watcher regenera a cada salvamento de `.rs` — o loop
+de *escrita*, complementando o de leitura do `just site` — e os avisos do
+parser aparecem em um canal de saída em vez de serem descartados. A adaptação
+ao webview (re-enraizamento de assets, CSP com nonce, injeção do modelo) é um
+módulo puro testado em unidade; a parte do host de extensão é encanamento
+fino.
 
 ---
 
