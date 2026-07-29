@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Node } from '@xyflow/react';
 import { loadProject } from './data/loadProject';
+import type { DomainProject } from './domain/types';
 import { toFlowModel } from './flow/toFlowModel';
 import type { LayoutEngine } from './layout/LayoutEngine';
 import { ElkLayoutEngine } from './layout/ElkLayoutEngine';
@@ -10,20 +11,30 @@ import { Sidebar } from './components/Sidebar/Sidebar';
 import { Inspector } from './components/Inspector/Inspector';
 import { Toolbar } from './components/Toolbar/Toolbar';
 
-const project = loadProject();
 const layoutEngine: LayoutEngine = new ElkLayoutEngine();
 
 export default function App() {
-  const [activeCoreId, setActiveCoreId] = useState<string | null>(
-    project.cores[0]?.id ?? null,
-  );
+  const [project, setProject] = useState<DomainProject | null>(null);
+  const [activeCoreId, setActiveCoreId] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [positionedNodes, setPositionedNodes] = useState<Node[]>([]);
 
+  useEffect(() => {
+    let cancelled = false;
+    loadProject().then((loaded) => {
+      if (cancelled) return;
+      setProject(loaded);
+      setActiveCoreId(loaded.cores[0]?.id ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const activeCore = useMemo(
-    () => project.cores.find((core) => core.id === activeCoreId) ?? null,
-    [activeCoreId],
+    () => project?.cores.find((core) => core.id === activeCoreId) ?? null,
+    [project, activeCoreId],
   );
 
   const flowModel = useMemo(
@@ -44,6 +55,10 @@ export default function App() {
   function selectCore(coreId: string) {
     setActiveCoreId(coreId);
     setSelection(null);
+  }
+
+  if (!project) {
+    return <div className="app-loading">Loading…</div>;
   }
 
   return (
