@@ -37,6 +37,8 @@ export const en = {
   'inspector.incoming': 'Incoming',
   'inspector.outgoing': 'Outgoing',
   'inspector.effects': 'Effects',
+  // A union over the incoming transitions: "some of these", never "all".
+  'inspector.entryEffects': 'Effects on entry',
   'inspector.none': '—',
   'inspector.tags': 'Tags',
   'inspector.aboutMachine': 'About this machine',

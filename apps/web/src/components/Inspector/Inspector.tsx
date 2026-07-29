@@ -1,5 +1,6 @@
 import type { DomainCore, DomainMachine } from '../../domain/types';
 import { machineOf } from '../../domain/fromParserJson';
+import { entryEffects } from '../../domain/effects';
 import { stateRole } from '../../domain/stateRole';
 import type { Selection } from '../../state/selection';
 import { ANY_STATE_NAME } from '../../domain/types';
@@ -34,6 +35,7 @@ function InspectorBody({ core, selection }: InspectorProps) {
     const state = machine.states.find((s) => s.id === selection.id);
     if (!state) return null;
     const role = stateRole(machine, state);
+    const onEntry = entryEffects(state);
     return (
       <div>
         <StateName name={state.name} role={role} />
@@ -46,6 +48,15 @@ function InspectorBody({ core, selection }: InspectorProps) {
         <EventList events={state.incoming.map((transition) => transition.event)} docs={core.eventDocs} />
         <h4>{t('inspector.outgoing')}</h4>
         <EventList events={state.outgoing.map((transition) => transition.event)} docs={core.eventDocs} />
+        {/* What arriving here does: the union over incoming transitions —
+            "some of these fire", never "all of these". Only shown when the
+            arrivals actually request something. */}
+        {onEntry.length > 0 ? (
+          <>
+            <h4>{t('inspector.entryEffects')}</h4>
+            <EventList events={onEntry} docs={core.effectDocs} />
+          </>
+        ) : null}
         {/* Context rather than the selection, so it comes last. */}
         <MachineDoc machine={machine} />
       </div>
