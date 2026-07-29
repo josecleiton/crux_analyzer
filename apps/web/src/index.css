@@ -158,23 +158,25 @@ body {
   color: var(--sim-text);
 }
 
-.theme-toggle {
+/* `.toolbar button` also matches, so keep the same specificity to win. */
+.toolbar button.theme-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
+  width: 32px;
   height: 28px;
   padding: 0;
   color: var(--text-muted);
 }
 
-.theme-toggle:hover {
+.toolbar button.theme-toggle:hover {
   color: var(--text);
 }
 
 .theme-toggle svg {
-  width: 16px;
-  height: 16px;
+  flex: none;
+  width: 17px;
+  height: 17px;
 }
 
 .app-body {
