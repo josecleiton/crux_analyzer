@@ -97,7 +97,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # First run enables Pages on the repo (build_type: workflow).
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
         with:
           enablement: true
 
