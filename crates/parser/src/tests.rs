@@ -17,7 +17,12 @@ fn transitions_of(code: &str) -> (Vec<(String, String, String)>, Vec<String>) {
             .iter()
             .map(|t: &Transition| (t.from.0.clone(), t.event.0.clone(), t.to.0.clone()))
             .collect(),
-        outcome.warnings.iter().map(|w| w.message.clone()).collect(),
+        // English is the source locale, so existing prose assertions hold.
+        outcome
+            .warnings
+            .iter()
+            .map(|w| w.kind.message(crux_analyzer_i18n::Locale::En))
+            .collect(),
     )
 }
 

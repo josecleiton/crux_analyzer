@@ -6,4 +6,5 @@ license.workspace = true
 description = "Documentation generators for the crux_analyzer semantic model (Mermaid, Markdown)."
 
 [dependencies]
+crux-analyzer-i18n = { path = "../i18n" }
 crux-analyzer-model = { path = "../model" }

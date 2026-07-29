@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 crux-analyzer-docgen = { path = "../docgen" }
+crux-analyzer-i18n = { path = "../i18n" }
 crux-analyzer-model = { path = "../model" }
 crux-analyzer-parser = { path = "../parser" }
 notify = "8"

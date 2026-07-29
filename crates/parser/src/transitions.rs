@@ -27,7 +27,7 @@ use crate::ast_util::{
 use crate::core_finder::CoreInfo;
 use crate::index::CrateIndex;
 use crate::state_enum::StateMachine;
-use crate::Warning;
+use crate::{Warning, WarningKind};
 
 /// The wildcard source: the transition fires from any state.
 pub(crate) const ANY_STATE: &str = "*";
@@ -86,7 +86,9 @@ pub(crate) fn extract(
         warnings.push(Warning {
             file: PathBuf::new(),
             line: 0,
-            message: format!("core {}: no `update` method found", core.name),
+            kind: WarningKind::NoUpdateMethod {
+                core: core.name.clone(),
+            },
         });
         return Vec::new();
     };
@@ -900,11 +902,9 @@ impl<'w, 'a> Walker<'w, 'a> {
         self.warnings.push(Warning {
             file: file.to_path_buf(),
             line: assign.span().start().line,
-            message: format!(
-                "transition of `{}` dropped: target state is dynamic \
-                 (assigned from a runtime value)",
-                machine.enum_name
-            ),
+            kind: WarningKind::DynamicTarget {
+                machine: machine.enum_name.clone(),
+            },
         });
     }
 
@@ -1098,9 +1098,7 @@ impl<'w, 'a> Walker<'w, 'a> {
             self.warnings.push(Warning {
                 file: file.to_path_buf(),
                 line,
-                message: format!(
-                    "transition to `{to}` dropped: could not infer the triggering event"
-                ),
+                kind: WarningKind::UnknownEvent { to: to.clone() },
             });
             return;
         };
@@ -1123,10 +1121,7 @@ impl<'w, 'a> Walker<'w, 'a> {
                 self.warnings.push(Warning {
                     file: file.to_path_buf(),
                     line,
-                    message: format!(
-                        "transition to `{to}` dropped: source-state condition could not \
-                         be resolved statically"
-                    ),
+                    kind: WarningKind::UnresolvableSource { to: to.clone() },
                 });
             }
         }

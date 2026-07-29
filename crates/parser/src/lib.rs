@@ -26,11 +26,13 @@
 
 use std::path::{Path, PathBuf};
 
+use crux_analyzer_i18n::Locale;
 use crux_analyzer_model::Project;
 
 mod ast_util;
 mod core_finder;
 mod emit;
+mod i18n;
 mod index;
 mod loader;
 mod state_enum;
@@ -49,31 +51,72 @@ pub enum ParseError {
     NoCoreFound,
 }
 
+/// Renders in English, the source locale. Use [`ParseError::message`] to
+/// render in a caller-chosen locale.
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParseError::Io(path, err) => write!(f, "failed to read {}: {err}", path.display()),
-            ParseError::Syntax(path, err) => {
-                write!(f, "failed to parse {}: {err}", path.display())
-            }
-            ParseError::NoCoreFound => write!(f, "no `impl App for ...` block found"),
-        }
+        f.write_str(&self.message(Locale::En))
     }
 }
 
 impl std::error::Error for ParseError {}
+
+/// What the parser could not infer, as data.
+///
+/// The prose lives in [`crate::i18n`], keyed off these variants, so a
+/// diagnostic can be rendered in any locale long after it was produced. The
+/// interpolated names are identifiers from the analyzed source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WarningKind {
+    /// An `impl App` block without an `update` fn.
+    NoUpdateMethod { core: String },
+    /// The assigned value has no payload typing and no resolvable constraints.
+    DynamicTarget { machine: String },
+    /// A state assignment was reached with no event label in scope.
+    UnknownEvent { to: String },
+    /// The guard references the state but defeats static analysis.
+    UnresolvableSource { to: String },
+}
+
+impl WarningKind {
+    /// Stable, locale-independent identifier for this diagnostic.
+    ///
+    /// This — not the prose — is what documentation and tooling should key on.
+    pub fn code(&self) -> &'static str {
+        match self {
+            WarningKind::NoUpdateMethod { .. } => "no-update-method",
+            WarningKind::DynamicTarget { .. } => "dynamic-target",
+            WarningKind::UnknownEvent { .. } => "unknown-event",
+            WarningKind::UnresolvableSource { .. } => "unresolvable-source",
+        }
+    }
+}
 
 /// A transition (or pattern) the parser saw but could not fully infer.
 #[derive(Debug, Clone)]
 pub struct Warning {
     pub file: PathBuf,
     pub line: usize,
-    pub message: String,
+    pub kind: WarningKind,
 }
 
+impl Warning {
+    /// `file:line: message`, with the message in `locale`.
+    pub fn render(&self, locale: Locale) -> String {
+        format!(
+            "{}:{}: {}",
+            self.file.display(),
+            self.line,
+            self.kind.message(locale)
+        )
+    }
+}
+
+/// Renders in English, the source locale. Use [`Warning::render`] to render in
+/// a caller-chosen locale.
 impl std::fmt::Display for Warning {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}: {}", self.file.display(), self.line, self.message)
+        f.write_str(&self.render(Locale::En))
     }
 }
 
