@@ -37,22 +37,15 @@ export function Toolbar({
   const t = useTranslate();
   return (
     <header className="toolbar">
-      <span className="toolbar-title">
-        {projectName}
-        {coreName ? <span className="toolbar-core"> / {coreName}</span> : null}
-      </span>
-      <div className="toolbar-actions">
-        {/* Simulate leads: it is the primary action of the toolbar. While a
-            simulation runs the icon is a stop square, not a pause — stopping
-            discards the run, and an icon must not promise a resume. */}
-        <button className={simulating ? 'active' : ''} onClick={onToggleSimulation}>
-          {simulating ? <StopIcon /> : <PlayIcon />}
-          {simulating ? t('toolbar.stopSimulation') : t('toolbar.simulate')}
-        </button>
-        {/* The reading filters step aside while the simulation owns the
-            emphasis — disabled rather than hidden, so they don't reflow.
-            A core with no declared tags has nothing to filter by, so the
-            input does not render at all. */}
+      <div className="toolbar-lead">
+        <span className="toolbar-title">
+          {projectName}
+          {coreName ? <span className="toolbar-core"> / {coreName}</span> : null}
+        </span>
+        {/* The tag filter reads, the buttons act — so it sits on the left
+            with the title, out of the action cluster, wide enough for its
+            whole label. Disabled (not hidden) while a simulation owns the
+            emphasis; a core with no declared tags gets no filter at all. */}
         {tagOptions.length > 0 ? (
           <>
             <input
@@ -72,6 +65,15 @@ export function Toolbar({
             </datalist>
           </>
         ) : null}
+      </div>
+      <div className="toolbar-actions">
+        {/* Simulate leads: it is the primary action of the toolbar. While a
+            simulation runs the icon is a stop square, not a pause — stopping
+            discards the run, and an icon must not promise a resume. */}
+        <button className={simulating ? 'active' : ''} onClick={onToggleSimulation}>
+          {simulating ? <StopIcon /> : <PlayIcon />}
+          {simulating ? t('toolbar.stopSimulation') : t('toolbar.simulate')}
+        </button>
         {/* The warning triangle says what this toggle is about — the states
             a reader should not trust yet; the title explains it on hover. */}
         <button
