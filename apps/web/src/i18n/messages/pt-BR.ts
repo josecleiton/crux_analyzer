@@ -29,6 +29,7 @@ export const ptBR: Catalog = {
   'inspector.incoming': 'Entradas',
   'inspector.outgoing': 'Saídas',
   'inspector.effects': 'Efeitos',
+  'inspector.entryEffects': 'Efeitos ao entrar',
   'inspector.none': '—',
   'inspector.tags': 'Etiquetas',
   'inspector.aboutMachine': 'Sobre esta máquina',
