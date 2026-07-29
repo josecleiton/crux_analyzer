@@ -1,6 +1,32 @@
 packages:
   - apps/*
 
+# Versions used by more than one workspace package live here once, and the
+# packages ask for them as `catalog:`.
+#
+# Two manifests naming the same dependency is how a monorepo drifts: the web app
+# and the extension are type-checked and tested by the *same* toolchain, and a
+# build that passes under two different TypeScripts proves less than one that
+# passes under the one people run. A single entry makes disagreement
+# unrepresentable rather than merely discouraged.
+#
+# Only genuinely shared dependencies belong here. A version used in exactly one
+# package is already in exactly one place, and moving it would trade a real
+# guarantee for indirection — `@types/vscode` in particular stays in the
+# extension's manifest, next to the `engines.vscode` it has to agree with.
+# Dependabot updates catalog entries natively.
+#
+# `catalogMode` is deliberately left at its default (`manual`): `prefer` and
+# `strict` also pull *new*, unshared dependencies into this catalog on
+# `pnpm add`, which would quietly turn the rule above into the opposite one. The
+# cost of `manual` is that `pnpm add <catalogued-dep> --filter <pkg>` writes a
+# literal version and silently unlinks that package from the catalog — so bump a
+# shared version *here*, not with `pnpm add`.
+catalog:
+  "@types/node": ^24.13.3
+  typescript: ~7.0.2
+  vitest: ^4.1.10
+
 # Node 24 (the active LTS) is the only supported major, and a mismatch is an
 # error rather than the default warning — a version nobody tested is not
 # something to discover halfway through a build. `engines` in package.json

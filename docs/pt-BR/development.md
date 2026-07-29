@@ -126,6 +126,16 @@ ao binário. Então adicionar uma dependência muda esse arquivo, e o
 `notices-current` é o que torna esquecer isso um build vermelho em vez de uma
 violação de licença silenciosa.
 
+Uma dependência usada pelos **dois** pacotes, `apps/web` e `apps/vscode` — hoje
+`typescript`, `vitest` e `@types/node` —, tem sua versão no `catalog:` do
+[`pnpm-workspace.yaml`](../../pnpm-workspace.yaml), e os manifestos a pedem como
+`"typescript": "catalog:"`. Os dois pacotes são type-checados e testados pelo
+mesmo toolchain, então um build que passa sob dois TypeScripts diferentes prova
+menos que um que passa sob o único que as pessoas realmente rodam. Suba uma versão
+compartilhada nesse arquivo, **não** com `pnpm add` — o `pnpm add` escreve uma
+versão literal e desconecta o pacote do catálogo sem avisar. Versões usadas por
+apenas um pacote continuam no manifesto daquele pacote.
+
 Instalar **não** executa scripts de ciclo de vida das dependências: o pnpm os
 bloqueia a menos que o pacote esteja permitido em `allowBuilds`
 (`pnpm-workspace.yaml`), e esse mapa está deliberadamente vazio. Uma dependência que queira executar código

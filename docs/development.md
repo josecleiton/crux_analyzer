@@ -122,6 +122,16 @@ not from what is installed: the web half from the chunks the bundler emitted
 adding a dependency changes that file, and `notices-current` is what makes
 forgetting it a red build rather than a silent license violation.
 
+A dependency used by **both** `apps/web` and `apps/vscode` — today `typescript`,
+`vitest` and `@types/node` — has its version in the `catalog:` of
+[`pnpm-workspace.yaml`](../pnpm-workspace.yaml), and the manifests ask for it as
+`"typescript": "catalog:"`. The two packages are type-checked and tested by the
+same toolchain, so a build that passes under two different TypeScripts proves
+less than one that passes under the one people actually run. Bump a shared
+version in that file, **not** with `pnpm add` — `pnpm add` writes a literal
+version and unlinks the package from the catalog without saying so. Versions used
+by only one package stay in that package's manifest.
+
 Installing does **not** run dependency lifecycle scripts: pnpm blocks them
 unless the package is allowed in `allowBuilds` (`pnpm-workspace.yaml`), and that
 map is deliberately empty. A dependency that wants to run code at install time shows up
