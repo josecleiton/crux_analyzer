@@ -24,6 +24,9 @@ export function toFlowModel(core: DomainCore): FlowModel {
     source: transition.from,
     target: transition.to,
     label: transition.event,
+    // smoothstep keeps back edges (upward transitions) close to the nodes
+    // instead of the default bezier's long off-viewport curves
+    type: 'smoothstep' as const,
     markerEnd: { type: 'arrowclosed' as const },
   }));
 

@@ -37,6 +37,9 @@ export function Graph({ nodes, edges, selection, onSelect }: GraphProps) {
       nodesDraggable
       nodesConnectable={false}
       fitView
+      // extra padding keeps back-edge routes (which run around the
+      // outermost nodes) inside the initial viewport
+      fitViewOptions={{ padding: 0.25 }}
       proOptions={{ hideAttribution: true }}
     >
       <Background />
