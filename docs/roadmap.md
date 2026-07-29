@@ -312,6 +312,57 @@ answer to the 500 kB chunk warning.
 
 ---
 
+## 5b. Effects become the other half of the loop ✅ **done**
+
+Prompted by the question "we map the events in and out well — what about the
+effects?" The answer was that an effect was a *string*: a label on a transition,
+collected per event arm, with no capability, no return leg, and no honesty about
+arms that branch. Events had a whole vocabulary; effects had a name.
+
+Four things landed together, because they are one reading of the same source:
+
+- **The capability.** `Effect::Audio(AudioOperation)` says every
+  `AudioOperation` request goes through `Audio`. Structure, not a name-shaped
+  guess — and it answers a question the transition tables answered badly: what
+  does this core talk to? The Markdown generator gained a per-core
+  **Capabilities** table off the back of it.
+- **The answer (`resolvesWith`).** Crux's loop is
+  `Event → Effect → shell → Event`, and the callback event is written *at the
+  request site*, so reading it is evidence, not inference. All three real shapes
+  are read — an event passed alongside the operation, `then_send(Event::X)`, and
+  a result-mapping closure — plus one call deep into a request helper, which is
+  how the real target app writes it. A **set**, because one request has one
+  answer per outcome; the target app's shared audio helper legitimately answers
+  with thirteen. A `then_send` naming something unreadable is a new warning
+  (`unresolved-effect-callback`); a request with *no* callback is not, because
+  fire-and-forget is a legitimate shape.
+- **Branch scoping, and `conditional`.** Effects were shared across every
+  transition of an arm, an over-approximation the model never admitted to. Now
+  the chain of alternatives entered to reach a request is compared with the
+  assignment's: a sibling branch's request no longer lands on this transition,
+  and one found *deeper* travels with it marked conditional — "arriving here
+  *may* request this". The honesty rule applied to attribution rather than to
+  extraction.
+- **Effects on the diagram, and in the replay.** Mermaid transition labels are
+  `event / effect` (the statechart convention; the diagram had been hiding
+  effects entirely), and the simulation now models the return leg: a request
+  with a declared answer waits under *Waiting for the shell*, the event that
+  answers it is badged `from the shell` in the fireable list, and an answer no
+  transition handles is listed inert instead of hidden.
+
+`Effect` widened from a bare string to "string or object" the way `states[]` did
+(§4), so an app whose requests show neither a capability nor a callback still
+emits byte-identical JSON.
+
+**Deliberately left out:** `@failure` / `@tag` annotations on effect *variants*.
+[parser.md](parser.md#documentation-and-annotations) used to say there was
+nothing for a marker to mean on an effect; with capabilities and answers there
+now would be (a request that can fail, a capability worth filtering by), so this
+is a real next increment rather than a refusal — it just wants a use case from
+adoption first, like tags got.
+
+---
+
 ## 6. Deliberately not doing yet
 
 - **PlantUML generator.** Listed in `init.md`, but Mermaid already renders

@@ -324,6 +324,58 @@ elkjs era 82% do bundle, é também a resposta ao aviso de 500 kB.
 
 ---
 
+## 5b. Efeitos se tornam a outra metade do laço ✅ **feito**
+
+Motivado pela pergunta "mapeamos bem os eventos de entrada e saída — e os
+efeitos?" A resposta era que um efeito era uma *string*: um rótulo em uma
+transição, coletado por braço de evento, sem capacidade, sem volta e sem
+honestidade sobre braços que ramificam. Eventos tinham um vocabulário inteiro;
+efeitos tinham um nome.
+
+Quatro coisas entraram juntas, porque são uma única leitura da mesma fonte:
+
+- **A capacidade.** `Effect::Audio(AudioOperation)` diz que toda solicitação de
+  `AudioOperation` passa por `Audio`. Estrutura, não um chute pelo formato do
+  nome — e responde a uma pergunta que as tabelas de transição respondiam mal: com
+  o que este núcleo conversa? O gerador Markdown ganhou uma tabela
+  **Capacidades** por núcleo por causa disso.
+- **A resposta (`resolvesWith`).** O laço do Crux é
+  `Evento → Efeito → shell → Evento`, e o evento de callback está escrito *no local
+  da solicitação*, então lê-lo é evidência, não inferência. Os três formatos reais
+  são lidos — um evento passado ao lado da operação, `then_send(Event::X)` e um
+  callback que mapeia o resultado — mais uma chamada adiante dentro de um helper de
+  solicitação, que é como o app-alvo real escreve. Um **conjunto**, porque uma
+  solicitação tem uma resposta por desfecho; o helper de áudio compartilhado do
+  app-alvo responde legitimamente com treze. Um `then_send` que nomeia algo
+  ilegível é um aviso novo (`unresolved-effect-callback`); uma solicitação *sem*
+  callback não é, porque disparar e esquecer é um formato legítimo.
+- **Escopo de ramo, e `conditional`.** Efeitos eram compartilhados por todas as
+  transições de um braço, uma sobreaproximação que o modelo nunca admitia. Agora a
+  cadeia de alternativas percorrida até a solicitação é comparada com a da
+  atribuição: a solicitação de um ramo irmão não cai mais nesta transição, e uma
+  encontrada *mais profunda* viaja com ela marcada como condicional — "chegar aqui
+  *pode* solicitar isso". A regra de honestidade aplicada à atribuição, e não à
+  extração.
+- **Efeitos no diagrama, e no replay.** Rótulos de transição no Mermaid são
+  `evento / efeito` (a convenção de statechart; o diagrama vinha escondendo os
+  efeitos por completo), e a simulação agora modela a volta: uma solicitação com
+  resposta declarada aguarda em *Aguardando o shell*, o evento que a responde
+  recebe o selo `do shell` na lista de disparáveis, e uma resposta que nenhuma
+  transição trata é listada inerte em vez de escondida.
+
+`Effect` passou de string simples para "string ou objeto" do mesmo jeito que
+`states[]` (§4), então um app cujas solicitações não mostram capacidade nem
+callback continua emitindo JSON byte a byte idêntico.
+
+**Deliberadamente de fora:** anotações `@failure` / `@tag` em *variantes* de
+efeito. O [parser.md](parser.md#efeitos) dizia que não havia nada que um marcador
+significasse em um efeito; com capacidades e respostas agora haveria (uma
+solicitação que pode falhar, uma capacidade que valha filtrar), então isso é um
+incremento real e não uma recusa — só quer um caso de uso vindo da adoção
+primeiro, como as etiquetas quiseram.
+
+---
+
 ## 6. Deliberadamente ainda não
 
 - **Gerador PlantUML.** Listado no `init.md`, mas o Mermaid já renderiza
