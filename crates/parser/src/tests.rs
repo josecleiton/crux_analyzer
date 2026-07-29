@@ -422,7 +422,7 @@ fn mirror_enum_is_not_a_state_machine() {
     let machine = &core.machines[0];
     assert_eq!(machine.name, "State");
     assert_eq!(
-        machine.states.iter().map(|s| s.0.clone()).collect::<Vec<_>>(),
+        machine.states.iter().map(|s| s.name.clone()).collect::<Vec<_>>(),
         vec!["Idle", "Running", "Done"]
     );
     assert_eq!(machine.transitions.len(), 1);
@@ -700,7 +700,7 @@ fn composite_states_expand_to_slash_paths() {
     let machine = &outcome.project.cores[0].machines[0];
 
     assert_eq!(
-        machine.states.iter().map(|s| s.0.as_str()).collect::<Vec<_>>(),
+        machine.states.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
         ["Idle", "Active/Loading", "Active/Ready"]
     );
     let triples: Vec<(String, String, String)> = machine
@@ -830,7 +830,7 @@ fn payload_data_enum_is_not_a_composite_state() {
     let machine = &outcome.project.cores[0].machines[0];
 
     assert_eq!(
-        machine.states.iter().map(|s| s.0.as_str()).collect::<Vec<_>>(),
+        machine.states.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
         ["Idle", "Failed"],
         "ErrorCode must not expand into fake sub-states"
     );

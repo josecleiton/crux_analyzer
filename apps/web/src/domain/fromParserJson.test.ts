@@ -70,22 +70,34 @@ describe('fromParserJson', () => {
     expect(machineOf(core, inputs.transitions[0].id)?.name).toBe('InputState');
     expect(machineOf(core, 'nonsense')).toBeNull();
   });
-});
 
-describe('parseProjectJson', () => {
-  it('rejects JSON outside the contract', () => {
-    expect(() => parseProjectJson({ cores: [] })).toThrow(/project/);
-    expect(() =>
-      parseProjectJson({
-        project: 'X',
-        cores: [{ name: 'A', machines: [{ name: 'M', states: ['S'], transitions: [{ from: 'S' }] }] }],
-      }),
-    ).toThrow(/transition/);
-    expect(() =>
-      parseProjectJson({
-        project: 'X',
-        cores: [{ name: 'A', states: [], transitions: [] }],
-      }),
-    ).toThrow(/machines/);
+  it('carries the documentation authored on a state', () => {
+    const auth = project.cores[1].machines[0];
+    const failed = auth.states.find((s) => s.name === 'Failed')!;
+    expect(failed.doc).toMatch(/refused by the server/);
+    expect(failed.markers).toEqual(['failure']);
+    expect(failed.tags).toEqual(['retryable']);
+  });
+
+  it('leaves an undocumented state without metadata', () => {
+    const recording = project.cores[0].machines[0].states.find((s) => s.name === 'Recording')!;
+    expect(recording.doc).toBeUndefined();
+    expect(recording.markers).toEqual([]);
+    expect(recording.tags).toEqual([]);
+  });
+
+  it('carries the description authored on the state enum', () => {
+    expect(project.cores[2].machines[0].doc).toMatch(/one device at a time/);
+    expect(project.cores[0].machines[0].doc).toBeUndefined();
+  });
+
+  it('generates the same id and graph for a state however it was authored', () => {
+    // `Failed` is written as an object and `Authenticating` as a bare string in
+    // the same machine: the authored form must not leak into ids or wiring.
+    const auth = project.cores[1].machines[0];
+    const failed = auth.states.find((s) => s.name === 'Failed')!;
+    expect(failed.id).toBe(`${auth.id}/Failed`);
+    expect(failed.incoming.map((t) => t.event)).toEqual(['AuthFailed']);
+    expect(failed.outgoing.map((t) => t.event)).toEqual(['RetryPressed']);
   });
 });

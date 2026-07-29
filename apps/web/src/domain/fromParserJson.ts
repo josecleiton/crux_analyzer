@@ -34,11 +34,16 @@ function mapMachine(coreId: string, machine: ParserMachineJson): DomainMachine {
     effects: t.effects ?? [],
   }));
 
-  const states: DomainState[] = machine.states.map((name) => {
-    const id = stateId(name);
+  // `doc`, `markers` and `tags` pass through verbatim: normalizing prose or
+  // author-chosen tag names here would be the mapper inventing semantics.
+  const states: DomainState[] = machine.states.map((state) => {
+    const id = stateId(state.name);
     return {
       id,
-      name,
+      name: state.name,
+      doc: state.doc,
+      markers: state.markers,
+      tags: state.tags,
       incoming: transitions.filter((t) => t.to === id),
       outgoing: transitions.filter((t) => t.from === id),
     };
@@ -47,6 +52,9 @@ function mapMachine(coreId: string, machine: ParserMachineJson): DomainMachine {
   return {
     id: machineId,
     name: machine.name,
+    doc: machine.doc,
+    markers: machine.markers,
+    tags: machine.tags,
     states,
     transitions,
     hasWildcard: machine.transitions.some(

@@ -48,25 +48,25 @@ fn machine_diagram(machine: &Machine, labels: &Labels) -> String {
     // Composite blocks: `state Parent { state "Child" as Parent_Child }`.
     let mut seen_parents: Vec<&str> = Vec::new();
     for state in &machine.states {
-        if let Some((parent, _)) = state.0.split_once('/') {
+        if let Some((parent, _)) = state.name.split_once('/') {
             if !seen_parents.contains(&parent) {
                 seen_parents.push(parent);
                 lines.push(format!("    state {parent} {{"));
                 for leaf in &machine.states {
-                    if let Some((p, child)) = leaf.0.split_once('/') {
+                    if let Some((p, child)) = leaf.name.split_once('/') {
                         if p == parent {
                             lines.push(format!(
                                 "        state \"{child}\" as {}",
-                                state_id(&leaf.0)
+                                state_id(&leaf.name)
                             ));
                         }
                     }
                 }
                 lines.push("    }".to_string());
             }
-        } else if !is_referenced(machine, &state.0) {
+        } else if !is_referenced(machine, &state.name) {
             // Orphan simple states still show up in the diagram.
-            lines.push(format!("    {}", state_id(&state.0)));
+            lines.push(format!("    {}", state_id(&state.name)));
         }
     }
 
@@ -114,11 +114,7 @@ mod tests {
                 name: "Player".into(),
                 machines: vec![Machine {
                     name: "PlayerState".into(),
-                    states: vec![
-                        State("Stopped".into()),
-                        State("Playing".into()),
-                        State("Orphan".into()),
-                    ],
+                    states: vec!["Stopped".into(), "Playing".into(), "Orphan".into()],
                     transitions: vec![
                         Transition {
                             from: State("Stopped".into()),
@@ -133,6 +129,7 @@ mod tests {
                             effects: vec![],
                         },
                     ],
+                    ..Default::default()
                 }],
             }],
         }
@@ -147,9 +144,9 @@ mod tests {
                 machines: vec![Machine {
                     name: "State".into(),
                     states: vec![
-                        State("Idle".into()),
-                        State("Active/Loading".into()),
-                        State("Active/Ready".into()),
+                        "Idle".into(),
+                        "Active/Loading".into(),
+                        "Active/Ready".into(),
                     ],
                     transitions: vec![Transition {
                         from: State("Idle".into()),
@@ -157,6 +154,7 @@ mod tests {
                         to: State("Active/Loading".into()),
                         effects: vec![],
                     }],
+                    ..Default::default()
                 }],
             }],
         };

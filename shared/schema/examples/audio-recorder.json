@@ -31,7 +31,17 @@
       "machines": [
         {
           "name": "AuthState",
-          "states": ["SignedOut", "Authenticating", "SignedIn", "Failed"],
+          "states": [
+            "SignedOut",
+            "Authenticating",
+            "SignedIn",
+            {
+              "name": "Failed",
+              "doc": "Authentication was refused by the server.\n\nThe credentials are kept, so the user can retry without typing them again.",
+              "markers": ["failure"],
+              "tags": ["retryable"]
+            }
+          ],
           "transitions": [
             { "from": "SignedOut", "event": "LoginPressed", "to": "Authenticating" },
             { "from": "Authenticating", "event": "AuthSucceeded", "to": "SignedIn" },
@@ -47,7 +57,17 @@
       "machines": [
         {
           "name": "SyncState",
-          "states": ["Idle", "Syncing", "Conflict", "Done"],
+          "doc": "Mirrors finished recordings to the server, one device at a time.",
+          "states": [
+            "Idle",
+            "Syncing",
+            {
+              "name": "Conflict",
+              "doc": "The server copy changed too; someone has to choose which one wins.",
+              "tags": ["manual-resolution"]
+            },
+            { "name": "Done", "markers": ["deprecated"] }
+          ],
           "transitions": [
             { "from": "Idle", "event": "SyncRequested", "to": "Syncing" },
             { "from": "Syncing", "event": "ConflictDetected", "to": "Conflict" },
