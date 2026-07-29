@@ -1,0 +1,9 @@
+[package]
+name = "crux-analyzer-parser"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Static parser for Rust + Crux code: emits the intermediate model. Stub in the MVP."
+
+[dependencies]
+crux-analyzer-model = { path = "../model" }

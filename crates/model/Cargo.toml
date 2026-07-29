@@ -1,0 +1,12 @@
+[package]
+name = "crux-analyzer-model"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Semantic structs of the crux_analyzer intermediate model. No parsing or UI logic."
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
