@@ -16,8 +16,8 @@ Três áreas, no estilo LangGraph Studio:
   rotulada com seu evento. Transições curinga (`from`/`to` = `"*"`) se conectam a
   um pseudo-nó tracejado **qualquer estado**. Folhas de compostos aparecem como
   `Pai / Filho`. Clicar em uma seção (no título ou na área vazia) seleciona o
-  **estado de entrada** da máquina, então uma máquina pode ser inspecionada — e
-  simulada — em um clique.
+  **estado de entrada** da máquina e enquadra essa máquina na view, então uma
+  máquina pode ser inspecionada — e simulada — em um clique.
 - **Inspetor** (painel direito) — selecionar um estado mostra seus selos de papel
   e seus eventos de entrada/saída; selecionar uma transição mostra
   `evento: de ↓ para` mais os **efeitos** que ela solicita. A máquina proprietária
@@ -103,10 +103,15 @@ Selecione um estado (opcional) e clique em **Simular**:
   a nova entrada do histórico desliza para dentro;
 - aterrissar em um estado de **falha** deixa todo esse destaque vermelho (aresta,
   rótulo, ponta da seta, anel), então caminhos de falha se destacam dos saudáveis;
+- a view acompanha o replay: quando o estado recém-alcançado não está
+  inteiramente visível, o canvas pana para centralizá-lo, sem mexer no zoom — um
+  passo que cai na tela nunca move o canvas;
 - **Reiniciar** volta ao primeiro estado da máquina; **Parar simulação** retorna
   ao inspetor.
 
-Toda animação é suprimida sob `prefers-reduced-motion`.
+Toda animação é suprimida sob `prefers-reduced-motion`, movimentos de view
+incluídos (`src/components/Graph/ViewportFocus.tsx` lê a preferência em JS, já
+que uma regra CSS não silencia uma animação por script).
 
 O motor (`src/simulation/engine.ts`) é lógica de domínio pura; ele dirige o Graph
 exclusivamente por props de destaque — `traveledPath` e `availableTransitions` são

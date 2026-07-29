@@ -16,7 +16,8 @@ Three areas, LangGraph-Studio style:
   its event. Wildcard transitions (`from`/`to` = `"*"`) connect to a dashed
   **any state** pseudo-node. Composite leaves show as `Parent / Child`.
   Clicking a section (its title or empty area) selects the machine's **entry
-  state**, so a machine can be inspected — and simulated — in one click.
+  state** and frames that machine in the viewport, so a machine can be
+  inspected — and simulated — in one click.
 - **Inspector** (right panel) — selecting a state shows its role badges and
   its incoming/outgoing events; selecting a transition shows
   `event: from ↓ to` plus the **effects** it requests. The owning machine is
@@ -99,10 +100,15 @@ Select a state (optional) and hit **Simulate**:
   then breathes, and the new trail entry slides in;
 - landing on a **failure** state turns that whole highlight red (edge, label,
   arrowhead, ring), so failure paths stand out from healthy ones;
+- the viewport follows the replay: when the state just entered is not fully in
+  view, the canvas pans to center it, keeping the zoom untouched — a step that
+  lands on screen never moves the canvas;
 - **Restart** goes back to the machine's first state; **Stop simulation**
   returns to the inspector.
 
-Every animation is skipped under `prefers-reduced-motion`.
+Every animation is skipped under `prefers-reduced-motion`, viewport moves
+included (`src/components/Graph/ViewportFocus.tsx` reads the preference in JS,
+since a CSS rule cannot silence a scripted tween).
 
 The engine (`src/simulation/engine.ts`) is pure domain logic; it drives the
 Graph exclusively through highlight props — `traveledPath` and

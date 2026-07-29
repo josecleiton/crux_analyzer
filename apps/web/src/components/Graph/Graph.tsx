@@ -8,7 +8,7 @@
 import { ReactFlow, Background, Controls } from '@xyflow/react';
 import type { Edge, Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { Selection } from '../../state/selection';
 import type { Theme } from '../../theme/theme';
 import { useTranslate } from '../../i18n/useI18n';
@@ -17,9 +17,13 @@ import { StateNode } from './StateNode';
 import { AnyStateNode } from './AnyStateNode';
 import { MachineGroupNode } from './MachineGroupNode';
 import { RoutedEdge } from './RoutedEdge';
+import { ViewportFocus } from './ViewportFocus';
+import type { FitRequest } from './ViewportFocus';
 
 const nodeTypes = { state: StateNode, anyState: AnyStateNode, machineGroup: MachineGroupNode };
 const edgeTypes = { routed: RoutedEdge };
+/** Room left around the framed content, on load and on every framing. */
+const FIT_PADDING = 0.15;
 
 /**
  * Ids to emphasize. The simulation drives three tiers of emphasis, so the
@@ -55,6 +59,17 @@ interface GraphProps {
 export function Graph({ nodes, edges, selection, onSelect, highlight, theme }: GraphProps) {
   const colors = useGraphColors(theme);
   const t = useTranslate();
+  // Framing a section is a viewport reaction to a click, not graph state: a
+  // fresh request object per click re-frames even the same section.
+  const [fitRequest, setFitRequest] = useState<FitRequest | null>(null);
+
+  // The simulation already tells us where it is; the camera tags along.
+  const currentStateId = highlight?.nodeIds[0];
+  const step = highlight?.step ?? 0;
+  const follow = useMemo(
+    () => (currentStateId ? { nodeId: currentStateId, step } : null),
+    [currentStateId, step],
+  );
 
   // React Flow ships English accessible names for its own controls; without
   // this they would stay English while the rest of the UI is translated.
@@ -138,10 +153,12 @@ export function Graph({ nodes, edges, selection, onSelect, highlight, theme }: G
           onSelect({ kind: 'state', id: node.id });
           return;
         }
-        // a machine section resolves to the entry state the mapper put in it
+        // a machine section resolves to the entry state the mapper put in it,
+        // and frames the machine it stands for
         const entryStateId = node.data?.entryStateId;
         if (node.type === 'machineGroup' && typeof entryStateId === 'string') {
           onSelect({ kind: 'state', id: entryStateId });
+          setFitRequest({ nodeId: node.id });
         }
       }}
       onEdgeClick={(_, edge) => onSelect({ kind: 'transition', id: edge.id })}
@@ -151,11 +168,12 @@ export function Graph({ nodes, edges, selection, onSelect, highlight, theme }: G
       colorMode={theme}
       ariaLabelConfig={ariaLabelConfig}
       fitView
-      fitViewOptions={{ padding: 0.15 }}
+      fitViewOptions={{ padding: FIT_PADDING }}
       proOptions={{ hideAttribution: true }}
     >
       <Background gap={20} />
       <Controls showInteractive={false} />
+      <ViewportFocus fit={fitRequest} follow={follow} padding={FIT_PADDING} />
     </ReactFlow>
   );
 }
