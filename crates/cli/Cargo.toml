@@ -1,0 +1,16 @@
+[package]
+name = "crux-analyzer-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "CLI for crux_analyzer: analyzes a Rust + Crux crate and emits the semantic model as JSON."
+
+[[bin]]
+name = "crux-analyzer"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+crux-analyzer-model = { path = "../model" }
+crux-analyzer-parser = { path = "../parser" }
+serde_json = { workspace = true }
