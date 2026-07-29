@@ -126,7 +126,142 @@ listadas:
 
 ---
 
-## 5. Deliberadamente ainda não
+## 5. Distribuição — colocar na mão de outras pessoas
+
+Ninguém fora deste checkout consegue instalar a ferramenta. `cargo run` e `just`
+são interface de contribuidor, e a extensão do VS Code, quando não acha o
+binário, manda o usuário rodar `cargo install --path crates/cli` — um comando que
+não significa nada para quem nunca clonou o repositório. É a última frente não
+endereçada, e pertence a este lugar pela tese acima: distribuição é o "alcançar
+mais longe" definitivo, então vem depois das garantias.
+
+### A ordem, e por que ela não é uma hesitação
+
+1. **`cargo install crux-analyzer` do crates.io** — o canal principal. O público é
+   de desenvolvedores Rust/Crux; todos já têm toolchain, e isso contorna as duas
+   piores partes de distribuir binário (o Gatekeeper do macOS pondo em quarentena
+   um download sem assinatura, e "qual arquivo eu quero"). Sem CI, sem segredos,
+   sem assinatura.
+2. **Binários prontos em GitHub Releases** — não primariamente para humanos, mas
+   porque a §5.4 precisa deles: uma extensão de Marketplace que diz "vá instalar
+   Rust" não tem público.
+3. **Marketplace do VS Code + Open VSX** — em cima de (2).
+
+Clonar e compilar continua documentado, rebaixado ao caminho do contribuidor.
+Note o que já funciona hoje, sem nenhuma mudança no repositório:
+
+```sh
+cargo install --git https://github.com/josecleiton/crux_analyzer crux-analyzer-cli --locked
+```
+
+### 5.1 crates.io
+
+São **os cinco crates ou nenhum**: um crate publicado não pode depender de uma
+dependência por caminho não publicada, e colapsar as bibliotecas dentro do
+binário violaria as [regras rígidas](architecture.md#regras-rígidas). A
+mitigação já está no lugar — todo nome tem o prefixo `crux-analyzer`, então eles
+são auto-namespaced. Os cinco nomes estão livres hoje.
+
+O bloqueio duro é mecânico: as dependências entre crates são só por caminho, sem
+a chave `version`, o que o `cargo publish` rejeita de saída em vez de avisar.
+`[workspace.package]` também não tem `repository`, `keywords` nem `categories`.
+Vale registrar porque elimina uma categoria inteira de ferramental: **`cargo
+publish --workspace`** (cargo ≥ 1.90) ordena o DAG topologicamente *e* espera a
+propagação do índice entre crates, então "publicar as folhas primeiro, dormir
+esperando o índice" é uma flag, não um problema. Publicar do laptop, não do CI —
+um segredo a menos, e cortar uma versão continua sendo um ato humano deliberado.
+
+Renomear `crux-analyzer-cli` → `crux-analyzer` **antes** de publicar qualquer
+coisa, para o comando documentado nunca mudar: o crate que *é* o produto deve ter
+o nome curto, e `cargo install crux-analyzer-cli` instalando um binário chamado
+`crux-analyzer` é uma unha encravada que se explicaria para sempre. Toca ~20
+lugares (`Justfile`, `README.md`, `cli.md` e `development.md` com seus gêmeos) e
+**zero** no CI, que só chama `just check`.
+
+### 5.2 Binários prontos — um workflow escrito à mão, não `cargo-dist`
+
+O `dist init` gera e depois *é dono* do `release.yml`, e não sabe nada da metade
+pnpm do monorepo, então a matriz de VSIX terminaria em um segundo workflow de
+todo jeito — e aí seriam dois para manter, um gerado e um à mão. Um `release.yml`
+disparado por tag reusando as recipes do `just` combina com o jeito que todo o
+resto aqui funciona: um humano consegue rodar cada passo localmente.
+
+Alvos: `aarch64-apple-darwin`, `x86_64-apple-darwin`,
+`x86_64-unknown-linux-musl`, `x86_64-pc-windows-msvc`. **musl em vez de gnu, de
+propósito** — um binário `-gnu` compilado no `ubuntu-latest` liga contra a glibc
+daquela imagem e morre com `GLIBC_2.xx not found` em uma distribuição mais velha,
+o relato mais comum de "seu binário de release não funciona". O conjunto de
+dependências é Rust puro, sem `build.rs` e sem ligação com C, então o musl
+compila limpo e dá um artefato estático que roda em qualquer lugar.
+
+### 5.3 Versões em passo travado
+
+A extensão conversa com o CLI pelo contrato JSON, então o workspace Rust, o
+`package.json` da raiz e o `apps/vscode` publicam um número só: "extensão 0.4.x
+precisa do CLI 0.4.x" é uma frase que cabe na cabeça, e uma matriz de
+compatibilidade não. `apps/web` fica em `0.0.0` de propósito — artefato de build,
+nunca publicado. Garantido por uma recipe `version-check` dentro do `just check`,
+não por um bot. Uma pegadinha que vale anotar: subir a versão do workspace
+invalida o `Cargo.lock`, e os builds de release usam `--locked`, então o lock
+regenerado faz parte do commit que sobe a versão.
+
+### 5.4 O bloqueio real da extensão
+
+`apps/vscode/src/panel.ts` chama um binário do `PATH` e, ao falhar, imprime a
+mensagem do `cargo install --path crates/cli` descrita acima. O caminho adiante é
+um módulo puro de resolução no estilo do `sourceDir.ts` já testado —
+configuração explícita ganha, depois um binário embutido em `bin/`, depois o
+`PATH` — mais `vsce package --target` por plataforma, com um VSIX sem alvo como
+alternativa. *Baixar na ativação* está descartado: um Mach-O baixado ganha
+`com.apple.quarantine` e o Gatekeeper se recusa a executá-lo, então todo aquele
+código de rede e checksum compra um resultado pior do que passar `--target`.
+
+Uma armadilha a lembrar quando essa mensagem for reescrita: no `vscode.l10n` **a
+string em inglês é a chave do catálogo**, então reescrevê-la orfana a entrada
+pt-BR em `apps/vscode/l10n/bundle.l10n.pt-br.json` e o usuário pt-BR passa a ver
+inglês em silêncio, sem nenhum teste falhar. Um teste de paridade tornaria isso
+um build vermelho; o lado web já tem o padrão.
+
+### 5.5 Já vencido, não trabalho futuro
+
+Duas obrigações de licença estão descumpridas **hoje**, então são defeitos e não
+planos:
+
+- **O aviso EPL-2.0 do elkjs não está no bundle compilado.** O Vite o remove e
+  `apps/web/dist/` não carrega nenhum NOTICE, mas a EPL-2.0 §3.1/§3.2 exige que
+  quem recebe o código objeto receba o texto da licença. O `README.md` atribui o
+  elkjs corretamente, e o README não viaja com o artefato — então o preview no
+  Pages vem redistribuindo o elkjs a descoberto em todo push para `main`. Um
+  `THIRD-PARTY-NOTICES.md` versionado e copiado para `dist/` pelo `web-build`
+  cobre o Pages, todo VSIX (`media/web` já está na lista de permissão) e qualquer
+  arquivo de release de uma vez.
+- **Todo VSIX publica código MIT sem o texto da licença.** O `.vscodeignore` já
+  permite `!LICENSE*`, mas `apps/vscode/LICENSE` não existe. Consertar do jeito
+  que o bundle web já é tratado — copiado no momento do build pelo `ext-build`,
+  para haver uma fonte de verdade só e nada para divergir.
+
+### 5.6 Recusado, com gatilho de revisita
+
+- **Tap do Homebrew.** Um segundo repositório e uma fórmula precisando de um novo
+  SHA a cada release, para um público que tem cargo. *Revisitar se um usuário
+  não-Rust pedir.*
+- **Pacote npm para o schema.** Publicá-lo cria uma obrigação de versionamento
+  sobre o contrato que o git satisfaz de graça; a URL bruta em uma tag é a
+  resposta inteira. *Revisitar se aparecer um cliente de terceiro.*
+- **Assinatura de código / notarização.** Uma conta de Apple Developer e um
+  certificado Windows para evitar uma linha `xattr -d com.apple.quarantine` na
+  documentação — mais um argumento a favor do canal (1). *Revisitar se o
+  Gatekeeper virar um custo de suporte real.*
+- **`cargo-dist`.** *Revisitar se a matriz de alvos crescer além de um YAML
+  legível.*
+- **`release-plz` / `cargo-release`.** O recurso principal deles agora é o
+  `cargo publish --workspace`, e nenhum dos dois conhece o
+  `apps/vscode/package.json` — então quebrariam o passo travado da §5.3 em vez de
+  garanti-lo. *Revisitar com contribuidores externos ou uma cadência fixa.*
+
+---
+
+## 6. Deliberadamente ainda não
 
 - **Gerador PlantUML.** Listado no `init.md`, mas o Mermaid já renderiza
   nativamente no GitHub/GitLab e o `just site` cobre o resto. Um gerador inteiro
