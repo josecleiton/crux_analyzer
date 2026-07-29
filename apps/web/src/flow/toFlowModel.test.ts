@@ -12,6 +12,31 @@ const project = fromParserJson(parseProjectJson(rawProject));
 const recorderCore = project.cores[0]; // two machines
 const syncCore = project.cores[2]; // one machine
 
+/** A single-machine core with a composite family, the shape the parser emits. */
+function compositeCore(states: string[] = ['Idle', 'Active/Loading', 'Active/Ready']) {
+  return fromParserJson(
+    parseProjectJson({
+      project: 'Composite',
+      cores: [
+        {
+          name: 'C',
+          machines: [
+            {
+              name: 'State',
+              states,
+              transitions: [
+                { from: 'Idle', event: 'Start', to: 'Active/Loading' },
+                { from: 'Active/Loading', event: 'Loaded', to: 'Active/Ready' },
+                { from: 'Active/Ready', event: 'Stop', to: 'Idle' },
+              ],
+            },
+          ],
+        },
+      ],
+    }),
+  ).cores[0];
+}
+
 describe('toFlowModel', () => {
   it('renders a multi-machine core as sections (group nodes)', () => {
     const { nodes } = toFlowModel(recorderCore, labels);
@@ -116,6 +141,35 @@ describe('toFlowModel', () => {
       labels,
     ).nodes.filter((n) => n.type === 'machineGroup');
     expect(documented[0].data.doc).toBe('A region.');
+  });
+
+  it('nests composite leaves inside a container named after their parent', () => {
+    const composite = compositeCore();
+    const { nodes } = toFlowModel(composite, labels);
+
+    const container = nodes.find((n) => n.type === 'compositeGroup')!;
+    expect(container.data.label).toBe('Active');
+    // containers come before their children (a React Flow requirement)
+    expect(nodes.indexOf(container)).toBeLessThan(
+      nodes.findIndex((n) => n.parentId === container.id),
+    );
+
+    const loading = nodes.find((n) => n.id.endsWith('Active/Loading'))!;
+    const ready = nodes.find((n) => n.id.endsWith('Active/Ready'))!;
+    expect(loading.parentId).toBe(container.id);
+    expect(ready.parentId).toBe(container.id);
+    // inside the container the parent's name is the title, not the label
+    expect(loading.data.label).toBe('Loading');
+    // flat states stay at the machine level
+    expect(nodes.find((n) => n.data.label === 'Idle')!.parentId).toBeUndefined();
+  });
+
+  it('keeps a family flat when a plain state collides with the parent name', () => {
+    const collided = compositeCore(['Idle', 'Active', 'Active/Loading']);
+    const { nodes } = toFlowModel(collided, labels);
+    expect(nodes.every((n) => n.type !== 'compositeGroup')).toBe(true);
+    // the composite leaf keeps its full, spaced name
+    expect(nodes.map((n) => n.data.label)).toContain('Active / Loading');
   });
 
   it('turns each transition into an edge labeled with its event', () => {
