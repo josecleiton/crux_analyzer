@@ -15,6 +15,11 @@ export const en = {
   'toolbar.simulate': 'Simulate',
   'toolbar.stopSimulation': 'Stop simulation',
   'toolbar.relayout': 'Re-layout',
+  // Tag *names* are the analyzed app's identifiers and stay untranslated;
+  // only this chrome around them is localized.
+  'toolbar.filterByTag': 'Filter by tag',
+  'toolbar.undocumented': 'Undocumented',
+  'toolbar.undocumentedHint': 'Highlight states without documentation',
 
   // Two complete sentences rather than one template: the interpolated word
   // would need adjective agreement in some locales.

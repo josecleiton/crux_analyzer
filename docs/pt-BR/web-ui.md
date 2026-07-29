@@ -85,6 +85,35 @@ parágrafos (`docParagraphs`), porque quebrar em 80 colunas no `///` não é um
 pedido de quebra de linha em um painel de 260px. O documento Markdown gerado é o
 cliente que renderiza Markdown como Markdown.
 
+## Filtrando o canvas
+
+Dois filtros de leitura vivem na barra de ferramentas. Ambos dizem "estes, não
+o resto" do mesmo jeito que a simulação: os estados que casam ficam em força
+total enquanto todos os outros estados e transições esmaecem.
+
+- **Filtrar por etiqueta** — digite um fragmento de um nome de `@tag`
+  declarado; a comparação ignora maiúsculas e o campo sugere as etiquetas do
+  próprio núcleo ativo. Uma etiqueta declarada no enum de estado cobre a
+  região inteira. O campo só é renderizado quando o núcleo declara alguma
+  etiqueta — sem nada para filtrar, não há filtro.
+- **Sem documentação** — um botão opt-in que mantém apenas os estados sem
+  descrição autoral: os estados em que um leitor ainda não deveria confiar.
+  Opt-in de propósito, para que a visão padrão continue sendo sobre a máquina
+  e não sobre cobertura de documentação (o número em si vem do
+  `crux-analyzer coverage`, veja [cli.md](cli.md)).
+
+Os dois critérios compõem como interseção. Uma transição continua legível
+apenas quando tudo que ela conecta continua; em uma aresta curinga o
+pseudo-nó **qualquer estado** conta como casando — "qualquer estado" inclui os
+mantidos — então `* → Ready` sobrevive sempre que `Ready` sobrevive.
+
+Os filtros são lógica pura de domínio (`src/domain/focus.ts`) e chegam ao
+Graph pela mesma prop de destaque que a simulação usa — um nível `kept`
+silencioso que apenas escapa do esmaecimento, então um resultado de filtro
+nunca toma emprestadas as cores da simulação. Enquanto uma simulação roda os
+filtros ficam desabilitados: a ênfase pertence ao replay. Trocar de núcleo os
+limpa — cada núcleo declara suas próprias etiquetas.
+
 ## Fonte de dados
 
 Ao carregar, a aplicação busca `model.json` relativo à sua base (veja

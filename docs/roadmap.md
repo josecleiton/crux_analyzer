@@ -54,18 +54,24 @@ which is exactly the kind of number a ratchet is for.
 
 ---
 
-## 2. Close the loop on tags
+## 2. Close the loop on tags ✅ **done**
 
-`@tag` exists in the model and renders as chips, but it is **inert**: you can
-declare a tag and look at it, not *use* it. With eight states that is fine; with
-thirty it is the difference between a diagram and a tool.
+`@tag` existed in the model and rendered as chips, but it was **inert**: you
+could declare a tag and look at it, not *use* it. With eight states that is
+fine; with thirty it is the difference between a diagram and a tool. Both
+halves shipped as one increment; see
+[web-ui.md](web-ui.md#filtering-the-canvas).
 
-- **Filter and search by tag in the web UI.** Type `retryable`, keep the states
-  that carry it, dim the rest. The graph already dims nodes during simulation,
-  so the visual vocabulary exists.
-- **Highlight undocumented states.** The visual counterpart of §1.3 — the
-  states a reader should not trust yet. Deliberately opt-in, so the default view
-  stays about the machine rather than about our metrics.
+- **Filter and search by tag in the web UI** — type `retryable` (or a
+  fragment; the input suggests the core's own tags), keep the states that
+  carry it, dim the rest. The dimming *is* the simulation's, reached through
+  the same highlight prop via a quiet `kept` tier, so the Graph stayed a pure
+  renderer and the matching logic is a tested domain module
+  (`src/domain/focus.ts`).
+- **Highlight undocumented states** — an opt-in **Undocumented** toggle keeps
+  only the states with no authored description. Opt-in as planned: the default
+  view stays about the machine, and the *number* stays with
+  `crux-analyzer coverage`.
 
 ---
 

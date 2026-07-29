@@ -34,12 +34,16 @@ const FIT_PADDING = 0.15;
  * - `available` — what can fire from the current state, and where it lands.
  *
  * With `dimOthers`, states and transitions outside those sets fade back.
+ * `kept` is the quietest tier: it earns no emphasis of its own, it only
+ * escapes the dimming — how the tag filter and the undocumented highlight
+ * say "these, not the rest" without borrowing the simulation's colors.
  */
 export interface GraphHighlight {
   nodeIds: string[];
   edgeIds: string[];
   visited?: { nodeIds: string[]; edgeIds: string[] };
   available?: { nodeIds: string[]; edgeIds: string[] };
+  kept?: { nodeIds: string[]; edgeIds: string[] };
   dimOthers?: boolean;
   /** Paints the highlight red — the simulation sits in a failure state. */
   failure?: boolean;
@@ -92,13 +96,23 @@ export function Graph({ nodes, edges, selection, onSelect, highlight, theme }: G
   const visitedEdges = new Set(highlight?.visited?.edgeIds ?? []);
   const availableNodes = new Set(highlight?.available?.nodeIds ?? []);
   const availableEdges = new Set(highlight?.available?.edgeIds ?? []);
+  const keptNodes = new Set(highlight?.kept?.nodeIds ?? []);
+  const keptEdges = new Set(highlight?.kept?.edgeIds ?? []);
 
   /** Emphasis tier of a graph element, from the highlight sets. */
-  function tier(id: string, current: boolean, visited: Set<string>, available: Set<string>) {
+  function tier(
+    id: string,
+    current: boolean,
+    visited: Set<string>,
+    available: Set<string>,
+    kept: Set<string>,
+  ) {
     const classes: string[] = [];
     if (visited.has(id)) classes.push('visited');
     if (available.has(id)) classes.push('available');
-    if (highlight?.dimOthers && !current && classes.length === 0) classes.push('dimmed');
+    if (highlight?.dimOthers && !current && !kept.has(id) && classes.length === 0) {
+      classes.push('dimmed');
+    }
     return classes;
   }
 
@@ -106,7 +120,9 @@ export function Graph({ nodes, edges, selection, onSelect, highlight, theme }: G
     const current = highlight?.nodeIds.includes(node.id) ?? false;
     // group containers are scenery: they never take part in the emphasis
     const classes =
-      node.type === 'machineGroup' ? [] : tier(node.id, current, visitedNodes, availableNodes);
+      node.type === 'machineGroup'
+        ? []
+        : tier(node.id, current, visitedNodes, availableNodes, keptNodes);
     if (current) classes.push('highlighted', pulseClass, ...(failureClass ? ['is-failure'] : []));
     return {
       ...node,
@@ -117,7 +133,7 @@ export function Graph({ nodes, edges, selection, onSelect, highlight, theme }: G
   const styledEdges = edges.map((edge) => {
     const selected = selection?.kind === 'transition' && selection.id === edge.id;
     const highlighted = highlight?.edgeIds.includes(edge.id) ?? false;
-    const classes = tier(edge.id, highlighted, visitedEdges, availableEdges);
+    const classes = tier(edge.id, highlighted, visitedEdges, availableEdges, keptEdges);
     if (highlighted) {
       classes.push('highlighted', ...(failureClass ? ['is-failure'] : []));
     }

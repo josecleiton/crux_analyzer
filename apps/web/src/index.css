@@ -194,6 +194,38 @@ body {
   color: var(--sim-text);
 }
 
+/* Reading filters step aside while a simulation owns the emphasis. Placed
+   after the hover rule so the same specificity wins on a disabled hover. */
+.toolbar button:disabled {
+  opacity: 0.45;
+  cursor: default;
+  background: var(--bg-panel);
+}
+
+/* Tag filter: an input among buttons, so it borrows their footprint. */
+.toolbar input.toolbar-filter {
+  width: 140px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  color: var(--text);
+  font: inherit;
+}
+
+.toolbar input.toolbar-filter::placeholder {
+  color: var(--text-faint);
+}
+
+/* A non-empty query is a mode, like an active toggle — same accent. */
+.toolbar input.toolbar-filter.active {
+  border-color: var(--sim);
+}
+
+.toolbar input.toolbar-filter:disabled {
+  opacity: 0.45;
+}
+
 /* `.toolbar button` also matches, so keep the same specificity to win. */
 .toolbar button.theme-toggle {
   display: flex;
