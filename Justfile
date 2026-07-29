@@ -57,6 +57,14 @@ model-watch src name:
     cargo run -q -p crux-analyzer-cli -- generate --src {{src}} --name {{name}} \
       --out apps/web/public/model.json --watch
 
+# Static documentation site in apps/web/dist: analyze, then build the UI with
+# the model baked in. `base` is the path the site will be served from —
+# default root, e.g. `just site ../app/src MyApp /crux-docs/` for Pages.
+site src name base="/":
+    just model {{src}} {{name}}
+    CRUX_BASE={{base}} pnpm --filter web build
+    @echo "Static site ready in apps/web/dist (base {{base}}) — serve it over HTTP, not file://"
+
 # Generate docs: just docs path/to/app/src MyApp [markdown|mermaid] [en|pt-BR]
 docs src name format="markdown" locale="en":
     cargo run -q -p crux-analyzer-cli -- docs --src {{src}} --name {{name}} \

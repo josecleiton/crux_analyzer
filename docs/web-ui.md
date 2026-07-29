@@ -44,11 +44,42 @@ The Inspector and the simulation panel repeat the roles as badges.
 
 ## Data source
 
-On load the app fetches `/model.json` (put a generated model at
-`apps/web/public/model.json` — `just model <src> <name>`, or `model-watch`
-to keep it fresh). Without one — or with a stale/invalid one — it falls back
-to the bundled example (`shared/schema/examples/audio-recorder.json`) and
-logs a console warning. The artifact is gitignored.
+On load the app fetches `model.json` relative to its base (see
+[Static deployment](#static-deployment) — `/model.json` in dev). Put a
+generated model at `apps/web/public/model.json` — `just model <src> <name>`,
+or `model-watch` to keep it fresh. Without one — or with a stale/invalid
+one — it falls back to the bundled example
+(`shared/schema/examples/audio-recorder.json`) and logs a console warning.
+The artifact is gitignored.
+
+## Static deployment
+
+The UI is a static bundle, so publishing it as internal documentation needs
+no server-side logic — only a plain HTTP host. One recipe does everything:
+
+```sh
+just site ../my-app/shared/src MyApp              # served from the domain root
+just site ../my-app/shared/src MyApp /crux-docs/  # served from a subpath
+# then publish apps/web/dist/
+```
+
+`site` analyzes the crate into `apps/web/public/model.json` and only then
+builds, so the model ships *inside* `dist/` — the published page never calls
+back to the analyzer, and refreshing the docs means re-running the recipe.
+Both steps live in one recipe deliberately: building without generating first
+publishes the bundled example, which looks like a working site instead of an
+error.
+
+The third argument is Vite's `base` (`CRUX_BASE=<base>` for raw `pnpm build`
+invocations, normalized in `vite.config.ts`). It is **required whenever the
+site is not at the domain root** — per-project GitHub/GitLab Pages, for
+instance: asset URLs and the `model.json` fetch are both resolved from it, and
+a root-absolute build under a subpath fails silently into the bundled example.
+A full origin (`https://cdn.example.com/docs/`) works too.
+
+Two things not to expect: the bundle must be served over HTTP (`file://`
+blocks both the ES module and the model fetch), and no SPA fallback rule is
+needed — there is a single page and no router.
 
 ## Simulation
 
