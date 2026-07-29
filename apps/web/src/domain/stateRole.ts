@@ -13,10 +13,19 @@
  * from the "any state" pseudo-node, so it stays visible instead of erasing
  * every final state of machines that have one.
  *
- * `failure` — a naming heuristic (a guess), so it lives here in the UI and
- * never in the parser: a state is read as a failure when one of its words is
- * a failure word. Nothing in the model marks failure, and inventing a parser
- * flag for it would break the parser honesty rule.
+ * `failure` — declared, then guessed. A state whose doc comment in the
+ * analyzed source carries `@failure` *is* a failure: that is the author of
+ * that application speaking, and it reaches us as model data, so the parser is
+ * reporting rather than inventing. When no state of the machine declares one,
+ * the naming heuristic stands in — a state is read as a failure when one of
+ * its words is a failure word. That heuristic is a guess, which is why it
+ * lives here in the UI and never in the parser; and one `@failure` anywhere in
+ * a machine silences it for that whole machine, because from then on an
+ * unmarked sibling is unmarked on purpose.
+ *
+ * `deprecated` — declared only (`@deprecated`). There is no heuristic for it
+ * and there must not be one: nothing in a state's name says it is on its way
+ * out.
  */
 
 import type { DomainMachine, DomainState } from './types';
@@ -24,6 +33,7 @@ import type { DomainMachine, DomainState } from './types';
 export interface StateRole {
   initial: boolean;
   failure: boolean;
+  deprecated: boolean;
   final: boolean;
 }
 
@@ -77,10 +87,25 @@ export function entryState(machine: DomainMachine): DomainState | null {
   return machine.states.find((state) => isInitial(machine, state)) ?? machine.states[0] ?? null;
 }
 
+/**
+ * Declared, then guessed. A machine that declares even one `@failure` silences
+ * the heuristic for all of its states: from then on an unmarked state is
+ * unmarked on purpose, and guessing over that would contradict a declaration.
+ */
+function isFailure(machine: DomainMachine, state: DomainState): boolean {
+  if (state.markers.includes('failure')) return true;
+  return !declaresFailure(machine) && isFailureName(state.name);
+}
+
+function declaresFailure(machine: DomainMachine): boolean {
+  return machine.states.some((s) => s.markers.includes('failure'));
+}
+
 export function stateRole(machine: DomainMachine, state: DomainState): StateRole {
   return {
     initial: isInitial(machine, state),
-    failure: isFailureName(state.name),
+    failure: isFailure(machine, state),
+    deprecated: state.markers.includes('deprecated'),
     final: state.outgoing.length === 0,
   };
 }

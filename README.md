@@ -53,6 +53,10 @@ The parser never depends on Crux — it analyzes sources statically:
   warnings instead of being silently dropped.
 - Effects per transition: the operations each event arm requests
   (`AudioOperation::Start`, crux `render()` → `Render`, ...).
+- Documentation the app already wrote: `///` on a state enum becomes the
+  machine's description and each variant's becomes its state's, with
+  `@failure` / `@deprecated` / `@tag <name>` lines inside them read as declared
+  markers. Author prose is carried verbatim and never translated.
 
 ## Running
 

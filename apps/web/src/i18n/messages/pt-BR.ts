@@ -26,9 +26,12 @@ export const ptBR: Catalog = {
   'inspector.outgoing': 'Saídas',
   'inspector.effects': 'Efeitos',
   'inspector.none': '—',
+  'inspector.tags': 'Etiquetas',
+  'inspector.aboutMachine': 'Sobre esta máquina',
 
   'badge.initial': 'inicial',
   'badge.failure': 'falha',
+  'badge.deprecated': 'descontinuado',
   'badge.final': 'final',
 
   'state.anyState': 'qualquer estado',

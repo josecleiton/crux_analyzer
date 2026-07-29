@@ -18,10 +18,12 @@ Três áreas, no estilo LangGraph Studio:
   `Pai / Filho`. Clicar em uma seção (no título ou na área vazia) seleciona o
   **estado de entrada** da máquina e enquadra essa máquina na view, então uma
   máquina pode ser inspecionada — e simulada — em um clique.
-- **Inspetor** (painel direito) — selecionar um estado mostra seus selos de papel
-  e seus eventos de entrada/saída; selecionar uma transição mostra
-  `evento: de ↓ para` mais os **efeitos** que ela solicita. A máquina proprietária
-  é etiquetada quando o core tem mais de uma.
+- **Inspetor** (painel direito) — selecionar um estado mostra seus selos de papel,
+  a descrição e as etiquetas escritas nele na fonte analisada, e seus eventos de
+  entrada/saída; selecionar uma transição mostra `evento: de ↓ para` mais os
+  **efeitos** que ela solicita. Em ambos os casos a descrição da própria máquina
+  encerra o painel. A máquina proprietária é etiquetada quando o core tem mais de
+  uma.
 
 ## Papéis dos estados
 
@@ -36,13 +38,52 @@ Os papéis são pintados no canvas o tempo todo, com ou sem simulação
   própria. Um curinga que valha para toda a máquina (`from: "*"`) ainda pode
   deixá-lo; essa fuga permanece visível como uma aresta partindo do nó **qualquer
   estado**.
-- **falha** (vermelho) — uma heurística de nomenclatura, o único palpite dos três:
-  as palavras do estado incluem uma palavra de falha (`Failed`, `Error`, `Denied`,
-  `Rejected`, `Invalid`, `TimedOut`, …). Isso nunca chega ao parser, que não deve
-  inventar semântica; um estado que é ao mesmo tempo falha e final mantém a borda
-  dupla em vermelho.
+- **falha** (vermelho) — declarada, depois adivinhada. Um marcador `@failure` no
+  comentário de documentação do estado na fonte analisada é autoritativo: ele
+  viaja no modelo como dado, então é a declaração do *autor* e a regra de
+  honestidade do parser continua valendo — nada foi inventado. Quando uma máquina
+  não declara nenhuma falha, a heurística de nomenclatura entra no lugar
+  (`Failed`, `Error`, `Denied`, `Rejected`, `Invalid`, `TimedOut`, …): o único
+  palpite dos quatro, e é por isso que ele vive na UI (`isFailureName`) e nunca no
+  parser. Um `@failure` em qualquer lugar de uma máquina silencia a heurística
+  para aquela máquina inteira — dali em diante um estado sem marcação está sem
+  marcação de propósito. Um estado que é ao mesmo tempo falha e final mantém a
+  borda dupla em vermelho.
+- **descontinuado** (âmbar, borda tracejada) — apenas declarado, a partir de
+  `@deprecated`. Nenhuma heurística o sustenta e nenhuma deveria: um nome nunca
+  diz que um estado está a caminho de sair. Os painéis também riscam o nome.
+  Tracejado em vez de esmaecido, porque esmaecer já significa "fora do alcance da
+  simulação".
 
 O Inspetor e o painel de simulação repetem os papéis como selos.
+
+## Documentação vinda da fonte
+
+Comentários de documentação no enum de estado da aplicação analisada chegam ao
+modelo e são renderizados **como estão** — são a prosa da própria aplicação,
+então nunca são traduzidos (veja [i18n.md](i18n.md)). Apenas os títulos em volta
+deles são.
+
+No canvas, um estado documentado carrega uma pequena marca de três linhas depois
+do rótulo e mostra sua descrição como tooltip nativo; uma caixa de seção faz o
+mesmo pela descrição do próprio enum de estado. `title` em vez de um cartão de
+hover de propósito: o React Flow escala o painel de nós, então um cartão dentro
+de um nó fica borrado e um fora precisa de um portal posicionado contra a
+transformação.
+
+O Inspetor e o painel de simulação mostram o texto completo com as quebras de
+parágrafo preservadas, mais quaisquer valores de `@tag` livres como chips
+monoespaçados — monoespaçado porque uma etiqueta é dado da aplicação analisada,
+diferente dos selos de papel em maiúsculas, que são o vocabulário desta UI. A
+descrição de um estado fica logo abaixo do seu nome, sem título; a descrição da
+própria máquina vem por último, sob *Sobre esta máquina*, junto com quaisquer
+marcadores declarados na região.
+
+Sintaxe Markdown dentro de um comentário de documentação **não** é renderizada
+aqui (nenhuma dependência de Markdown); linhas quebradas à mão são rejuntadas em
+parágrafos (`docParagraphs`), porque quebrar em 80 colunas no `///` não é um
+pedido de quebra de linha em um painel de 260px. O documento Markdown gerado é o
+cliente que renderiza Markdown como Markdown.
 
 ## Fonte de dados
 

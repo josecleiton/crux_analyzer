@@ -5,6 +5,7 @@ import type { Selection } from '../../state/selection';
 import { ANY_STATE_NAME } from '../../domain/types';
 import { useTranslate } from '../../i18n/useI18n';
 import { StateBadges, StateName } from './StateBadges';
+import { DocText, MachineDoc, StateTags } from './StateDoc';
 
 interface InspectorProps {
   core: DomainCore | null;
@@ -38,10 +39,15 @@ function InspectorBody({ core, selection }: InspectorProps) {
         <StateName name={state.name} role={role} />
         <MachineTag machine={machine} core={core} />
         <StateBadges role={role} />
+        {/* The state's own prose, under its own name — no heading needed. */}
+        {state.doc ? <DocText doc={state.doc} /> : null}
+        <StateTags tags={state.tags} />
         <h4>{t('inspector.incoming')}</h4>
         <EventList events={state.incoming.map((transition) => transition.event)} />
         <h4>{t('inspector.outgoing')}</h4>
         <EventList events={state.outgoing.map((transition) => transition.event)} />
+        {/* Context rather than the selection, so it comes last. */}
+        <MachineDoc machine={machine} />
       </div>
     );
   }
@@ -71,6 +77,7 @@ function InspectorBody({ core, selection }: InspectorProps) {
           <EventList events={transition.effects} />
         </>
       ) : null}
+      <MachineDoc machine={machine} />
     </div>
   );
 }

@@ -32,9 +32,12 @@ export const en = {
   'inspector.outgoing': 'Outgoing',
   'inspector.effects': 'Effects',
   'inspector.none': '—',
+  'inspector.tags': 'Tags',
+  'inspector.aboutMachine': 'About this machine',
 
   'badge.initial': 'initial',
   'badge.failure': 'failure',
+  'badge.deprecated': 'deprecated',
   'badge.final': 'final',
 
   // Prose standing in for the `"*"` wildcard sentinel carried by the model.

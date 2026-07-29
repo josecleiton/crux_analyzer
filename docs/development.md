@@ -78,7 +78,9 @@ source and compare against the CLI output before trusting the tests.
   See [i18n.md](i18n.md).
 - **Honesty rule** — the parser warns about anything it cannot infer; it
   never guesses and never drops silently. New inference features must keep
-  the corpus warning-free or explain each remaining warning.
+  the corpus warning-free or explain each remaining warning. Reading what the
+  source *declares* is fair game — annotations are data the parser may report —
+  but inference stays banned, and guesses stay in the clients.
 - **Evidence over shape** — detection heuristics (machines, composites,
   nested event enums) key on how the code *uses* a type, not on what it
   looks like. Follow that principle when extending detection.

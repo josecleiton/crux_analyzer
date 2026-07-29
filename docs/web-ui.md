@@ -18,10 +18,12 @@ Three areas, LangGraph-Studio style:
   Clicking a section (its title or empty area) selects the machine's **entry
   state** and frames that machine in the viewport, so a machine can be
   inspected — and simulated — in one click.
-- **Inspector** (right panel) — selecting a state shows its role badges and
-  its incoming/outgoing events; selecting a transition shows
-  `event: from ↓ to` plus the **effects** it requests. The owning machine is
-  tagged when the core has more than one.
+- **Inspector** (right panel) — selecting a state shows its role badges, the
+  description and tags authored on it in the analyzed source, and its
+  incoming/outgoing events; selecting a transition shows `event: from ↓ to`
+  plus the **effects** it requests. Either way the machine's own description
+  closes the panel. The owning machine is tagged when the core has more than
+  one.
 
 ## State roles
 
@@ -35,13 +37,47 @@ Roles are painted on the canvas at all times, simulation or not
 - **final** (violet, double border) — a dead end: no outgoing transition of
   its own. A machine-wide wildcard (`from: "*"`) may still leave it; that
   escape stays visible as an edge from the **any state** node.
-- **failure** (red) — a naming heuristic, the only guess of the three: the
-  state's words include a failure word (`Failed`, `Error`, `Denied`,
-  `Rejected`, `Invalid`, `TimedOut`, …). It never reaches the parser, which
-  must not invent semantics; a state that is both failure and final keeps the
-  double border in red.
+- **failure** (red) — declared, then guessed. A `@failure` marker in the
+  state's doc comment in the analyzed source is authoritative: it travels in the
+  model as data, so it is the *author's* statement and the parser honesty rule
+  holds — nothing was invented. When a machine declares no failure of its own,
+  the naming heuristic stands in (`Failed`, `Error`, `Denied`, `Rejected`,
+  `Invalid`, `TimedOut`, …): the only guess of the four, which is why it lives
+  in the UI (`isFailureName`) and never in the parser. One `@failure` anywhere
+  in a machine silences the heuristic for that whole machine — from then on an
+  unmarked state is unmarked deliberately. A state that is both failure and
+  final keeps the double border in red.
+- **deprecated** (amber, dashed border) — declared only, from `@deprecated`. No
+  heuristic backs it and none should: a name never says a state is on its way
+  out. The panels also strike the name through. Dashed rather than dimmed,
+  because dimming already means "outside the simulation's reach".
 
 The Inspector and the simulation panel repeat the roles as badges.
+
+## Documentation from the source
+
+Doc comments on the analyzed app's state enum reach the model and are rendered
+**as-is** — they are that application's own prose, so they are never translated
+(see [i18n.md](i18n.md)). Only the headings around them are.
+
+On the canvas a documented state carries a small three-line mark after its
+label and shows its description as a native tooltip; a section box does the
+same for the state enum's own description. `title` rather than a hover card on
+purpose: React Flow scales its node pane, so a card inside a node blurs and one
+outside needs a portal positioned against the transform.
+
+The Inspector and the simulation panel show the full text with paragraph breaks
+preserved, plus any free-form `@tag` values as monospace chips — monospace
+because a tag is data from the analyzed app, unlike the uppercase role badges,
+which are this UI's own vocabulary. A state's description sits directly under
+its name with no heading; the machine's own description comes last, under
+*About this machine*, together with any markers declared on the region.
+
+Markdown syntax inside a doc comment is **not** rendered here (no Markdown
+dependency); hard-wrapped lines are rejoined into paragraphs
+(`docParagraphs`), because `///` wrapping at 80 columns is not a request for
+line breaks in a 260px panel. The generated Markdown document is the client
+that renders Markdown as Markdown.
 
 ## Data source
 

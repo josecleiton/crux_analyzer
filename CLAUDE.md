@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-The original roadmap is fully implemented: syn-based parser (predicate guards, `==`/closure guards, `Default` resets, wildcard sources AND targets, value-flow analysis for runtime-assigned targets, hierarchical/composite states as `Parent/Child` paths, per-transition effects, multiple state machines per core), CLI (`crux-analyzer generate | docs`, both with `--watch`), doc generators (Mermaid with composite blocks, Markdown), and the web UI (machine sections, inspector with effects, Simulation Engine). The corpus test against a real app is gated on `CORPUS_SRC` and extracts it warning-free. `init.md` is the original project spec (in Portuguese).
+The original roadmap is fully implemented: syn-based parser (predicate guards, `==`/closure guards, `Default` resets, wildcard sources AND targets, value-flow analysis for runtime-assigned targets, hierarchical/composite states as `Parent/Child` paths, per-transition effects, multiple state machines per core, plus state/machine documentation and `@failure` / `@deprecated` / `@tag` annotations read from `///` doc comments), CLI (`crux-analyzer generate | docs`, both with `--watch`), doc generators (Mermaid with composite blocks and per-state notes, Markdown with a states table), and the web UI (machine sections, inspector with effects and authored documentation, Simulation Engine). The corpus test against a real app is gated on `CORPUS_SRC` and extracts it warning-free. `init.md` is the original project spec (in Portuguese).
 
 ## Documentation
 
@@ -14,7 +14,7 @@ The full documentation set lives in `docs/` (index at `docs/README.md`): archite
 
 - **English is the source language**: all git commit messages and all code — identifiers, comments, doc comments, schema descriptions — must be written in English.
 - **User-facing text is localized**: UI strings, CLI output, parser diagnostics and generated-document labels live in the locale catalogs (`en` + `pt-BR`), never as inline literals. Add a key instead of a string. Identifiers read out of the analyzed application (core/machine/state/event/effect names) are data and are never translated. See `docs/i18n.md`.
-- **Parser honesty rule**: what cannot be inferred statically is surfaced as a `Warning` (never silently dropped, never guessed). An assignment with *no* state evidence legitimately fires from any state (`"*"`).
+- **Parser honesty rule**: what cannot be inferred statically is surfaced as a `Warning` (never silently dropped, never guessed). An assignment with *no* state evidence legitimately fires from any state (`"*"`). Reading what the source *declares* is not guessing — doc comments and their `@failure` / `@deprecated` / `@tag` annotations are evidence and belong in the model; name-shaped inferences stay in the clients (`apps/web/src/domain/stateRole.ts`).
 
 ## Commands
 
@@ -74,3 +74,6 @@ Hard rules:
 
 - PlantUML/HTML generators; VS Code extension.
 - Visual nesting of composite states in the web graph (they currently render as flat `Parent / Child` nodes; Mermaid already nests them).
+- Doc comments on events, effects and transitions (only states and machines are covered today).
+- Marker styling in Mermaid (`classDef`) behind an explicit generator option — the default output states markers in words, since a hardcoded fill breaks in a dark-mode reader.
+- Rendering Markdown inside descriptions in the web UI (it currently shows as literal text; the generated document is the client for real Markdown).

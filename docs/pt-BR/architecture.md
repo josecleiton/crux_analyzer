@@ -61,14 +61,18 @@ construída (garantidas por camadas, verificadas em revisão):
    uma linha do componente Graph; esse é o teste decisivo da regra 4.
 5. **Regra da honestidade (parser)** — o que não pode ser inferido estaticamente
    é exposto como um `Warning`, nunca descartado em silêncio e nunca adivinhado.
-   Veja [parser.md](parser.md#referência-de-avisos).
+   Ler o que a fonte *declara* não é adivinhar: comentários de documentação e
+   suas anotações `@failure` / `@deprecated` / `@tag` são evidência e viajam no
+   modelo, enquanto inferências baseadas em nomes ficam nos clientes que as
+   quiserem (`domain/stateRole.ts`). Veja
+   [parser.md](parser.md#documentação-e-anotações).
 6. **Localização é uma preocupação de apresentação** — `crates/model`, a extração
    do parser e as camadas `domain/` / `flow/` / `layout/` da aplicação web não
    guardam texto traduzido. Diagnósticos viajam como dados (`WarningKind`) e os
    geradores recebem um locale; o texto traduzido é injetado na fronteira (props
    de componentes, `Labels`, `FlowLabels`). O modelo JSON permanece independente
-   de locale, e identificadores da aplicação analisada nunca são traduzidos.
-   Veja [i18n.md](i18n.md).
+   de locale: ele não guarda texto **nosso**, e identificadores e prosa do autor
+   lidos da aplicação analisada nunca são traduzidos. Veja [i18n.md](i18n.md).
 
 ## Camadas da aplicação web
 
