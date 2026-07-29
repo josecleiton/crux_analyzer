@@ -41,8 +41,14 @@ export function buildWebviewHtml(options: WebviewHtmlOptions): string {
   ].join('; ');
 
   // `</script>` inside author prose must not close the injection script;
-  // escaping `<` inside JSON strings is lossless.
-  const modelJson = JSON.stringify(model).replace(/</g, '\\u003c');
+  // escaping `<` inside JSON strings is lossless. U+2028/U+2029 go too:
+  // `JSON.stringify` leaves them raw and they are line terminators to a
+  // JavaScript parser, so prose containing one would break the statement on any
+  // engine older than ES2019.
+  const modelJson = JSON.stringify(model)
+    .replace(/</g, '\\u003c')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 
   return (
     indexHtml

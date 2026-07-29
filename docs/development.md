@@ -28,6 +28,7 @@ just            # lists every recipe
 | Corpus tests | `just corpus` | `QUIPU_SRC=<path> cargo test --workspace` |
 | Corpus coverage ratchet | `just quipu-coverage [floor]` | `cargo run -p crux-analyzer-cli -- coverage ... --min <floor>` |
 | Clippy | `just clippy` | `cargo clippy --workspace` |
+| Supply-chain gate | `just security` | `cargo deny check` + `pnpm audit --audit-level high` |
 | Everything | `just check` | — |
 | Model for the UI | `just model <src> <name>` | `cargo run -p crux-analyzer-cli -- generate ...` |
 | Docs | `just docs <src> <name> [format] [locale]` | `cargo run -p crux-analyzer-cli -- docs ...` |
@@ -90,8 +91,17 @@ ways this project can silently rot:
 | Guard | Catches |
 | --- | --- |
 | `just check` | broken tests, clippy, a missing message-catalog key (`tsc`) |
+| `security` | a dependency advisory, a license outside the allowed set, a git or wildcard dependency |
 | `fixture-guard` | the fixture starting to warn, or its documentation regressing below the floor |
 | `docs-current` | a committed generated example that no longer matches the generator |
+
+`just security` installs `cargo-deny` on first use — a gate people skip because
+it needs setup is not a gate. The policy lives in `deny.toml`, and
+[security.md](security.md) explains what it is defending.
+
+Note that `pnpm install --frozen-lockfile` still runs dependency lifecycle
+scripts, so CI executes the install hooks of every transitive dependency. That is
+the main reason a new dependency deserves a look rather than a `pnpm add`.
 
 The corpus test gates itself on `QUIPU_SRC`, and that source is not public — so
 CI proves the fixture path and the corpus stays a local gate. Keep it that way

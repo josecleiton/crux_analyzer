@@ -1,0 +1,34 @@
+# Dependency updates as pull requests, so a security release is something the
+# repository notices rather than something it waits to be told about.
+#
+# GitHub Actions is included deliberately: `ci.yml` pins actions to commit SHAs
+# (see the comment there), and a SHA pin never expires on its own — dependabot is
+# what keeps a pinned action from silently rotting.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for routine bumps; security advisories still come through on
+      # their own so they are never buried in a group.
+      rust-dependencies:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      js-dependencies:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

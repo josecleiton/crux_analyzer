@@ -86,6 +86,20 @@ elements and injects no HTML), and hard-wrapped `///` lines rejoin naturally,
 since Markdown treats a single newline as a soft break. Node and section
 tooltips are native `title` attributes, so there the prose stays plain text.
 
+That prose comes from whatever repository was analyzed, so three limits are
+spelled out rather than inherited from the library's defaults — see
+[security.md](security.md#1-author-prose-is-untrusted-text-everywhere-it-lands),
+and `StateDoc.test.tsx` if you are about to change them:
+
+- **link targets** may only be `http`, `https` or `mailto`, and open with
+  `rel="noopener noreferrer nofollow"`. A `javascript:` link renders as inert
+  text.
+- **images are never fetched.** An `![](https://host/pixel.png)` in a doc
+  comment would report every reader of a published document to that host, so
+  the alt text is shown in its place.
+- **raw HTML has no path to the DOM.** No `dangerouslySetInnerHTML`, and
+  `rehype-raw` must not be added.
+
 ## Filtering the canvas
 
 Two reading filters. Both say "these, not the rest" the same way the

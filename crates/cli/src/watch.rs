@@ -14,8 +14,21 @@ const DEBOUNCE: Duration = Duration::from_millis(300);
 
 /// Runs `run` once, then again after every relevant filesystem change.
 /// Only returns on watcher setup failure (Ctrl-C ends the process).
-pub fn watch(src: &Path, messages: &Messages, run: impl Fn() -> ExitCode) -> ExitCode {
+///
+/// `out` is the output path, if any: writing it must not be mistaken for a
+/// source change, or `--out` inside `--src` with a `.rs` name would regenerate
+/// forever.
+pub fn watch(
+    src: &Path,
+    out: Option<&Path>,
+    messages: &Messages,
+    run: impl Fn() -> ExitCode,
+) -> ExitCode {
     run();
+
+    // Canonicalized once: the events carry absolute paths, and the output file
+    // now exists (`run` just wrote it).
+    let out = out.and_then(|path| path.canonicalize().ok());
 
     let (sender, receiver) = mpsc::channel();
     let mut watcher = match notify::recommended_watcher(sender) {
@@ -40,7 +53,13 @@ pub fn watch(src: &Path, messages: &Messages, run: impl Fn() -> ExitCode) -> Exi
     eprintln!("{}", messages.watching(src));
 
     while let Ok(event) = receiver.recv() {
-        if !is_relevant(&event) {
+        // A watcher error is reported rather than dropped: an inotify queue
+        // overflow otherwise leaves the output silently stale.
+        if let Err(err) = &event {
+            eprintln!("{}: {err}", messages.warning_prefix());
+            continue;
+        }
+        if !is_relevant(&event, out.as_deref()) {
             continue;
         }
         // Debounce: absorb the burst of events an editor save produces.
@@ -54,12 +73,14 @@ pub fn watch(src: &Path, messages: &Messages, run: impl Fn() -> ExitCode) -> Exi
     ExitCode::SUCCESS
 }
 
-fn is_relevant(event: &notify::Result<notify::Event>) -> bool {
+fn is_relevant(event: &notify::Result<notify::Event>, out: Option<&Path>) -> bool {
     match event {
-        Ok(event) => event
-            .paths
-            .iter()
-            .any(|path| path.extension().is_some_and(|ext| ext == "rs")),
+        Ok(event) => event.paths.iter().any(|path| {
+            // A path that no longer resolves was deleted — still a change. Only
+            // a path that resolves to the output file is ignored.
+            path.extension().is_some_and(|ext| ext == "rs")
+                && !matches!((path.canonicalize(), out), (Ok(p), Some(out)) if p == out)
+        }),
         Err(_) => false,
     }
 }

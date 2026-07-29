@@ -593,6 +593,10 @@ body {
   color: var(--text-muted);
   font-size: 13px;
   line-height: 1.5;
+  /* Prose is the analyzed app's, so it can contain a token longer than this
+     panel — a long identifier, a URL — which would otherwise reach past the
+     edge instead of wrapping. */
+  overflow-wrap: break-word;
 }
 
 .doc-text p + p {
@@ -653,6 +657,38 @@ body {
   margin: 6px 0;
   padding-left: 10px;
   border-left: 2px solid var(--border-strong);
+}
+
+/* An image in author prose is never fetched — it would report every reader of a
+   published document to its host — so the alt text stands in for it. */
+.doc-text .doc-image {
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+/* The error boundary: shown only when rendering the model failed outright. */
+.fatal-error {
+  max-width: 60ch;
+  margin: 48px auto;
+  padding: 0 24px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.fatal-error h1 {
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.fatal-error pre {
+  margin-top: 12px;
+  padding: 10px;
+  background: var(--bg-hover);
+  border-radius: 6px;
+  overflow-x: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
 }
 
 .state-tags {

@@ -28,6 +28,7 @@ just            # lista todas as receitas
 | Testes de corpus | `just corpus` | `QUIPU_SRC=<caminho> cargo test --workspace` |
 | Catraca de cobertura do corpus | `just quipu-coverage [piso]` | `cargo run -p crux-analyzer-cli -- coverage ... --min <piso>` |
 | Clippy | `just clippy` | `cargo clippy --workspace` |
+| Gate de cadeia de suprimentos | `just security` | `cargo deny check` + `pnpm audit --audit-level high` |
 | Tudo | `just check` | — |
 | Modelo para a UI | `just model <src> <nome>` | `cargo run -p crux-analyzer-cli -- generate ...` |
 | Documentação | `just docs <src> <nome> [formato] [locale]` | `cargo run -p crux-analyzer-cli -- docs ...` |
@@ -92,8 +93,18 @@ quais este projeto pode apodrecer em silêncio:
 | Guarda | Pega |
 | --- | --- |
 | `just check` | testes quebrados, clippy, uma chave faltando no catálogo de mensagens (`tsc`) |
+| `security` | um aviso de segurança em dependência, uma licença fora do conjunto permitido, uma dependência git ou com wildcard |
 | `fixture-guard` | o fixture começando a emitir avisos, ou sua documentação regredindo abaixo do piso |
 | `docs-current` | um exemplo gerado versionado que não corresponde mais ao gerador |
+
+O `just security` instala o `cargo-deny` no primeiro uso — um gate que as pessoas
+pulam porque precisa de setup não é um gate. A política vive no `deny.toml`, e o
+[security.md](security.md) explica o que ela está defendendo.
+
+Note que `pnpm install --frozen-lockfile` ainda executa scripts de ciclo de vida
+das dependências, então o CI executa os hooks de instalação de cada dependência
+transitiva. Esse é o principal motivo pelo qual uma nova dependência merece uma
+olhada em vez de um `pnpm add`.
 
 O teste do corpus se auto-restringe por `QUIPU_SRC`, e essa fonte não é pública —
 então o CI comprova o caminho do fixture e o corpus continua sendo uma guarda

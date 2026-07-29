@@ -121,6 +121,47 @@ Observed while building; all six closed, in the order they were listed:
 
 ---
 
+## 4b. Hardening for public use ✅ **done**
+
+Prompted by the question "do we have security problems?" ahead of putting this in
+front of an audience. An audit of both sides found four classes, all now closed
+and all pinned by tests. [security.md](security.md) is the standing contract —
+threat model, rules, and the properties that must not be traded away — and
+`CLAUDE.md` carries the short form as a peer to the parser honesty rule.
+
+- **Resource limits in the parser.** The call-following walker broke recursion
+  *cycles* but never bounded fan-out, so a diamond call graph of ~40 tiny
+  functions described 2⁴⁰ walks — a hang and an OOM from a 60-line file. Now a
+  step budget, depth caps and a call-depth cap, plus per-file and total size
+  caps, and a bracket-nesting pre-check (`syn::parse_file` recurses over nesting
+  and its stack overflow *aborts the process*, so that one has to run before
+  parsing). Every cap reports a `Warning`: the honesty rule, applied to
+  resources, which makes `--deny-warnings` cover truncation for free.
+- **Output encoding in docgen.** Doc-comment prose reached published Markdown
+  verbatim, so raw HTML became a real element and a fence-shaped line hijacked
+  the diagram's fence. Now `<`/`&`/`>` are escaped in prose while author
+  *Markdown* is preserved, fences are computed to outgrow their content, table
+  cells escape the backslash before the pipe, and Mermaid ids are generated,
+  collision-checked and keyword-checked with the real name in a quoted label.
+- **The web app's Markdown posture is now explicit and tested.** react-markdown's
+  defaults were already safe, but that was a property of the dependency; the
+  protocol allowlist, link `rel`, and never fetching images are stated in
+  `StateDoc.tsx` and pinned by `StateDoc.test.tsx`. Plus a CSP on the static site
+  (hashes computed at build, not pasted), an error boundary, and a fix for a
+  prototype-chain lookup that let an event variant named `constructor` blank the
+  app.
+- **The extension and the supply chain.** `cruxAnalyzer.binary` is machine-scoped
+  so a cloned repo cannot choose the executable; `cruxAnalyzer.src` is contained
+  to the workspace root. CI declares `permissions:`, passes `github.event.*`
+  through `env:`, and pins third-party actions to commit SHAs. `just security`
+  (`cargo deny` + `pnpm audit`) is blocking inside `just check`, with dependabot
+  keeping the pins fresh.
+
+Deliberately *not* done: fuzzing the parser (`cargo-fuzz` over `parse_project`)
+would be the natural next step and is listed in §6.
+
+---
+
 ## 5. Distribution — getting it into other people's hands
 
 Nobody outside this checkout can install the tool. `cargo run` and `just` are a
@@ -265,3 +306,9 @@ Two license obligations are unmet **today**, so they are bugs rather than plans:
 - **Inferring markers from names in the parser.** The naming heuristic stays in
   the clients. See the honesty rule in
   [architecture.md](architecture.md#hard-rules).
+- **Fuzzing the parser.** `cargo-fuzz` over `parse_project` is the natural
+  successor to §4b: the resource limits and the nesting pre-check were found by
+  writing hostile inputs *by hand*, and a fuzzer finds the ones nobody thought
+  of. Deferred rather than refused — it wants a CI budget (a fuzz job is not a
+  60-second gate) and a corpus to be worth anything, so it belongs after
+  distribution rather than squeezed into `just check`.

@@ -20,10 +20,29 @@ crux-analyzer generate --src <dir> [--name <projeto>] [--out <arquivo>] [--watch
 | `--watch` | Continua observando `--src` e regenera a cada mudança em `.rs` (com debounce). |
 | `--locale` | `en` ou `pt-BR`. Idioma da saída da própria CLI e da prosa gerada — veja abaixo. |
 | `--deny-warnings` | Sai com código diferente de zero se o parser reportou algo. Global: funciona em todos os subcomandos. |
+| `--max-file-size` | Ignora arquivos `.rs` maiores que este número de bytes (padrão 2 MiB). Global. |
+| `--max-total-size` | Para de ler quando esta quantidade de bytes de fonte tiver sido carregada (padrão 256 MiB). Global. |
+| `--max-steps` | Passos de caminhada por expressão permitidos por núcleo (padrão 2.000.000). Global. |
 
 Avisos (veja a [referência de avisos](parser.md#referência-de-avisos)) vão para
 stderr; o JSON vai para `--out`/stdout. O código de saída é diferente de zero
 quando o parsing falha (por exemplo, nenhum `impl App` encontrado).
+
+### Limites de recursos
+
+As flags `--max-*` existem porque o analisador é rotineiramente apontado para
+código que ninguém do seu time escreveu — uma dependência, um pull request de um
+fork, um crate que alguém baixou. Os padrões estão muito acima de qualquer
+aplicação Crux real (a fixture de teste usa uma contagem de passos de quatro
+dígitos) e muito abaixo do necessário para travar uma máquina, então **você nunca
+deve precisar mudá-los**; aumente um apenas para uma base de código grande em que
+você confia.
+
+Todo limite obedece à regra da honestidade: acioná-lo emite um aviso
+([avisos de recursos](parser.md#avisos-de-recursos)), então o `--deny-warnings`
+faz uma análise truncada falhar a execução em vez de publicar um diagrama
+silenciosamente parcial. O `docs/security.md` explica o que cada limite delimita e
+por que memoização não é a alternativa.
 
 O `--deny-warnings` ainda escreve a saída — o código de saída é o sinal, para que
 um pipeline falhe enquanto uma pessoa ainda recebe o artefato para olhar. Sob

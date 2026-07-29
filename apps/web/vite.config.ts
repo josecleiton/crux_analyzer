@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { cspPlugin } from './csp.js'
 
 // A static documentation site is a first-class deployment of this app
 // (`just site <src> <name> [base]`), and such a site is often served from a
@@ -21,5 +22,5 @@ function normalizeBase(raw: string | undefined): string {
 // https://vite.dev/config/
 export default defineConfig({
   base,
-  plugins: [react()],
+  plugins: [react(), cspPlugin()],
 })

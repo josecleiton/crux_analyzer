@@ -126,6 +126,51 @@ listadas:
 
 ---
 
+## 4b. Endurecimento para uso público ✅ **feito**
+
+Motivado pela pergunta "temos problemas de segurança?" antes de colocar isto
+diante de um público. Uma auditoria dos dois lados encontrou quatro classes, todas
+agora fechadas e todas fixadas por testes. O [security.md](security.md) é o
+contrato permanente — modelo de ameaça, regras, e as propriedades que não devem
+ser negociadas — e o `CLAUDE.md` carrega a forma curta como par da regra de
+honestidade do parser.
+
+- **Limites de recursos no parser.** O walker que segue chamadas quebrava *ciclos*
+  de recursão mas nunca limitava o fan-out, então um grafo de chamadas em diamante
+  com ~40 funções minúsculas descrevia 2⁴⁰ caminhadas — um travamento e um OOM a
+  partir de um arquivo de 60 linhas. Agora há um orçamento de passos, limites de
+  profundidade e de profundidade de chamadas, mais limites de tamanho por arquivo
+  e total, e uma verificação prévia de aninhamento de delimitadores
+  (`syn::parse_file` recursa sobre aninhamento e seu stack overflow *aborta o
+  processo*, então essa precisa rodar antes do parsing). Todo limite reporta um
+  `Warning`: a regra da honestidade aplicada a recursos, o que faz o
+  `--deny-warnings` cobrir truncamento de graça.
+- **Codificação de saída no docgen.** A prosa dos doc comments chegava ao Markdown
+  publicado verbatim, então HTML cru se tornava um elemento real e uma linha em
+  forma de cerca sequestrava a cerca do diagrama. Agora `<`/`&`/`>` são escapados
+  na prosa enquanto o *Markdown* autoral é preservado, cercas são calculadas para
+  superar seu conteúdo, células de tabela escapam a barra invertida antes do pipe,
+  e ids do Mermaid são gerados, verificados contra colisão e contra palavras
+  reservadas, com o nome real num rótulo entre aspas.
+- **A postura de Markdown da UI web agora é explícita e testada.** Os padrões do
+  react-markdown já eram seguros, mas isso era uma propriedade da dependência; a
+  lista de protocolos permitidos, o `rel` dos links e o não-carregamento de
+  imagens estão declarados no `StateDoc.tsx` e fixados pelo `StateDoc.test.tsx`.
+  Mais um CSP no site estático (hashes calculados no build, não colados), um error
+  boundary, e a correção de uma busca pela cadeia de protótipos que permitia a uma
+  variante de evento chamada `constructor` apagar a aplicação.
+- **A extensão e a cadeia de suprimentos.** `cruxAnalyzer.binary` tem escopo de
+  máquina para que um repositório clonado não escolha o executável;
+  `cruxAnalyzer.src` é contido à raiz do workspace. O CI declara `permissions:`,
+  passa `github.event.*` por `env:` e fixa actions de terceiros em SHAs de commit.
+  O `just security` (`cargo deny` + `pnpm audit`) é bloqueante dentro do
+  `just check`, com o dependabot mantendo os pins frescos.
+
+Deliberadamente *não* feito: fuzzing do parser (`cargo-fuzz` sobre
+`parse_project`) seria o próximo passo natural e está listado na §6.
+
+---
+
 ## 5. Distribuição — colocar na mão de outras pessoas
 
 Ninguém fora deste checkout consegue instalar a ferramenta. `cargo run` e `just`
@@ -274,3 +319,9 @@ planos:
 - **Inferir marcadores a partir de nomes no parser.** A heurística de
   nomenclatura fica nos clientes. Veja a regra de honestidade em
   [architecture.md](architecture.md#regras-rígidas).
+- **Fuzzing do parser.** `cargo-fuzz` sobre `parse_project` é o sucessor natural
+  da §4b: os limites de recursos e a verificação prévia de aninhamento foram
+  encontrados escrevendo entradas hostis *à mão*, e um fuzzer encontra as que
+  ninguém pensou. Adiado, não recusado — precisa de orçamento de CI (um job de
+  fuzz não é um gate de 60 segundos) e de um corpus para valer algo, então fica
+  depois da distribuição em vez de espremido no `just check`.
