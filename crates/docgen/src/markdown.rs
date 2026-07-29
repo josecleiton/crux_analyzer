@@ -29,6 +29,7 @@ pub fn markdown(project: &Project, locale: Locale) -> String {
                 push_line(&mut out, "");
                 push_line(&mut out, doc.trim());
             }
+            push_machine_annotations(&mut out, machine, &labels);
 
             push_line(&mut out, "");
             push_line(&mut out, "```mermaid");
@@ -66,6 +67,44 @@ pub fn markdown(project: &Project, locale: Locale) -> String {
     }
 
     out
+}
+
+/// Markers and tags declared on the state enum itself. They describe the whole
+/// region, so they belong beside its description rather than in the per-state
+/// table.
+fn push_machine_annotations(out: &mut String, machine: &Machine, labels: &Labels) {
+    if !machine.markers.is_empty() {
+        push_line(out, "");
+        push_line(
+            out,
+            &format!(
+                "**{}:** {}",
+                labels.markers,
+                machine
+                    .markers
+                    .iter()
+                    .map(|marker| marker_label(*marker, labels))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        );
+    }
+    if !machine.tags.is_empty() {
+        push_line(out, "");
+        push_line(
+            out,
+            &format!(
+                "**{}:** {}",
+                labels.tags,
+                machine
+                    .tags
+                    .iter()
+                    .map(|tag| format!("`{tag}`"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        );
+    }
 }
 
 /// The states table, plus a section per state whose description does not fit

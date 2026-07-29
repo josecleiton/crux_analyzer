@@ -1,3 +1,8 @@
+/// Mirrors the finished take to the server.
+///
+/// Being folded into `RecorderState`, which already tracks the upload.
+///
+/// @deprecated
 pub enum UploadState {
     Empty,
     Uploading,
