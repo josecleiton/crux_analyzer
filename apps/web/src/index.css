@@ -168,3 +168,75 @@ body {
 .transition-arrow {
   color: #6b7280;
 }
+
+/* --- Graph: nodes ------------------------------------------------------- */
+
+.state-node {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 0 12px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2430;
+  cursor: pointer;
+}
+
+.state-node:hover {
+  border-color: #a5b4fc;
+}
+
+.state-node.selected {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+  color: #4338ca;
+}
+
+.state-node-handle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* --- Graph: edges ------------------------------------------------------- */
+
+.routed-edge {
+  stroke: #8792a2;
+  stroke-width: 1.5;
+}
+
+.routed-edge.selected {
+  stroke: #6366f1;
+  stroke-width: 2.25;
+}
+
+.edge-label {
+  cursor: pointer;
+}
+
+.edge-label-box {
+  fill: #ffffff;
+  stroke: #e2e5ea;
+}
+
+.edge-label-text {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  fill: #4b5563;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.edge-label.selected .edge-label-box {
+  fill: #eef2ff;
+  stroke: #6366f1;
+}
+
+.edge-label.selected .edge-label-text {
+  fill: #4338ca;
+}
