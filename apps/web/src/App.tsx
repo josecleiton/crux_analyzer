@@ -8,6 +8,7 @@ import { toFlowModel } from './flow/toFlowModel';
 import type { LayoutEngine, LayoutResult } from './layout/LayoutEngine';
 import { ElkLayoutEngine } from './layout/ElkLayoutEngine';
 import type { Selection } from './state/selection';
+import { fromHash, resolveUrlState, toHash } from './state/urlSelection';
 import type { Simulation } from './simulation/engine';
 import {
   availableTransitions,
@@ -44,12 +45,47 @@ export default function App() {
     loadProject().then((loaded) => {
       if (cancelled) return;
       setProject(loaded);
-      setActiveCoreId(loaded.cores[0]?.id ?? null);
+      // a deep link (#state=Core/Machine/Name) lands selected; a stale or
+      // foreign one falls back to the first core, nothing selected
+      const initial = resolveUrlState(loaded, fromHash(window.location.hash));
+      setActiveCoreId(initial.coreId ?? loaded.cores[0]?.id ?? null);
+      setSelection(initial.selection);
     });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // The address bar mirrors the selection — replaceState, so casual clicking
+  // does not pile up history entries. The default view keeps a clean URL.
+  useEffect(() => {
+    if (!project) return;
+    const defaultCoreId = project.cores[0]?.id ?? null;
+    const hash = toHash({
+      coreId: activeCoreId === defaultCoreId && !selection ? null : activeCoreId,
+      selection,
+    });
+    const base = window.location.pathname + window.location.search;
+    window.history.replaceState(null, '', hash === '' ? base : base + hash);
+  }, [project, activeCoreId, selection]);
+
+  // A link pasted into the address bar applies without a reload.
+  useEffect(() => {
+    if (!project) return;
+    const onHashChange = () => {
+      const resolved = resolveUrlState(project, fromHash(window.location.hash));
+      if (!resolved.coreId) return;
+      if (resolved.coreId !== activeCoreId) {
+        setActiveCoreId(resolved.coreId);
+        setSimulation(null);
+        setTagQuery('');
+        setUndocumentedOnly(false);
+      }
+      setSelection(resolved.selection);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [project, activeCoreId]);
 
   const activeCore = useMemo(
     () => project?.cores.find((core) => core.id === activeCoreId) ?? null,
