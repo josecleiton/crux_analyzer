@@ -1,4 +1,5 @@
 import type { Theme } from '../../theme/theme';
+import { useTranslate } from '../../i18n/useI18n';
 
 interface ThemeToggleProps {
   theme: Theme;
@@ -6,14 +7,12 @@ interface ThemeToggleProps {
 }
 
 export function ThemeToggle({ theme, onToggle }: ThemeToggleProps) {
-  const next = theme === 'dark' ? 'light' : 'dark';
+  const t = useTranslate();
+  // One key per destination rather than one template with the mode name: the
+  // adjective has to agree with the noun in several locales.
+  const label = theme === 'dark' ? t('themeToggle.switchToLight') : t('themeToggle.switchToDark');
   return (
-    <button
-      className="theme-toggle"
-      onClick={onToggle}
-      title={`Switch to ${next} mode`}
-      aria-label={`Switch to ${next} mode`}
-    >
+    <button className="theme-toggle" onClick={onToggle} title={label} aria-label={label}>
       {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
     </button>
   );

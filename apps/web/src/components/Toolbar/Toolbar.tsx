@@ -1,4 +1,6 @@
 import type { Theme } from '../../theme/theme';
+import { useTranslate } from '../../i18n/useI18n';
+import { LocaleToggle } from './LocaleToggle';
 import { ThemeToggle } from './ThemeToggle';
 
 interface ToolbarProps {
@@ -20,6 +22,7 @@ export function Toolbar({
   onRelayout,
   onToggleTheme,
 }: ToolbarProps) {
+  const t = useTranslate();
   return (
     <header className="toolbar">
       <span className="toolbar-title">
@@ -28,9 +31,10 @@ export function Toolbar({
       </span>
       <div className="toolbar-actions">
         <button className={simulating ? 'active' : ''} onClick={onToggleSimulation}>
-          {simulating ? 'Stop simulation' : 'Simulate'}
+          {simulating ? t('toolbar.stopSimulation') : t('toolbar.simulate')}
         </button>
-        <button onClick={onRelayout}>Re-layout</button>
+        <button onClick={onRelayout}>{t('toolbar.relayout')}</button>
+        <LocaleToggle />
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
       </div>
     </header>

@@ -8,8 +8,10 @@
 import { ReactFlow, Background, Controls } from '@xyflow/react';
 import type { Edge, Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { useMemo } from 'react';
 import type { Selection } from '../../state/selection';
 import type { Theme } from '../../theme/theme';
+import { useTranslate } from '../../i18n/useI18n';
 import { useGraphColors } from '../../theme/useTheme';
 import { StateNode } from './StateNode';
 import { AnyStateNode } from './AnyStateNode';
@@ -52,6 +54,19 @@ interface GraphProps {
 
 export function Graph({ nodes, edges, selection, onSelect, highlight, theme }: GraphProps) {
   const colors = useGraphColors(theme);
+  const t = useTranslate();
+
+  // React Flow ships English accessible names for its own controls; without
+  // this they would stay English while the rest of the UI is translated.
+  const ariaLabelConfig = useMemo(
+    () => ({
+      'controls.ariaLabel': t('graph.a11y.controls'),
+      'controls.zoomIn.ariaLabel': t('graph.a11y.zoomIn'),
+      'controls.zoomOut.ariaLabel': t('graph.a11y.zoomOut'),
+      'controls.fitView.ariaLabel': t('graph.a11y.fitView'),
+    }),
+    [t],
+  );
 
   // Alternating pulse class: re-adding the same class would not restart the
   // arrival animation when a transition loops back to the current state.
@@ -134,6 +149,7 @@ export function Graph({ nodes, edges, selection, onSelect, highlight, theme }: G
       nodesDraggable={false}
       nodesConnectable={false}
       colorMode={theme}
+      ariaLabelConfig={ariaLabelConfig}
       fitView
       fitViewOptions={{ padding: 0.15 }}
       proOptions={{ hideAttribution: true }}

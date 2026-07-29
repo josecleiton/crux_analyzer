@@ -4,6 +4,7 @@
  */
 
 import type { StateRole } from '../../domain/stateRole';
+import { useTranslate } from '../../i18n/useI18n';
 
 export function StateName({ name, role }: { name: string; role: StateRole }) {
   const tone = role.failure ? ' failure' : role.final ? ' final' : '';
@@ -11,12 +12,13 @@ export function StateName({ name, role }: { name: string; role: StateRole }) {
 }
 
 export function StateBadges({ role }: { role: StateRole }) {
+  const t = useTranslate();
   if (!role.initial && !role.failure && !role.final) return null;
   return (
     <div className="state-badges">
-      {role.initial ? <span className="state-badge initial">initial</span> : null}
-      {role.failure ? <span className="state-badge failure">failure</span> : null}
-      {role.final ? <span className="state-badge final">final</span> : null}
+      {role.initial ? <span className="state-badge initial">{t('badge.initial')}</span> : null}
+      {role.failure ? <span className="state-badge failure">{t('badge.failure')}</span> : null}
+      {role.final ? <span className="state-badge final">{t('badge.final')}</span> : null}
     </div>
   );
 }

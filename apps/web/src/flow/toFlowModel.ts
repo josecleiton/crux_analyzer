@@ -18,6 +18,20 @@ export interface FlowModel {
   edges: Edge[];
 }
 
+/**
+ * Chrome this layer has to render but must not author.
+ *
+ * Localization is a presentation concern: the mapper receives already-
+ * translated text from the component boundary instead of importing the message
+ * catalog, which keeps this layer (and the domain below it) language-free.
+ * It matters for geometry too — node widths are estimated from the label, so
+ * the *translated* string is the one that has to be measured.
+ */
+export interface FlowLabels {
+  /** Label of the wildcard pseudo-node. */
+  anyState: string;
+}
+
 const NODE_HEIGHT = 44;
 const NODE_MIN_WIDTH = 110;
 const NODE_PADDING_X = 44;
@@ -26,7 +40,7 @@ const NODE_CHAR_WIDTH = 7.6;
 /** Extra room for the initial-state dot rendered before the label. */
 const INITIAL_MARKER_WIDTH = 14;
 
-export function toFlowModel(core: DomainCore): FlowModel {
+export function toFlowModel(core: DomainCore, labels: FlowLabels): FlowModel {
   const grouped = core.machines.length > 1;
   const nodes: Node[] = [];
   const edges: Edge[] = [];
@@ -41,14 +55,18 @@ export function toFlowModel(core: DomainCore): FlowModel {
         position: { x: 0, y: 0 },
       });
     }
-    nodes.push(...machineNodes(machine, grouped ? machine.id : undefined));
+    nodes.push(...machineNodes(machine, grouped ? machine.id : undefined, labels));
     edges.push(...machineEdges(machine));
   }
 
   return { nodes, edges };
 }
 
-function machineNodes(machine: DomainMachine, parentId: string | undefined): Node[] {
+function machineNodes(
+  machine: DomainMachine,
+  parentId: string | undefined,
+  labels: FlowLabels,
+): Node[] {
   const base = { parentId, position: { x: 0, y: 0 } };
 
   const nodes: Node[] = machine.states.map((state) => {
@@ -71,8 +89,8 @@ function machineNodes(machine: DomainMachine, parentId: string | undefined): Nod
       ...base,
       id: wildcardStateId(machine.id),
       type: 'anyState',
-      data: { label: 'any state' },
-      width: nodeWidth('any state'),
+      data: { label: labels.anyState },
+      width: nodeWidth(labels.anyState),
       height: 36,
     });
   }
