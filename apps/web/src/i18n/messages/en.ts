@@ -56,6 +56,8 @@ export const en = {
   'simulation.unknownState': '?',
   'simulation.sendEvent': 'Send event',
   'simulation.noEvents': 'No events can fire from here.',
+  'simulation.runtimeTargetNote':
+    'These land on a state decided at runtime, so the replay cannot follow them.',
   'simulation.trail': 'Trail',
   'simulation.nothingFired': 'Nothing fired yet.',
   'simulation.restart': 'Restart',
