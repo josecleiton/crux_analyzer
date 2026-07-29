@@ -131,7 +131,8 @@ mesmos tokens (`src/theme/theme.ts`), mantendo o CSS como única fonte da verdad
 ## Localização
 
 O alternador de idioma na barra de ferramentas troca entre inglês e português
-(`en` / `pt-BR`); ele mostra o código curto do locale para o qual *vai* mudar. O
+(`en` / `pt-BR`); ele mostra o código curto do locale **ativo**, enquanto o
+tooltip e o nome acessível dizem para qual idioma o clique leva. O
 módulo (`src/i18n/`) espelha o tema de propósito: o locale ativo é o atributo
 `data-locale` no `<html>` (com `lang` definido junto, para tecnologia assistiva),
 a escolha persiste em `localStorage`, um script pré-pintura em `index.html` a

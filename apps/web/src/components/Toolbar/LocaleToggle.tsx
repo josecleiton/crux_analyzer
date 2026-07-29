@@ -1,9 +1,10 @@
 /**
  * Language switcher, sitting next to the theme toggle.
  *
- * The button shows the locale it will switch *to*, and its accessible name
- * uses that locale's endonym — a language is named in its own language, so the
- * name is substituted untranslated.
+ * The button shows the **active** locale: a text label reads as state, and
+ * showing the destination instead made the UI look mislabeled. Where it leads
+ * is the accessible name and the tooltip, using the target locale's endonym —
+ * a language is named in its own language, so the name goes in untranslated.
  */
 
 import { LOCALES, localeEndonym, localeShortLabel } from '../../i18n/locale';
@@ -21,7 +22,7 @@ export function LocaleToggle() {
       title={label}
       aria-label={label}
     >
-      {localeShortLabel(next)}
+      {localeShortLabel(locale)}
     </button>
   );
 }
