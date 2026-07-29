@@ -154,6 +154,18 @@ validating every message.
   [`deny.toml`](../deny.toml) + `pnpm audit --audit-level high`). It is part of
   `just check`, so it is blocking.
 - Both lockfiles are committed and `cargo` runs `--locked`.
+- **No dependency runs code at install time.** pnpm blocks dependency lifecycle
+  scripts unless the package is allowed in `allowBuilds`
+  ([`pnpm-workspace.yaml`](../pnpm-workspace.yaml)), and that map is **empty** —
+  written out rather than left to the default, so allowing one is a reviewable
+  diff instead of a local `pnpm approve-builds` nobody sees. Nothing in the tree
+  needs building today. A blocked script is reported
+  (`ERR_PNPM_IGNORED_BUILDS`), never silent, which is the honesty rule applied to
+  install-time code.
+- **The package manager is pinned by hash.** `packageManager` carries pnpm's
+  version *and* its sha512, so corepack refuses a substituted tarball; a
+  compromised release of the tool that installs everything else would otherwise
+  be the shortest path into every build.
 - GitHub Actions are pinned to **commit SHAs**, not tags — `@stable` and `@v2`
   are mutable refs. Dependabot keeps the pins from rotting.
 - Workflows declare `permissions:` explicitly, and untrusted `${{ }}` values

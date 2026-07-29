@@ -22,8 +22,8 @@ use std::path::{Path, PathBuf};
 use syn::spanned::Spanned;
 
 use crate::ast_util::{
-    as_matches_macro, enum_variant_of_expr, enum_variant_path, expr_path_string, is_catch_all,
-    last_field_name, pattern_variants,
+    arm_pattern_and_guard, as_matches_macro, enum_variant_of_expr, enum_variant_path,
+    expr_path_string, is_catch_all, last_field_name, pattern_variants,
 };
 use crate::core_finder::CoreInfo;
 use crate::index::CrateIndex;
@@ -454,7 +454,8 @@ impl<'w, 'a> Walker<'w, 'a> {
         // Anything else: walk generically.
         self.walk_expr(&expr_match.expr, ctx, self_ty, file);
         for arm in &expr_match.arms {
-            if let Some((_, guard)) = &arm.guard {
+            let (_, guard) = arm_pattern_and_guard(arm);
+            if let Some(guard) = guard {
                 self.walk_expr(guard, ctx, self_ty, file);
             }
             self.walk_expr(&arm.body, ctx, self_ty, file);
@@ -464,7 +465,7 @@ impl<'w, 'a> Walker<'w, 'a> {
     fn arms_reference_enum(&self, arms: &[syn::Arm], enum_name: &str) -> bool {
         arms.iter().any(|arm| {
             let mut variants = Vec::new();
-            pattern_variants(&arm.pat, &mut variants);
+            pattern_variants(arm_pattern_and_guard(arm).0, &mut variants);
             variants.iter().any(|(e, _)| e == enum_name)
         })
     }
@@ -472,7 +473,7 @@ impl<'w, 'a> Walker<'w, 'a> {
     fn arms_reference_events(&self, arms: &[syn::Arm]) -> bool {
         arms.iter().any(|arm| {
             let mut variants = Vec::new();
-            pattern_variants(&arm.pat, &mut variants);
+            pattern_variants(arm_pattern_and_guard(arm).0, &mut variants);
             variants.iter().any(|(e, _)| self.is_event_enum(e))
         })
     }
@@ -488,11 +489,12 @@ impl<'w, 'a> Walker<'w, 'a> {
         let mut seen: Vec<String> = Vec::new();
 
         for arm in &expr_match.arms {
-            let arm_states = self.state_leaves_of_pattern(&arm.pat, &machine);
+            let (arm_pat, arm_guard) = arm_pattern_and_guard(arm);
+            let arm_states = self.state_leaves_of_pattern(arm_pat, &machine);
 
             let states = if !arm_states.is_empty() {
                 arm_states
-            } else if is_catch_all(&arm.pat) {
+            } else if is_catch_all(arm_pat) {
                 // `_` matches whatever earlier arms did not.
                 machine
                     .variants
@@ -512,7 +514,7 @@ impl<'w, 'a> Walker<'w, 'a> {
                     .facts
                     .push((machine.enum_name.clone(), machine.field_name.clone(), states));
             }
-            if let Some((_, guard)) = &arm.guard {
+            if let Some(guard) = arm_guard {
                 arm_ctx.conditions.push(guard);
                 self.walk_expr(guard, ctx, self_ty, file);
             }
@@ -528,7 +530,8 @@ impl<'w, 'a> Walker<'w, 'a> {
         file: &Path,
     ) {
         for arm in &expr_match.arms {
-            let labels = self.event_labels(&arm.pat);
+            let (arm_pat, arm_guard) = arm_pattern_and_guard(arm);
+            let labels = self.event_labels(arm_pat);
             let events = match labels {
                 EventLabels::Labels(labels) => Some(labels),
                 // Wrapper variants (`Event::Recording(e)`) and catch-all
@@ -542,8 +545,8 @@ impl<'w, 'a> Walker<'w, 'a> {
             // Each event arm gets its own effect scope and payload bindings.
             self.arm_counter += 1;
             arm_ctx.arm = self.arm_counter;
-            arm_ctx.payload_bindings.extend(self.payload_bindings(&arm.pat));
-            if let Some((_, guard)) = &arm.guard {
+            arm_ctx.payload_bindings.extend(self.payload_bindings(arm_pat));
+            if let Some(guard) = arm_guard {
                 arm_ctx.conditions.push(guard);
                 self.walk_expr(guard, ctx, self_ty, file);
             }

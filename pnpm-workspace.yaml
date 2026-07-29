@@ -1,2 +1,18 @@
 packages:
   - apps/*
+
+# Node 24 (the active LTS) is the only supported major, and a mismatch is an
+# error rather than the default warning — a version nobody tested is not
+# something to discover halfway through a build. `engines` in package.json
+# states the *contract* (any Node 24); `.nvmrc` pins the exact version CI and
+# development actually run.
+engineStrict: true
+
+# No dependency may run code at install time.
+#
+# pnpm blocks dependency lifecycle scripts unless the package is allowed here,
+# and nothing in this tree needs building. The empty map is written out rather
+# than left to the default so that allowing one is a reviewable diff instead of a
+# local `pnpm approve-builds` nobody sees. A blocked script is still reported
+# (`ERR_PNPM_IGNORED_BUILDS`), never silently skipped. See `docs/security.md` §9.
+allowBuilds: {}

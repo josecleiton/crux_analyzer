@@ -4,10 +4,17 @@
 
 ## Setup
 
-Requisitos: Rust (stable), Node + pnpm e, opcionalmente,
-[`just`](https://just.systems) para o task runner.
+Requisitos: Rust (stable), Node 24 (o LTS ativo) e, opcionalmente,
+[`just`](https://just.systems) para o task runner. Qualquer outro major do Node é
+um erro de instalação, não um aviso (`engines` mais `engineStrict`); o
+[`.nvmrc`](../../.nvmrc) fixa a versão exata que o CI roda.
+
+O pnpm não é instalado à parte: `packageManager`, no `package.json` da raiz, fixa
+a versão *e* o sha512 dela, e o corepack busca exatamente isso.
 
 ```sh
+corepack enable  # uma vez, para que `pnpm` resolva para a versão fixada
+nvm use          # ou fnm/asdf — lê o .nvmrc
 pnpm install
 cargo check
 just            # lista todas as receitas
@@ -119,10 +126,13 @@ ao binário. Então adicionar uma dependência muda esse arquivo, e o
 `notices-current` é o que torna esquecer isso um build vermelho em vez de uma
 violação de licença silenciosa.
 
-Note que `pnpm install --frozen-lockfile` ainda executa scripts de ciclo de vida
-das dependências, então o CI executa os hooks de instalação de cada dependência
-transitiva. Esse é o principal motivo pelo qual uma nova dependência merece uma
-olhada em vez de um `pnpm add`.
+Instalar **não** executa scripts de ciclo de vida das dependências: o pnpm os
+bloqueia a menos que o pacote esteja permitido em `allowBuilds`
+(`pnpm-workspace.yaml`), e esse mapa está deliberadamente vazio. Uma dependência que queira executar código
+na instalação aparece como `ERR_PNPM_IGNORED_BUILDS` e precisa ser aprovada de
+propósito — então aprovar uma é uma decisão revisada, não algo que um `pnpm add`
+faz por conta própria. Esse ainda é o principal motivo pelo qual uma nova
+dependência merece uma olhada: o *código* dela acaba no bundle de todo jeito.
 
 Um teste de aplicação alvo se auto-restringe por `APP_SRC` e fica fora do
 versionamento, porque a aplicação que ele nomeia é privada — então o CI comprova

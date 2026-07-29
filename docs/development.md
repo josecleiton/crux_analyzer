@@ -4,10 +4,17 @@
 
 ## Setup
 
-Requirements: Rust (stable), Node + pnpm, and optionally
-[`just`](https://just.systems) for the task runner.
+Requirements: Rust (stable), Node 24 (the active LTS) and optionally
+[`just`](https://just.systems) for the task runner. Any other Node major is a
+hard install error, not a warning (`engines` plus `engineStrict`);
+[`.nvmrc`](../.nvmrc) pins the exact version CI runs.
+
+pnpm is not installed separately: `packageManager` in the root `package.json`
+pins the version *and* its sha512, and corepack fetches exactly that.
 
 ```sh
+corepack enable  # once, so `pnpm` resolves to the pinned version
+nvm use          # or fnm/asdf — reads .nvmrc
 pnpm install
 cargo check
 just            # lists every recipe
@@ -115,9 +122,13 @@ not from what is installed: the web half from the chunks the bundler emitted
 adding a dependency changes that file, and `notices-current` is what makes
 forgetting it a red build rather than a silent license violation.
 
-Note that `pnpm install --frozen-lockfile` still runs dependency lifecycle
-scripts, so CI executes the install hooks of every transitive dependency. That is
-the main reason a new dependency deserves a look rather than a `pnpm add`.
+Installing does **not** run dependency lifecycle scripts: pnpm blocks them
+unless the package is allowed in `allowBuilds` (`pnpm-workspace.yaml`), and that
+map is deliberately empty. A dependency that wants to run code at install time shows up
+as `ERR_PNPM_IGNORED_BUILDS` and has to be approved on purpose — so approving one
+is a reviewed decision, not something a `pnpm add` does on its own. That is still
+the main reason a new dependency deserves a look: its *code* ends up in the
+bundle either way.
 
 A target-app test gates itself on `APP_SRC`, and lives untracked because the
 app it names is private — so CI proves the fixture path and a real app stays a

@@ -115,6 +115,20 @@ pub(crate) fn as_matches_macro(mac: &syn::Macro) -> Option<MatchesArgs> {
     syn::parse2::<MatchesArgs>(mac.tokens.clone()).ok()
 }
 
+/// Splits a match arm into the pattern it matches and its guard predicate.
+///
+/// syn 3 moved the guard into the pattern grammar: `Some(x) if x > 0` parses as
+/// a `Pat::Guard` wrapping the pattern, where syn 2 kept a separate `Arm::guard`
+/// field. Every walker that reads an arm's pattern unwraps here, so a guarded
+/// arm yields the same states, events and bindings as an unguarded one — the
+/// alternative is a guard silently hiding its arm's evidence.
+pub(crate) fn arm_pattern_and_guard(arm: &syn::Arm) -> (&syn::Pat, Option<&syn::Expr>) {
+    match &arm.pat {
+        syn::Pat::Guard(guard) => (&guard.pat, Some(&guard.guard)),
+        pat => (pat, None),
+    }
+}
+
 /// Collects every `(Enum, Variant)` referenced by a pattern, walking through
 /// or-patterns, bindings (`x @ pat`), parens, references and struct/tuple pats.
 pub(crate) fn pattern_variants(pat: &syn::Pat, out: &mut Vec<(String, String)>) {
@@ -164,17 +178,24 @@ fn pattern_variants_at(pat: &syn::Pat, out: &mut Vec<(String, String)>, depth: u
         }
         syn::Pat::Paren(paren) => pattern_variants(&paren.pat, out),
         syn::Pat::Reference(reference) => pattern_variants(&reference.pat, out),
+        // A guard narrows *when* the arm runs, never *what* it matches.
+        syn::Pat::Guard(guard) => pattern_variants(&guard.pat, out),
         _ => {}
     }
 }
 
 /// Whether a pattern matches anything (wildcard `_` or a bare binding).
+///
+/// A guard is deliberately not consulted: `_ if cond` counts as a catch-all
+/// here, because callers use this to decide which states an arm *can* cover,
+/// and the guard's outcome is exactly what static analysis cannot know.
 pub(crate) fn is_catch_all(pat: &syn::Pat) -> bool {
     match pat {
         syn::Pat::Wild(_) => true,
         syn::Pat::Ident(ident) => ident.subpat.is_none(),
         syn::Pat::Paren(paren) => is_catch_all(&paren.pat),
         syn::Pat::Reference(reference) => is_catch_all(&reference.pat),
+        syn::Pat::Guard(guard) => is_catch_all(&guard.pat),
         _ => false,
     }
 }

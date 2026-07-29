@@ -1004,7 +1004,7 @@ SOFTWARE.
 
 ## Rust crates (the `crux-analyzer` binary)
 
-47 crates under MIT License.
+46 crates under MIT License.
 2 crates under ISC License.
 1 crate under Creative Commons Zero v1.0 Universal.
 1 crate under Unicode License v3.
@@ -1050,7 +1050,6 @@ SOFTWARE.
 | [serde_core 1.0.229](https://github.com/serde-rs/serde) | MIT License |
 | [serde_derive 1.0.229](https://github.com/serde-rs/serde) | MIT License |
 | [serde_json 1.0.151](https://github.com/serde-rs/json) | MIT License |
-| [syn 2.0.119](https://github.com/dtolnay/syn) | MIT License |
 | [syn 3.0.3](https://github.com/dtolnay/syn) | MIT License |
 | [unicode-ident 1.0.24](https://github.com/dtolnay/unicode-ident) | MIT License |
 | [zmij 1.0.23](https://github.com/dtolnay/zmij) | MIT License |
@@ -1377,7 +1376,7 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ```
 
-#### MIT License — itoa 1.0.18, proc-macro2 1.0.107, quote 1.0.47, serde 1.0.229, serde_core 1.0.229, serde_derive 1.0.229, serde_json 1.0.151, syn 2.0.119, syn 3.0.3, unicode-ident 1.0.24, zmij 1.0.23
+#### MIT License — itoa 1.0.18, proc-macro2 1.0.107, quote 1.0.47, serde 1.0.229, serde_core 1.0.229, serde_derive 1.0.229, serde_json 1.0.151, syn 3.0.3, unicode-ident 1.0.24, zmij 1.0.23
 
 ```
 Permission is hereby granted, free of charge, to any

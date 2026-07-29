@@ -65,9 +65,9 @@
     "package": "pnpm dlx @vscode/vsce package --no-dependencies"
   },
   "devDependencies": {
-    "@types/node": "^24.13.2",
-    "@types/vscode": "^1.90.0",
-    "typescript": "~6.0.2",
+    "@types/node": "^24.13.3",
+    "@types/vscode": "~1.90.0",
+    "typescript": "~7.0.2",
     "vitest": "^4.1.10"
   }
 }

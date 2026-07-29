@@ -161,6 +161,18 @@ adicione um sem validar cada mensagem.
   contra [`deny.toml`](../../deny.toml) + `pnpm audit --audit-level high`). Faz
   parte do `just check`, então é bloqueante.
 - Os dois lockfiles são versionados e o `cargo` roda com `--locked`.
+- **Nenhuma dependência executa código na instalação.** O pnpm bloqueia scripts
+  de ciclo de vida de dependências a menos que o pacote esteja permitido em
+  `allowBuilds` ([`pnpm-workspace.yaml`](../../pnpm-workspace.yaml)), e esse mapa
+  está **vazio** — escrito explicitamente em vez de deixado no padrão, para que
+  permitir uma seja um diff revisável, e não um `pnpm approve-builds` local que
+  ninguém vê. Nada na árvore precisa ser compilado hoje. Um script bloqueado é
+  reportado (`ERR_PNPM_IGNORED_BUILDS`), nunca silencioso — a regra da honestidade
+  aplicada ao código de instalação.
+- **O gerenciador de pacotes é fixado por hash.** O `packageManager` carrega a
+  versão do pnpm *e* o sha512 dela, então o corepack recusa um tarball
+  substituído; um release comprometido da ferramenta que instala todo o resto
+  seria, de outro modo, o caminho mais curto para dentro de todo build.
 - GitHub Actions são fixadas em **SHAs de commit**, não em tags — `@stable` e
   `@v2` são refs mutáveis. O Dependabot evita que os pins apodreçam.
 - Workflows declaram `permissions:` explicitamente, e valores `${{ }}` não

@@ -35,9 +35,10 @@ allow = [
 confidence-threshold = 0.9
 
 [bans]
-# Duplicate major versions are a warning, not a failure: `serde_derive` builds on
-# syn 3 while the parser uses syn 2, and `notify` and `clap` pull different
-# `windows-sys` majors. All legitimate, none of it ours to resolve.
+# Duplicate major versions are a warning, not a failure: `notify` and `clap` pull
+# different `windows-sys` majors. Legitimate, and not ours to resolve. (The syn
+# 2/3 pair that used to sit here is gone — the parser moved to syn 3, which is
+# what `serde_derive` already built on.)
 multiple-versions = "warn"
 # No wildcard versions on published crates — a `*` accepts whatever is newest at
 # build time, which is the opposite of a reviewed dependency. The workspace's own

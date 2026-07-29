@@ -210,7 +210,7 @@ fn index_items<'a>(
                 let Some(self_ty) = type_name(&item_impl.self_ty) else {
                     continue;
                 };
-                if let Some((_, trait_path, _)) = &item_impl.trait_ {
+                if let Some((trait_path, _)) = &item_impl.trait_ {
                     if let Some(segment) = trait_path.segments.last() {
                         index.trait_impls.push(TraitImplInfo {
                             trait_name: segment.ident.to_string(),
