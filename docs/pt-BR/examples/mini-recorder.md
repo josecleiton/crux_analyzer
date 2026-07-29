@@ -47,11 +47,11 @@ interruption forced.
 
 | De | Evento | Para | Efeitos |
 | --- | --- | --- | --- |
-| Idle | `RecordPressed` | Recording | — |
+| Idle | `RecordPressed` | Recording | `AudioOperation::Start` |
 | Recording | `PausePressed` | Paused | — |
 | Paused | `ResumePressed` | Recording | — |
-| Recording | `StopPressed` | Uploading | — |
-| Paused | `StopPressed` | Uploading | — |
+| Recording | `StopPressed` | Uploading | `AudioOperation::Stop` |
+| Paused | `StopPressed` | Uploading | `AudioOperation::Stop` |
 | Uploading | `UploadFinished` | Completed | — |
 | Failed | `RetryPressed` | Uploading | — |
 | Recording | `Failed` | Failed | — |
@@ -76,3 +76,16 @@ stateDiagram-v2
 | --- | --- | --- | --- |
 | Empty | `StopPressed` | Uploading | — |
 | Uploading | `UploadFinished` | Synced | — |
+
+### Eventos
+
+| Evento | Descrição |
+| --- | --- |
+| `RecordPressed` | The user hit the record button on the main screen. |
+| `RetryPressed` | Retry the failed upload, keeping the recorded take. |
+
+### Efeitos
+
+| Efeito | Descrição |
+| --- | --- |
+| `AudioOperation::Start` | Arms the microphone and begins capturing into the session buffer. |

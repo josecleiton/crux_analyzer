@@ -31,6 +31,11 @@ pub struct Labels {
     pub no_effects: &'static str,
     /// States table heading.
     pub states: &'static str,
+    /// Heading of the per-core documented-events table. The `effects` label
+    /// doubles as the documented-effects heading.
+    pub events: &'static str,
+    /// Documented-effects table column: one effect (singular of `effects`).
+    pub effect: &'static str,
     /// States table column: the state's name.
     pub state: &'static str,
     /// States table column: the description authored in the analyzed source.
@@ -62,6 +67,8 @@ impl Labels {
         any_state: "any state",
         no_effects: "—",
         states: "States",
+        events: "Events",
+        effect: "Effect",
         state: "State",
         description: "Description",
         markers: "Markers",
@@ -85,6 +92,8 @@ impl Labels {
         // that needs different filler has somewhere to put it.
         no_effects: "—",
         states: "Estados",
+        events: "Eventos",
+        effect: "Efeito",
         state: "Estado",
         description: "Descrição",
         markers: "Marcadores",

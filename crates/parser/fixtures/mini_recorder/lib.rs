@@ -9,6 +9,17 @@ pub enum Event {
     Recorder(recorder::RecorderEvent),
 }
 
+/// Operations the shell performs against the audio hardware.
+pub enum AudioOperation {
+    /// Arms the microphone and begins capturing into the session buffer.
+    Start,
+    Stop,
+}
+
+pub enum Effect {
+    Audio(AudioOperation),
+}
+
 pub struct Model {
     recorder: recorder::RecorderModel,
     uploads: upload::UploadModel,
@@ -18,6 +29,7 @@ pub struct MiniRecorder;
 
 impl App for MiniRecorder {
     type Event = Event;
+    type Effect = Effect;
     type Model = Model;
 
     fn update(&self, event: Event, model: &mut Model) {

@@ -73,6 +73,39 @@ fn extracts_all_state_machines() {
         ]
     );
 
+    // Effects requested by the arms reach their transitions.
+    let effect_of = |event: &str| {
+        recorder
+            .transitions
+            .iter()
+            .find(|t| t.event.0 == event)
+            .map(|t| t.effects.iter().map(|e| e.0.as_str()).collect::<Vec<_>>())
+            .unwrap_or_default()
+    };
+    assert_eq!(effect_of("RecordPressed"), ["AudioOperation::Start"]);
+    assert_eq!(effect_of("StopPressed"), ["AudioOperation::Stop"]);
+
+    // Doc comments on event and effect variants become the core's catalogs —
+    // only the documented AND used names.
+    let events: Vec<(&str, &str)> =
+        core.events.iter().map(|e| (e.name.as_str(), e.doc.as_str())).collect();
+    assert_eq!(
+        events,
+        [
+            ("RecordPressed", "The user hit the record button on the main screen."),
+            ("RetryPressed", "Retry the failed upload, keeping the recorded take."),
+        ]
+    );
+    let effects: Vec<(&str, &str)> =
+        core.effects.iter().map(|e| (e.name.as_str(), e.doc.as_str())).collect();
+    assert_eq!(
+        effects,
+        [(
+            "AudioOperation::Start",
+            "Arms the microphone and begins capturing into the session buffer."
+        )]
+    );
+
     // Documentation authored in the fixture reaches the model.
     assert_eq!(
         recorder.doc.as_deref(),

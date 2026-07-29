@@ -120,7 +120,16 @@ elas (uma sobreaproximação para braços com ramificação interna).
 
 Comentários de documentação em um enum de estado chegam ao modelo: o `///` do
 próprio enum se torna a descrição da máquina, e o de cada variante se torna a do
-seu estado. Eventos e efeitos ainda não são cobertos.
+seu estado.
+
+Comentários de documentação em **variantes de enums de evento e efeito**
+também chegam ao modelo, como catálogos `events` / `effects` por núcleo
+(`{ name, doc }`). Duas restrições mantêm os catálogos honestos: só entram
+nomes que aparecem nas transições do núcleo (um wrapper delegante documentado
+como `Event::Recorder(RecorderEvent)` não é um evento que uma transição possa
+carregar), e só entram nomes documentados — as tabelas de transição já
+enumeram o vocabulário. Anotações (linhas `@…`) não são lidas em eventos ou
+efeitos; ainda não há nada que um marcador signifique ali.
 
 ```rust
 /// Where a recording session lives.

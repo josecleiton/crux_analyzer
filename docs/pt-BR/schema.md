@@ -42,6 +42,12 @@ ele.
             }
           ]
         }
+      ],
+      "events": [
+        { "name": "RecordPressed", "doc": "The user hit the record button." }
+      ],
+      "effects": [
+        { "name": "AudioOperation::Start", "doc": "Begins capturing audio." }
       ]
     }
   ]
@@ -67,6 +73,8 @@ ele.
 | `transitions[].event` | Nome da variante de evento folha que dispara a transição. |
 | `transitions[].to` | Estado de destino, ou `"*"` — o destino é decidido em **tempo de execução** (por exemplo, carregado pelo payload do evento). |
 | `transitions[].effects[]` | Opcional. Efeitos solicitados quando a transição dispara: `"Render"`, `"AudioOperation::Start"`, ... Omitido quando vazio. |
+| `cores[].events[]` | Opcional. Pares `{ name, doc }`: documentação autoral nas variantes do enum de eventos, **apenas** para eventos que aparecem nas transições deste núcleo e **apenas** quando documentados — as tabelas de transição já enumeram o vocabulário. Omitido quando vazio, então uma aplicação sem documentação emite exatamente o JSON que emitia antes deste campo existir. |
+| `cores[].effects[]` | Opcional. O mesmo para efeitos, indexados pelo rótulo que as transições carregam (`AudioOperation::Start`, `Render`). |
 
 ## Estados documentados
 

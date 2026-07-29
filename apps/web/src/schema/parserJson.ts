@@ -20,6 +20,16 @@ export interface ParserProjectJson {
 export interface ParserCoreJson {
   name: string;
   machines: ParserMachineJson[];
+  /** Documented events, keyed by the name transitions use. Always an array. */
+  events: ParserDocumentedNameJson[];
+  /** Documented effects (`AudioOperation::Start`, `Render`). Always an array. */
+  effects: ParserDocumentedNameJson[];
+}
+
+/** A name from the analyzed source with the documentation authored on it. */
+export interface ParserDocumentedNameJson {
+  name: string;
+  doc: string;
 }
 
 export interface ParserMachineJson {
@@ -87,7 +97,20 @@ function parseCore(raw: unknown): ParserCoreJson {
   return {
     name: raw.name,
     machines: raw.machines.map((machine) => parseMachine(raw.name as string, machine)),
+    events: parseDocumentedNames(`core "${raw.name}": events`, raw.events),
+    effects: parseDocumentedNames(`core "${raw.name}": effects`, raw.effects),
   };
+}
+
+function parseDocumentedNames(what: string, raw: unknown): ParserDocumentedNameJson[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) throw invalid(`${what} must be an array`);
+  return raw.map((entry) => {
+    if (!isRecord(entry) || typeof entry.name !== 'string' || typeof entry.doc !== 'string') {
+      throw invalid(`${what}: entries must have name/doc strings`);
+    }
+    return { name: entry.name, doc: entry.doc };
+  });
 }
 
 function parseMachine(coreName: string, raw: unknown): ParserMachineJson {

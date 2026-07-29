@@ -160,7 +160,7 @@ fn effects_cell(transition: &Transition, labels: &Labels) -> String {
 mod tests {
     use super::*;
     use crux_analyzer_i18n::Locale;
-    use crux_analyzer_model::{Core, Effect, Event, Project};
+    use crux_analyzer_model::{Core, DocumentedName, Effect, Event, Project};
 
     fn sample() -> Project {
         Project {
@@ -186,6 +186,7 @@ mod tests {
                     ],
                     ..Default::default()
                 }],
+                ..Default::default()
             }],
         }
     }
@@ -276,6 +277,7 @@ mod tests {
                     }],
                     ..Default::default()
                 }],
+                ..Default::default()
             }],
         };
         project.cores[0].machines[0].states[1].doc = Some("Fetching the manifest.".into());
@@ -310,6 +312,36 @@ mod tests {
         assert!(doc.contains("| Stopped | Nothing is playing. | — | `idle-ish` |"), "{doc}");
         // An undocumented state still has a row, so the table is the state list.
         assert!(doc.contains("| Orphan | — | — | — |"), "{doc}");
+    }
+
+    #[test]
+    fn markdown_renders_documented_events_and_effects_per_core() {
+        let mut project = sample();
+        project.cores[0].events = vec![DocumentedName {
+            name: "Play".into(),
+            doc: "Starts playback.\n\nQueues the track first.".into(),
+        }];
+        project.cores[0].effects = vec![DocumentedName {
+            name: "Audio::Start".into(),
+            doc: "Begins capture.".into(),
+        }];
+
+        let en = markdown(&project, Locale::En);
+        assert!(en.contains("### Events"), "{en}");
+        // the whole description survives, unwrapped into the cell
+        assert!(en.contains("| `Play` | Starts playback. Queues the track first. |"), "{en}");
+        assert!(en.contains("### Effects"), "{en}");
+        assert!(en.contains("| `Audio::Start` | Begins capture. |"), "{en}");
+
+        // headings translate; names and author prose never do
+        let pt = markdown(&project, Locale::PtBr);
+        assert!(pt.contains("### Eventos"), "{pt}");
+        assert!(pt.contains("### Efeitos"), "{pt}");
+        assert!(pt.contains("| `Play` | Starts playback. Queues the track first. |"), "{pt}");
+
+        // the undocumented project emits no catalog at all
+        let bare = markdown(&sample(), Locale::En);
+        assert!(!bare.contains("### Events"), "{bare}");
     }
 
     #[test]
@@ -420,6 +452,7 @@ mod tests {
                     }],
                     ..Default::default()
                 }],
+                ..Default::default()
             }],
         };
         let body = &mermaid_diagrams(&project, Locale::En)[0].mermaid;

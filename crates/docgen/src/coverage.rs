@@ -151,6 +151,7 @@ mod tests {
             cores: vec![Core {
                 name: "C".into(),
                 machines,
+                ..Default::default()
             }],
         }
     }
@@ -194,6 +195,7 @@ mod tests {
                 Core {
                     name: "A".into(),
                     machines: vec![machine("M1", Some("doc"), vec![described("X")])],
+                    ..Default::default()
                 },
                 Core {
                     name: "B".into(),
@@ -202,6 +204,7 @@ mod tests {
                         None,
                         vec![described("Y"), StateDecl::bare("Z")],
                     )],
+                    ..Default::default()
                 },
             ],
         });

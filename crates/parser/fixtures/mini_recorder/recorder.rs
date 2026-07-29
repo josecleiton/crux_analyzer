@@ -1,9 +1,11 @@
 pub enum RecorderEvent {
+    /// The user hit the record button on the main screen.
     RecordPressed,
     PausePressed,
     ResumePressed,
     StopPressed,
     UploadFinished,
+    /// Retry the failed upload, keeping the recorded take.
     RetryPressed,
     Failed,
 }
@@ -46,6 +48,7 @@ impl super::MiniRecorder {
                 if matches!(model.recorder.session.state, RecorderState::Idle) =>
             {
                 model.recorder.session.state = RecorderState::Recording;
+                Self::request_audio(super::AudioOperation::Start);
             }
             RecorderEvent::PausePressed
                 if matches!(model.recorder.session.state, RecorderState::Recording) =>
@@ -79,6 +82,7 @@ impl super::MiniRecorder {
                 ) =>
             {
                 model.recorder.session.state = RecorderState::Uploading;
+                Self::request_audio(super::AudioOperation::Stop);
             }
             RecorderEvent::UploadFinished
                 if matches!(model.recorder.session.state, RecorderState::Uploading) =>
