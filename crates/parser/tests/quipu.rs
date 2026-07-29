@@ -112,8 +112,6 @@ fn extracts_quipu_recording_state_machine() {
     );
 
     // A second region exists in the corpus: the insight pipeline status.
-    // Its one statically-resolvable transition is guarded by an `==`
-    // comparison inside a `let-else` find closure.
     let insights = core
         .machines
         .iter()
@@ -124,17 +122,29 @@ fn extracts_quipu_recording_state_machine() {
         .iter()
         .map(|t| (t.from.0.as_str(), t.event.0.as_str(), t.to.0.as_str()))
         .collect();
-    assert_eq!(insight_triples, [("Pending", "DraftInsightsRequested", "Summarizing")]);
+    let insight_expected = [
+        // carry-over: value-flow through the is_this_runs_answer predicate
+        ("Pending", "DraftsLoaded", "Unsupported"),
+        ("Pending", "DraftsLoaded", "AwaitingModelDownload"),
+        ("Pending", "DraftsLoaded", "DisabledInSettings"),
+        ("Pending", "DraftsLoaded", "Unavailable"),
+        // `==` guard inside a let-else find closure
+        ("Pending", "DraftInsightsRequested", "Summarizing"),
+        // event-payload write: target supplied by the shell → wildcard
+        ("*", "InsightsUpdated", "*"),
+    ];
+    for triple in &insight_expected {
+        assert!(
+            insight_triples.contains(triple),
+            "missing insight transition {triple:?} in {insight_triples:#?}"
+        );
+    }
+    assert_eq!(insight_triples.len(), insight_expected.len(), "{insight_triples:#?}");
 
-    // The capture flow is fully resolvable; the only remaining warnings are
-    // the two InsightStatus writes whose target comes from a runtime value.
-    assert_eq!(outcome.warnings.len(), 2, "warnings: {:#?}", outcome.warnings);
+    // Everything in the corpus is now statically accounted for.
     assert!(
-        outcome
-            .warnings
-            .iter()
-            .all(|w| w.message.contains("target state is dynamic")),
-        "unexpected warning kind: {:#?}",
+        outcome.warnings.is_empty(),
+        "expected no warnings, got: {:#?}",
         outcome.warnings
     );
 }

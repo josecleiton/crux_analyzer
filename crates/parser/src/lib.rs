@@ -96,12 +96,15 @@ pub(crate) fn parse_sources(
     project_name: &str,
 ) -> Result<ParseOutcome, ParseError> {
     let index = index::build_index(sources);
-    let cores = core_finder::find_cores(&index);
+    let machines = state_enum::find_state_machines(&index);
+    // State enums are excluded from the event/effect closures: carried as an
+    // event payload they are data, not nested event enums.
+    let machine_enums: std::collections::BTreeSet<String> =
+        machines.iter().map(|m| m.enum_name.clone()).collect();
+    let cores = core_finder::find_cores(&index, &machine_enums);
     if cores.is_empty() {
         return Err(ParseError::NoCoreFound);
     }
-
-    let machines = state_enum::find_state_machines(&index);
     let mut warnings = Vec::new();
     let mut model_cores = Vec::new();
 

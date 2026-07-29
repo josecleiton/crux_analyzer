@@ -21,8 +21,8 @@ use std::path::{Path, PathBuf};
 use syn::spanned::Spanned;
 
 use crate::ast_util::{
-    as_matches_macro, enum_variant_of_expr, enum_variant_path, is_catch_all, last_field_name,
-    pattern_variants,
+    as_matches_macro, enum_variant_of_expr, enum_variant_path, expr_path_string, is_catch_all,
+    last_field_name, pattern_variants,
 };
 use crate::core_finder::CoreInfo;
 use crate::index::CrateIndex;
@@ -67,6 +67,10 @@ struct Ctx<'a> {
     conditions: Vec<&'a syn::Expr>,
     /// Facts from `match`-on-state arms: (machine enum, field, possible states).
     facts: Vec<(String, String, Vec<String>)>,
+    /// Bindings introduced by the current event arm's pattern:
+    /// binding name → payload type (`Event::Updated { status }` → status:
+    /// InsightStatus). Valid within the arm body only.
+    payload_bindings: HashMap<String, String>,
     /// The event arm this code belongs to — transitions and effects found
     /// under the same arm are associated with each other.
     arm: usize,
@@ -103,6 +107,7 @@ pub(crate) fn extract(
             events: None,
             conditions: Vec::new(),
             facts: Vec::new(),
+            payload_bindings: HashMap::new(),
             arm: 0,
         },
         update.self_ty.clone(),
@@ -153,8 +158,7 @@ impl<'w, 'a> Walker<'w, 'a> {
         let Some(position) = decl.variants.iter().position(|v| v == variant) else {
             return false;
         };
-        decl.variant_field_types[position]
-            .iter()
+        decl.field_types(position)
             .any(|field_type| self.is_event_enum(field_type))
     }
 
@@ -379,13 +383,7 @@ impl<'w, 'a> Walker<'w, 'a> {
         let mut seen: Vec<String> = Vec::new();
 
         for arm in &expr_match.arms {
-            let mut variants = Vec::new();
-            pattern_variants(&arm.pat, &mut variants);
-            let arm_states: Vec<String> = variants
-                .into_iter()
-                .filter(|(e, _)| *e == machine.enum_name || e == "Self")
-                .map(|(_, v)| v)
-                .collect();
+            let arm_states = self.state_leaves_of_pattern(&arm.pat, &machine);
 
             let states = if !arm_states.is_empty() {
                 arm_states
@@ -436,15 +434,90 @@ impl<'w, 'a> Walker<'w, 'a> {
 
             let mut arm_ctx = ctx.clone();
             arm_ctx.events = events;
-            // Each event arm gets its own effect scope.
+            // Each event arm gets its own effect scope and payload bindings.
             self.arm_counter += 1;
             arm_ctx.arm = self.arm_counter;
+            arm_ctx.payload_bindings.extend(self.payload_bindings(&arm.pat));
             if let Some((_, guard)) = &arm.guard {
                 arm_ctx.conditions.push(guard);
                 self.walk_expr(guard, ctx, self_ty, file);
             }
             self.walk_expr(&arm.body, &arm_ctx, self_ty, file);
         }
+    }
+
+    /// Bindings introduced by an event-arm pattern, with their payload types:
+    /// `Event::Updated { id, status }` → `{id: String, status: InsightStatus}`;
+    /// `Event::Sync(state)` → `{state: State}` (positional).
+    fn payload_bindings(&self, pat: &syn::Pat) -> HashMap<String, String> {
+        let mut bindings = HashMap::new();
+        self.collect_payload_bindings(pat, &mut bindings);
+        bindings
+    }
+
+    fn collect_payload_bindings(&self, pat: &syn::Pat, out: &mut HashMap<String, String>) {
+        match pat {
+            syn::Pat::Struct(strct) => {
+                let Some((enum_name, variant)) = enum_variant_path(&strct.path) else {
+                    return;
+                };
+                let Some(fields) = self.variant_fields(&enum_name, &variant) else {
+                    return;
+                };
+                for field_pat in &strct.fields {
+                    let syn::Member::Named(member) = &field_pat.member else {
+                        continue;
+                    };
+                    let syn::Pat::Ident(binding) = &*field_pat.pat else {
+                        continue;
+                    };
+                    if let Some(field) = fields
+                        .iter()
+                        .find(|f| f.name.as_deref() == Some(member.to_string().as_str()))
+                    {
+                        out.insert(binding.ident.to_string(), field.type_name.clone());
+                    }
+                }
+            }
+            syn::Pat::TupleStruct(tuple) => {
+                let Some((enum_name, variant)) = enum_variant_path(&tuple.path) else {
+                    return;
+                };
+                let Some(fields) = self.variant_fields(&enum_name, &variant) else {
+                    return;
+                };
+                for (position, element) in tuple.elems.iter().enumerate() {
+                    if let (syn::Pat::Ident(binding), Some(field)) = (element, fields.get(position))
+                    {
+                        out.insert(binding.ident.to_string(), field.type_name.clone());
+                    }
+                }
+            }
+            syn::Pat::Or(or) => {
+                for case in &or.cases {
+                    self.collect_payload_bindings(case, out);
+                }
+            }
+            syn::Pat::Ident(ident) => {
+                if let Some((_, subpat)) = &ident.subpat {
+                    self.collect_payload_bindings(subpat, out);
+                }
+            }
+            syn::Pat::Paren(paren) => self.collect_payload_bindings(&paren.pat, out),
+            syn::Pat::Reference(reference) => self.collect_payload_bindings(&reference.pat, out),
+            _ => {}
+        }
+    }
+
+    /// Fields of an event-enum variant.
+    fn variant_fields(
+        &self,
+        enum_name: &str,
+        variant: &str,
+    ) -> Option<&[crate::index::VariantField]> {
+        let decl = self.core.event_enums.get(enum_name)?;
+        let position = decl.variants.iter().position(|v| v == variant)?;
+        Some(&decl.variant_fields[position])
     }
 
     // ---- effect collection ----------------------------------------------
@@ -540,13 +613,7 @@ impl<'w, 'a> Walker<'w, 'a> {
                 if field != machine.field_name && !self_fields.contains(&field.as_str()) {
                     return GuardEval::NoConstraint;
                 }
-                let mut variants = Vec::new();
-                pattern_variants(&args.pat, &mut variants);
-                let states: Vec<String> = variants
-                    .into_iter()
-                    .filter(|(e, _)| *e == machine.enum_name || e == "Self")
-                    .map(|(_, v)| v)
-                    .collect();
+                let states = self.state_leaves_of_pattern(&args.pat, machine);
                 if states.is_empty() {
                     GuardEval::NoConstraint
                 } else {
@@ -630,8 +697,8 @@ impl<'w, 'a> Walker<'w, 'a> {
         }
     }
 
-    /// `state == State::X` (either side order) → the variant, when the other
-    /// side is the machine's state field.
+    /// `state == State::X` (either side order) → the state leaf, when the
+    /// other side is the machine's state field.
     fn comparison_variant(
         &self,
         left: &syn::Expr,
@@ -644,20 +711,104 @@ impl<'w, 'a> Walker<'w, 'a> {
                 field == machine.field_name || self_fields.contains(&field.as_str())
             })
         };
-        let variant_of = |expr: &syn::Expr| {
-            enum_variant_of_expr(expr).and_then(|(enum_name, variant)| {
-                ((enum_name == machine.enum_name || enum_name == "Self")
-                    && machine.variants.contains(&variant))
-                .then_some(variant)
-            })
-        };
 
         if is_state_field(left) {
-            variant_of(right)
+            self.state_leaf_of_expr(right, machine)
         } else if is_state_field(right) {
-            variant_of(left)
+            self.state_leaf_of_expr(left, machine)
         } else {
             None
+        }
+    }
+
+    /// All state leaves a pattern matches, resolving composite variants:
+    /// `State::Idle` → `[Idle]`; `State::Active(ActiveState::Ready)` →
+    /// `[Active/Ready]`; `State::Active(_)` → every `Active/*` leaf.
+    fn state_leaves_of_pattern(&self, pat: &syn::Pat, machine: &StateMachine) -> Vec<String> {
+        let is_machine_enum = |name: &str| name == machine.enum_name || name == "Self";
+        match pat {
+            syn::Pat::Path(path) => match enum_variant_path(&path.path) {
+                Some((enum_name, variant)) if is_machine_enum(&enum_name) => {
+                    machine.leaves_of(&variant)
+                }
+                _ => Vec::new(),
+            },
+            syn::Pat::Struct(strct) => match enum_variant_path(&strct.path) {
+                Some((enum_name, variant)) if is_machine_enum(&enum_name) => {
+                    machine.leaves_of(&variant)
+                }
+                _ => Vec::new(),
+            },
+            syn::Pat::TupleStruct(tuple) => {
+                let Some((enum_name, variant)) = enum_variant_path(&tuple.path) else {
+                    return Vec::new();
+                };
+                if !is_machine_enum(&enum_name) {
+                    return Vec::new();
+                }
+                let Some(child_enum) = machine.child_enum(&variant) else {
+                    return machine.leaves_of(&variant);
+                };
+                // Composite: resolve the child pattern.
+                let mut child_variants = Vec::new();
+                for element in &tuple.elems {
+                    pattern_variants(element, &mut child_variants);
+                }
+                let children: Vec<String> = child_variants
+                    .into_iter()
+                    .filter(|(e, _)| *e == child_enum || e == "Self")
+                    .map(|(_, v)| format!("{variant}/{v}"))
+                    .collect();
+                if children.is_empty() {
+                    machine.leaves_of(&variant) // `Active(_)` → all children
+                } else {
+                    children
+                }
+            }
+            syn::Pat::Or(or) => {
+                let mut leaves = Vec::new();
+                for case in &or.cases {
+                    for leaf in self.state_leaves_of_pattern(case, machine) {
+                        if !leaves.contains(&leaf) {
+                            leaves.push(leaf);
+                        }
+                    }
+                }
+                leaves
+            }
+            syn::Pat::Ident(ident) => ident
+                .subpat
+                .as_ref()
+                .map(|(_, subpat)| self.state_leaves_of_pattern(subpat, machine))
+                .unwrap_or_default(),
+            syn::Pat::Paren(paren) => self.state_leaves_of_pattern(&paren.pat, machine),
+            syn::Pat::Reference(reference) => {
+                self.state_leaves_of_pattern(&reference.pat, machine)
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    /// The state leaf a value expression constructs:
+    /// `State::Idle` → `Idle`; `State::Active(ActiveState::Ready)` →
+    /// `Active/Ready`; a composite with a dynamic child → `None`.
+    fn state_leaf_of_expr(&self, expr: &syn::Expr, machine: &StateMachine) -> Option<String> {
+        let (enum_name, variant) = enum_variant_of_expr(expr)?;
+        if enum_name != machine.enum_name && enum_name != "Self" {
+            return None;
+        }
+        match machine.child_enum(&variant) {
+            None => machine.variants.contains(&variant).then_some(variant),
+            Some(child_enum) => {
+                let syn::Expr::Call(call) = expr else { return None };
+                let [argument] = call.args.iter().collect::<Vec<_>>()[..] else {
+                    return None;
+                };
+                let (child_name, child_variant) = enum_variant_of_expr(argument)?;
+                (child_name == child_enum)
+                    .then(|| format!("{variant}/{child_variant}"))
+                    .filter(|leaf| machine.variants.contains(leaf))
+            }
         }
     }
 
@@ -684,29 +835,18 @@ impl<'w, 'a> Walker<'w, 'a> {
     // ---- transition emission ------------------------------------------------
 
     fn handle_assignment(&mut self, assign: &'a syn::ExprAssign, ctx: &Ctx<'a>, file: &Path) {
-        // `*.state = Enum::Variant` — a direct transition target.
+        // `*.state = Enum::Variant` — a direct transition target
+        // (composite children included: `State::Active(ActiveState::Ready)`).
         if let Some(field) = last_field_name(&assign.left) {
             if let Some(machine) = self.machine_for_field(&field) {
-                if let Some((enum_name, to)) = enum_variant_of_expr(&assign.right) {
-                    if enum_name == machine.enum_name && machine.variants.contains(&to) {
-                        let machine = machine.clone();
-                        self.emit(&machine, to, ctx, assign, file);
-                        return;
-                    }
+                let machine = machine.clone();
+                if let Some(to) = self.state_leaf_of_expr(&assign.right, &machine) {
+                    self.emit(&machine, to, ctx, assign, file);
+                    return;
                 }
-                // The state field is written from a runtime value (an event
-                // payload, another field): the target cannot be known
-                // statically. Surface it instead of staying silent.
+                // Not a literal construction: try value-flow before warning.
                 if self.default_reset_targets(&assign.right).is_none() {
-                    self.warnings.push(Warning {
-                        file: file.to_path_buf(),
-                        line: assign.span().start().line,
-                        message: format!(
-                            "transition of `{}` dropped: target state is dynamic \
-                             (assigned from a runtime value)",
-                            machine.enum_name
-                        ),
-                    });
+                    self.handle_dynamic_assignment(&machine, assign, ctx, file);
                     return;
                 }
             }
@@ -718,6 +858,190 @@ impl<'w, 'a> Walker<'w, 'a> {
             for (machine, to) in reset_targets {
                 self.emit(&machine, to, ctx, assign, file);
             }
+        }
+    }
+
+    /// Value-flow for `*.state = <runtime value>`:
+    /// - a binding from the event payload typed as the state enum means the
+    ///   target is externally supplied → wildcard target `"*"`;
+    /// - a value constrained by the conditions in force (`==`, `matches!`,
+    ///   predicate calls on that exact expression) fans out to the states
+    ///   the constraints allow;
+    /// - otherwise the transition is dropped with a warning.
+    fn handle_dynamic_assignment(
+        &mut self,
+        machine: &StateMachine,
+        assign: &'a syn::ExprAssign,
+        ctx: &Ctx<'a>,
+        file: &Path,
+    ) {
+        if let Some(path) = expr_path_string(&assign.right) {
+            // Event payload binding of the machine's enum type.
+            if !path.contains('.')
+                && ctx.payload_bindings.get(&path) == Some(&machine.enum_name)
+            {
+                self.emit(machine, ANY_STATE.to_string(), ctx, assign, file);
+                return;
+            }
+
+            // Conditions constraining this exact value expression.
+            let mut eval = GuardEval::NoConstraint;
+            for condition in &ctx.conditions {
+                eval = and(eval, self.eval_value_condition(condition, &path, machine, 0));
+            }
+            if let GuardEval::Known(targets) = eval {
+                for to in targets {
+                    self.emit(machine, to, ctx, assign, file);
+                }
+                return;
+            }
+        }
+
+        self.warnings.push(Warning {
+            file: file.to_path_buf(),
+            line: assign.span().start().line,
+            message: format!(
+                "transition of `{}` dropped: target state is dynamic \
+                 (assigned from a runtime value)",
+                machine.enum_name
+            ),
+        });
+    }
+
+    /// What `condition` says about the *value* at `path` (dotted expression
+    /// path). The mirror of [`Self::eval_condition`], keyed by exact path so
+    /// constraints on `known.status` never leak onto `draft.status`.
+    fn eval_value_condition(
+        &self,
+        condition: &syn::Expr,
+        path: &str,
+        machine: &StateMachine,
+        depth: usize,
+    ) -> GuardEval {
+        if depth >= MAX_PREDICATE_DEPTH {
+            return GuardEval::Unresolved;
+        }
+        match condition {
+            syn::Expr::Macro(expr_macro) => {
+                let Some(args) = as_matches_macro(&expr_macro.mac) else {
+                    return GuardEval::NoConstraint;
+                };
+                if expr_path_string(&args.expr).as_deref() != Some(path) {
+                    return GuardEval::NoConstraint;
+                }
+                let states = self.state_leaves_of_pattern(&args.pat, machine);
+                if states.is_empty() {
+                    GuardEval::NoConstraint
+                } else {
+                    GuardEval::Known(states)
+                }
+            }
+            syn::Expr::Binary(binary) => match binary.op {
+                syn::BinOp::And(_) => and(
+                    self.eval_value_condition(&binary.left, path, machine, depth),
+                    self.eval_value_condition(&binary.right, path, machine, depth),
+                ),
+                syn::BinOp::Or(_) => or(
+                    self.eval_value_condition(&binary.left, path, machine, depth),
+                    self.eval_value_condition(&binary.right, path, machine, depth),
+                ),
+                syn::BinOp::Eq(_) | syn::BinOp::Ne(_) => {
+                    let value = if expr_path_string(&binary.left).as_deref() == Some(path) {
+                        self.state_leaf_of_expr(&binary.right, machine)
+                    } else if expr_path_string(&binary.right).as_deref() == Some(path) {
+                        self.state_leaf_of_expr(&binary.left, machine)
+                    } else {
+                        None
+                    };
+                    let Some(variant) = value else {
+                        return GuardEval::NoConstraint;
+                    };
+                    if matches!(binary.op, syn::BinOp::Eq(_)) {
+                        GuardEval::Known(vec![variant])
+                    } else {
+                        GuardEval::Known(
+                            machine
+                                .variants
+                                .iter()
+                                .filter(|v| **v != variant)
+                                .cloned()
+                                .collect(),
+                        )
+                    }
+                }
+                _ => GuardEval::NoConstraint,
+            },
+            syn::Expr::Unary(unary) if matches!(unary.op, syn::UnOp::Not(_)) => {
+                match self.eval_value_condition(&unary.expr, path, machine, depth) {
+                    GuardEval::Known(states) => GuardEval::Known(
+                        machine
+                            .variants
+                            .iter()
+                            .filter(|v| !states.contains(v))
+                            .cloned()
+                            .collect(),
+                    ),
+                    other => other,
+                }
+            }
+            // `is_this_runs_answer(&value)` — resolve the predicate's body
+            // against its parameter.
+            syn::Expr::Call(call) => {
+                let syn::Expr::Path(func) = &*call.func else {
+                    return GuardEval::NoConstraint;
+                };
+                let position = call
+                    .args
+                    .iter()
+                    .position(|arg| expr_path_string(arg).as_deref() == Some(path));
+                let Some(position) = position else {
+                    return GuardEval::NoConstraint;
+                };
+                let segments: Vec<String> = func
+                    .path
+                    .segments
+                    .iter()
+                    .map(|s| s.ident.to_string())
+                    .collect();
+                let (callee_self, callee_name) = match segments.as_slice() {
+                    [name] => (None, name.as_str()),
+                    [ty, name] => (Some(ty.as_str()), name.as_str()),
+                    _ => return GuardEval::NoConstraint,
+                };
+                let Some(function) = self.index.find_fn(callee_self, callee_name) else {
+                    return GuardEval::Unresolved;
+                };
+                let Some(param) = function.params.get(position) else {
+                    return GuardEval::Unresolved;
+                };
+                let Some(syn::Stmt::Expr(trailing, None)) = function.block.stmts.last() else {
+                    return GuardEval::Unresolved;
+                };
+                match self.eval_value_condition(trailing, param, machine, depth + 1) {
+                    GuardEval::NoConstraint => GuardEval::Unresolved,
+                    resolved => resolved,
+                }
+            }
+            // `value.is_final()` — a predicate method on the state enum.
+            syn::Expr::MethodCall(call) => {
+                if expr_path_string(&call.receiver).as_deref() != Some(path) {
+                    return GuardEval::NoConstraint;
+                }
+                self.eval_predicate(&call.method.to_string(), machine, depth)
+            }
+            syn::Expr::Paren(paren) => {
+                self.eval_value_condition(&paren.expr, path, machine, depth)
+            }
+            syn::Expr::Group(group) => {
+                self.eval_value_condition(&group.expr, path, machine, depth)
+            }
+            syn::Expr::Block(block) => match block.block.stmts.last() {
+                Some(syn::Stmt::Expr(trailing, None)) => {
+                    self.eval_value_condition(trailing, path, machine, depth)
+                }
+                _ => GuardEval::NoConstraint,
+            },
+            _ => GuardEval::NoConstraint,
         }
     }
 

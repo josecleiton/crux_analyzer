@@ -571,7 +571,7 @@ fn let_else_find_closure_narrows_the_rest_of_the_block() {
 }
 
 #[test]
-fn dynamic_target_warns_instead_of_emitting() {
+fn event_payload_target_becomes_wildcard() {
     let code = format!(
         r#"{PREAMBLE}
         pub enum Event {{ Sync(State), Reset }}
@@ -591,10 +591,129 @@ fn dynamic_target_warns_instead_of_emitting() {
     "#
     );
     let (transitions, warnings) = transitions_of(&code);
-    // the concrete arm still extracts; the dynamic one warns
+    // the payload-driven write lands anywhere the shell decides: to = "*"
+    assert_eq!(
+        transitions,
+        vec![triple("*", "Sync", "*"), triple("*", "Reset", "Idle")]
+    );
+    assert!(warnings.is_empty(), "{warnings:?}");
+}
+
+#[test]
+fn value_flow_resolves_predicate_constrained_targets() {
+    let code = format!(
+        r#"{PREAMBLE}
+        pub struct Item {{ state: State }}
+        pub enum Event {{ CarryOver, Reset }}
+        impl App for App1 {{
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {{
+                match event {{
+                    Event::CarryOver => {{
+                        if model.state == State::Idle && is_final(&model.known.state) {{
+                            model.state = model.known.state.clone();
+                        }}
+                    }}
+                    Event::Reset => {{
+                        model.state = State::Idle;
+                    }}
+                }}
+            }}
+        }}
+        const fn is_final(state: &State) -> bool {{
+            matches!(state, State::Running | State::Done)
+        }}
+    "#
+    );
+    let (transitions, warnings) = transitions_of(&code);
+    // from: the == on model.state; to: the predicate on model.known.state
+    assert_eq!(
+        transitions,
+        vec![
+            triple("Idle", "CarryOver", "Running"),
+            triple("Idle", "CarryOver", "Done"),
+            triple("*", "Reset", "Idle"),
+        ]
+    );
+    assert!(warnings.is_empty(), "{warnings:?}");
+}
+
+#[test]
+fn dynamic_target_without_evidence_still_warns() {
+    let code = format!(
+        r#"{PREAMBLE}
+        pub enum Event {{ Restore, Reset }}
+        impl App for App1 {{
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {{
+                match event {{
+                    Event::Restore => {{
+                        model.state = model.backup.state.clone();
+                    }}
+                    Event::Reset => {{
+                        model.state = State::Idle;
+                    }}
+                }}
+            }}
+        }}
+    "#
+    );
+    let (transitions, warnings) = transitions_of(&code);
     assert_eq!(transitions, vec![triple("*", "Reset", "Idle")]);
     assert_eq!(warnings.len(), 1);
     assert!(warnings[0].contains("target state is dynamic"), "{warnings:?}");
+}
+
+#[test]
+fn composite_states_expand_to_slash_paths() {
+    let code = r#"
+        pub enum Phase { Loading, Ready }
+        pub enum State { Idle, Active(Phase) }
+        pub struct Model { state: State }
+        pub struct App1;
+        pub enum Event { Start, Loaded, Stop }
+        impl App for App1 {
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {
+                match event {
+                    Event::Start if matches!(model.state, State::Idle) => {
+                        model.state = State::Active(Phase::Loading);
+                    }
+                    Event::Loaded if matches!(model.state, State::Active(Phase::Loading)) => {
+                        model.state = State::Active(Phase::Ready);
+                    }
+                    Event::Stop if matches!(model.state, State::Active(_)) => {
+                        model.state = State::Idle;
+                    }
+                    _ => {}
+                }
+            }
+        }
+    "#;
+    let sources = sources_from_str(&[("lib.rs", code)]);
+    let outcome = parse_sources(&sources, "test").unwrap();
+    let machine = &outcome.project.cores[0].machines[0];
+
+    assert_eq!(
+        machine.states.iter().map(|s| s.0.as_str()).collect::<Vec<_>>(),
+        ["Idle", "Active/Loading", "Active/Ready"]
+    );
+    let triples: Vec<(String, String, String)> = machine
+        .transitions
+        .iter()
+        .map(|t| (t.from.0.clone(), t.event.0.clone(), t.to.0.clone()))
+        .collect();
+    assert_eq!(
+        triples,
+        vec![
+            triple("Idle", "Start", "Active/Loading"),
+            triple("Active/Loading", "Loaded", "Active/Ready"),
+            // `Active(_)` fans out over every child
+            triple("Active/Loading", "Stop", "Idle"),
+            triple("Active/Ready", "Stop", "Idle"),
+        ]
+    );
+    assert!(outcome.warnings.is_empty(), "{:?}", outcome.warnings);
 }
 
 #[test]

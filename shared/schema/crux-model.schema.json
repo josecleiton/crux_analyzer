@@ -45,7 +45,7 @@
         "states": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "States of the machine."
+          "description": "Leaf states of the machine. Children of composite (hierarchical) states are encoded as `Parent/Child` paths."
         },
         "transitions": {
           "type": "array",
@@ -63,7 +63,10 @@
           "description": "Source state, or \"*\" meaning any state."
         },
         "event": { "type": "string", "description": "Event that triggers the transition." },
-        "to": { "type": "string", "description": "Target state." },
+        "to": {
+          "type": "string",
+          "description": "Target state, or \"*\" when the target is decided at runtime (e.g. carried by the event payload)."
+        },
         "effects": {
           "type": "array",
           "items": { "type": "string" },

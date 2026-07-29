@@ -47,7 +47,7 @@ function InspectorBody({ core, selection }: InspectorProps) {
       <div className="transition-flow">
         <span>{transition.fromName === '*' ? 'any state' : transition.fromName}</span>
         <span className="transition-arrow">↓</span>
-        <span>{transition.toName}</span>
+        <span>{transition.toName === '*' ? 'any state (runtime)' : transition.toName}</span>
       </div>
       {transition.effects.length > 0 ? (
         <>

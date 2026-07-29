@@ -1,7 +1,7 @@
 //! Finds Cores: `impl App for X` blocks and their associated event and
 //! effect enums.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use crate::index::{CrateIndex, EnumDecl};
@@ -29,15 +29,23 @@ impl CoreInfo {
     }
 }
 
-pub(crate) fn find_cores(index: &CrateIndex) -> Vec<CoreInfo> {
+/// `excluded` holds the state-machine enums: a state enum carried as an
+/// event payload (`Event::Sync(State)`) must not join the event closure,
+/// or its wrapping variant would be mistaken for a delegating wrapper.
+pub(crate) fn find_cores(index: &CrateIndex, excluded: &BTreeSet<String>) -> Vec<CoreInfo> {
     index
         .trait_impls
         .iter()
         .filter(|imp| imp.trait_name == "App")
         .map(|imp| CoreInfo {
             name: imp.self_ty.clone(),
-            event_enums: enum_closure(index, associated_type(imp.item, "Event"), imp.file),
-            effect_enums: enum_closure(index, associated_type(imp.item, "Effect"), imp.file),
+            event_enums: enum_closure(index, associated_type(imp.item, "Event"), imp.file, excluded),
+            effect_enums: enum_closure(
+                index,
+                associated_type(imp.item, "Effect"),
+                imp.file,
+                excluded,
+            ),
         })
         .collect()
 }
@@ -63,6 +71,7 @@ fn enum_closure(
     index: &CrateIndex,
     root: Option<String>,
     core_file: &Path,
+    excluded: &BTreeSet<String>,
 ) -> BTreeMap<String, EnumDecl> {
     let mut found: BTreeMap<String, EnumDecl> = BTreeMap::new();
     let mut queue: Vec<(String, std::path::PathBuf)> = root
@@ -78,10 +87,13 @@ fn enum_closure(
             continue;
         };
         let decl = decl.clone();
-        for field_types in &decl.variant_field_types {
-            for field_type in field_types {
-                if !found.contains_key(field_type) && !index.enum_decls(field_type).is_empty() {
-                    queue.push((field_type.clone(), decl.file.clone()));
+        for fields in &decl.variant_fields {
+            for field in fields {
+                if !found.contains_key(&field.type_name)
+                    && !excluded.contains(&field.type_name)
+                    && !index.enum_decls(&field.type_name).is_empty()
+                {
+                    queue.push((field.type_name.clone(), decl.file.clone()));
                 }
             }
         }
