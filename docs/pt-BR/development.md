@@ -97,4 +97,7 @@ testes.
   espelho em português.
 - `CLAUDE.md` — acordos de trabalho para desenvolvimento assistido por IA
   (mantido em sincronia com as regras de arquitetura).
+- `docs/roadmap.md` — a fonte única do trabalho planejado. Acrescente nele em vez
+  de começar uma lista em outro lugar, e registre também o que você decidir *não*
+  fazer.
 - `init.md` — a especificação original do projeto (português, histórica).
