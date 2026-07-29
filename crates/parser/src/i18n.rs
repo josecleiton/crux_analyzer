@@ -38,6 +38,10 @@ impl WarningKind {
                 "transition to `{to}` dropped: source-state condition could not \
                  be resolved statically"
             ),
+            WarningKind::UnknownAnnotation { annotation } => format!(
+                "unrecognized annotation `{annotation}`: not one of @failure, \
+                 @deprecated, @tag <name>"
+            ),
         }
     }
 
@@ -57,6 +61,10 @@ impl WarningKind {
             WarningKind::UnresolvableSource { to } => format!(
                 "transição para `{to}` descartada: a condição do estado de origem não \
                  pôde ser resolvida estaticamente"
+            ),
+            WarningKind::UnknownAnnotation { annotation } => format!(
+                "anotação `{annotation}` não reconhecida: não é @failure, \
+                 @deprecated nem @tag <nome>"
             ),
         }
     }
@@ -101,6 +109,9 @@ mod tests {
             WarningKind::UnknownEvent { to: "Idle".into() },
             WarningKind::UnresolvableSource {
                 to: "Recording".into(),
+            },
+            WarningKind::UnknownAnnotation {
+                annotation: "@failur".into(),
             },
         ]
     }
@@ -147,7 +158,8 @@ mod tests {
                 "no-update-method",
                 "dynamic-target",
                 "unknown-event",
-                "unresolvable-source"
+                "unresolvable-source",
+                "unknown-annotation"
             ]
         );
     }

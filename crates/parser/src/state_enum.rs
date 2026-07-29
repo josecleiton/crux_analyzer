@@ -19,9 +19,11 @@
 //! the variant stays a plain leaf.
 
 use std::collections::BTreeSet;
+use std::path::PathBuf;
 
 use syn::visit::Visit;
 
+use crate::annotations::DocBlock;
 use crate::ast_util::{as_matches_macro, enum_variant_of_expr, enum_variant_path};
 use crate::index::{CrateIndex, EnumDecl};
 
@@ -31,7 +33,17 @@ pub(crate) struct StateMachine {
     pub field_name: String,
     /// Leaf state names, in declaration order. Children of composite
     /// variants appear as `Parent/Child` paths.
+    ///
+    /// Stays a plain `Vec<String>`: this is the analysis vocabulary that
+    /// `transitions.rs` resolves patterns against, so documentation rides
+    /// alongside in `variant_docs` rather than inside it.
     pub variants: Vec<String>,
+    /// Documentation for each leaf in `variants`. Parallel vector.
+    pub variant_docs: Vec<DocBlock>,
+    /// Documentation authored on the state enum itself — becomes the machine's.
+    pub docs: DocBlock,
+    /// File the chosen declaration came from, for diagnostics.
+    pub file: PathBuf,
     /// Composite variants: (variant name, child enum name).
     pub composites: Vec<(String, String)>,
 }
@@ -94,14 +106,19 @@ pub(crate) fn find_state_machines(index: &CrateIndex) -> Detection {
                 .iter()
                 .max_by_key(|decl| decl.variants.len())
                 .cloned();
-            let (variants, composites) = decl
+            let docs = decl.as_ref().map(|decl| decl.docs.clone()).unwrap_or_default();
+            let file = decl.as_ref().map(|decl| decl.file.clone()).unwrap_or_default();
+            let leaves = decl
                 .map(|decl| expand_leaves(&enum_name, &decl, index, &nested_patterns))
                 .unwrap_or_default();
             StateMachine {
                 enum_name,
                 field_name,
-                variants,
-                composites,
+                variants: leaves.names,
+                variant_docs: leaves.docs,
+                docs,
+                file,
+                composites: leaves.composites,
             }
         })
         .collect();
@@ -112,18 +129,32 @@ pub(crate) fn find_state_machines(index: &CrateIndex) -> Detection {
     }
 }
 
+/// The leaves of a state enum: their names, the documentation authored on
+/// each, and which variants turned out to be composite. Three parallel results
+/// is where a tuple stops being readable.
+#[derive(Default)]
+struct Leaves {
+    names: Vec<String>,
+    /// Parallel to `names`.
+    docs: Vec<DocBlock>,
+    composites: Vec<(String, String)>,
+}
+
 /// Expands composite variants into `Parent/Child` leaves. A variant is only
 /// composite when a nested variant pattern (`Parent::Variant(Child::X)`)
 /// exists somewhere in the crate — sub-state evidence, mirroring the
 /// assignment-evidence rule for machines themselves.
+///
+/// A child leaf inherits its parent variant's documentation (see
+/// [`DocBlock::inherit`]): the parent has no node of its own in the model, so
+/// anything written on it would otherwise be lost.
 fn expand_leaves(
     enum_name: &str,
     decl: &EnumDecl,
     index: &CrateIndex,
     nested_patterns: &BTreeSet<(String, String, String)>,
-) -> (Vec<String>, Vec<(String, String)>) {
-    let mut leaves = Vec::new();
-    let mut composites = Vec::new();
+) -> Leaves {
+    let mut leaves = Leaves::default();
 
     for (position, variant) in decl.variants.iter().enumerate() {
         let child = composite_child_enum(decl, position, index).filter(|(child_enum, _)| {
@@ -135,15 +166,22 @@ fn expand_leaves(
         });
         match child {
             Some((child_enum, child_decl)) => {
-                composites.push((variant.clone(), child_enum));
-                for child in &child_decl.variants {
-                    leaves.push(format!("{variant}/{child}"));
+                leaves.composites.push((variant.clone(), child_enum));
+                let parent_docs = decl.docs_of(position);
+                for (child_position, child) in child_decl.variants.iter().enumerate() {
+                    leaves.names.push(format!("{variant}/{child}"));
+                    leaves
+                        .docs
+                        .push(child_decl.docs_of(child_position).inherit(parent_docs));
                 }
             }
-            None => leaves.push(variant.clone()),
+            None => {
+                leaves.names.push(variant.clone());
+                leaves.docs.push(decl.docs_of(position).clone());
+            }
         }
     }
-    (leaves, composites)
+    leaves
 }
 
 /// `Active(ActiveState)` → the child enum, when the variant has exactly one

@@ -11,6 +11,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use crate::annotations::{doc_block, DocBlock};
 use crate::loader::SourceFile;
 
 /// A field of an enum variant: its name (for named fields) and the last
@@ -31,6 +32,10 @@ pub(crate) struct EnumDecl {
     /// `Event::Recording(RecordingEvent)`, event payload bindings, and
     /// composite states like `State::Active(ActiveState)`).
     pub variant_fields: Vec<Vec<VariantField>>,
+    /// Documentation authored on the enum item itself.
+    pub docs: DocBlock,
+    /// Documentation authored on each variant. Parallel to `variants`.
+    pub variant_docs: Vec<DocBlock>,
     /// The `#[default]` variant, when the enum derives `Default`.
     pub default_variant: Option<String>,
 }
@@ -41,6 +46,11 @@ impl EnumDecl {
         self.variant_fields[variant_index]
             .iter()
             .map(|f| f.type_name.as_str())
+    }
+
+    /// Documentation of a variant by position — companion to [`field_types`].
+    pub fn docs_of(&self, variant_index: usize) -> &DocBlock {
+        &self.variant_docs[variant_index]
     }
 }
 
@@ -150,6 +160,12 @@ fn index_items<'a>(
                             .variants
                             .iter()
                             .map(|v| variant_fields(&v.fields))
+                            .collect(),
+                        docs: doc_block(&item_enum.attrs),
+                        variant_docs: item_enum
+                            .variants
+                            .iter()
+                            .map(|v| doc_block(&v.attrs))
                             .collect(),
                         default_variant: item_enum
                             .variants

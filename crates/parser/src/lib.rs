@@ -29,6 +29,7 @@ use std::path::{Path, PathBuf};
 use crux_analyzer_i18n::Locale;
 use crux_analyzer_model::Project;
 
+mod annotations;
 mod ast_util;
 mod core_finder;
 mod emit;
@@ -76,6 +77,10 @@ pub enum WarningKind {
     UnknownEvent { to: String },
     /// The guard references the state but defeats static analysis.
     UnresolvableSource { to: String },
+    /// A doc comment line looked like an annotation but is not one — a typo
+    /// (`@failur`), a marker given an argument, or a `@tag` with no usable
+    /// name. Reported rather than left inert, so the mistake is visible.
+    UnknownAnnotation { annotation: String },
 }
 
 impl WarningKind {
@@ -88,6 +93,7 @@ impl WarningKind {
             WarningKind::DynamicTarget { .. } => "dynamic-target",
             WarningKind::UnknownEvent { .. } => "unknown-event",
             WarningKind::UnresolvableSource { .. } => "unresolvable-source",
+            WarningKind::UnknownAnnotation { .. } => "unknown-annotation",
         }
     }
 }
@@ -150,7 +156,7 @@ pub(crate) fn parse_sources(
     if cores.is_empty() {
         return Err(ParseError::NoCoreFound);
     }
-    let mut warnings = Vec::new();
+    let mut warnings = annotation_warnings(&machines);
     let mut model_cores = Vec::new();
 
     for core in &cores {
@@ -165,4 +171,33 @@ pub(crate) fn parse_sources(
         },
         warnings,
     })
+}
+
+/// Annotation-shaped lines the grammar did not recognize, as warnings.
+///
+/// Only enums that became state machines are inspected, so a doc comment on an
+/// unrelated enum can never produce noise. Deduplicated because
+/// `use X as Y` registers a clone of the same declaration under a second name,
+/// which makes one typo reachable twice.
+fn annotation_warnings(machines: &[state_enum::StateMachine]) -> Vec<Warning> {
+    let mut warnings: Vec<Warning> = Vec::new();
+    for machine in machines {
+        let blocks = std::iter::once(&machine.docs).chain(&machine.variant_docs);
+        for problem in blocks.flat_map(|block| &block.problems) {
+            let warning = Warning {
+                file: machine.file.clone(),
+                line: problem.line,
+                kind: WarningKind::UnknownAnnotation {
+                    annotation: problem.text.clone(),
+                },
+            };
+            if !warnings
+                .iter()
+                .any(|seen| seen.file == warning.file && seen.line == warning.line && seen.kind == warning.kind)
+            {
+                warnings.push(warning);
+            }
+        }
+    }
+    warnings
 }

@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use crux_analyzer_model::{Core, Effect, Event, Machine, State, StateDecl, Transition};
 
+use crate::annotations::DocBlock;
 use crate::core_finder::CoreInfo;
 use crate::state_enum::StateMachine;
 use crate::transitions::RawTransition;
@@ -42,9 +43,16 @@ pub(crate) fn to_core(core: &CoreInfo, machines: &[StateMachine], raw: Vec<RawTr
 
             Some(Machine {
                 name: machine_name(machine, machines),
-                states: machine.variants.iter().map(StateDecl::bare).collect(),
+                doc: machine.docs.doc.clone(),
+                markers: machine.docs.markers.clone(),
+                tags: machine.docs.tags.clone(),
+                states: machine
+                    .variants
+                    .iter()
+                    .zip(&machine.variant_docs)
+                    .map(|(name, docs)| state_decl(name, docs))
+                    .collect(),
                 transitions,
-                ..Default::default()
             })
         })
         .collect();
@@ -52,6 +60,17 @@ pub(crate) fn to_core(core: &CoreInfo, machines: &[StateMachine], raw: Vec<RawTr
     Core {
         name: core.name.clone(),
         machines: model_machines,
+    }
+}
+
+/// The model's view of one leaf state. The parser-to-model conversion belongs
+/// here, the single place state values are constructed.
+fn state_decl(name: &str, docs: &DocBlock) -> StateDecl {
+    StateDecl {
+        name: name.to_string(),
+        doc: docs.doc.clone(),
+        markers: docs.markers.clone(),
+        tags: docs.tags.clone(),
     }
 }
 

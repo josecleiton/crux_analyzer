@@ -30,6 +30,24 @@ fn triple(from: &str, event: &str, to: &str) -> (String, String, String) {
     (from.to_string(), event.to_string(), to.to_string())
 }
 
+/// The first machine of the first core, for assertions about documentation
+/// rather than about transitions.
+fn machine_of(code: &str) -> crux_analyzer_model::Machine {
+    let sources = sources_from_str(&[("lib.rs", code)]);
+    let outcome = parse_sources(&sources, "test").expect("must parse");
+    outcome.project.cores[0].machines[0].clone()
+}
+
+/// The declaration of one state by name.
+fn state_of(machine: &crux_analyzer_model::Machine, name: &str) -> crux_analyzer_model::StateDecl {
+    machine
+        .states
+        .iter()
+        .find(|state| state.name == name)
+        .unwrap_or_else(|| panic!("no state {name}"))
+        .clone()
+}
+
 const PREAMBLE: &str = r#"
     pub enum State { Idle, Running, Done }
     pub struct Model { state: State }
@@ -889,3 +907,289 @@ fn no_core_is_an_error() {
         Err(crate::ParseError::NoCoreFound)
     ));
 }
+
+#[test]
+fn variant_docs_become_state_documentation() {
+    let machine = machine_of(
+        r#"
+        pub enum State {
+            /// Nothing is being recorded yet.
+            Idle,
+            /// Capturing audio from the microphone.
+            Running,
+            Done,
+        }
+        pub struct Model { state: State }
+        pub struct App1;
+        pub enum Event { Go }
+        impl App for App1 {
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {
+                match event {
+                    Event::Go if matches!(model.state, State::Idle) => {
+                        model.state = State::Running;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        "#,
+    );
+    assert_eq!(
+        state_of(&machine, "Idle").doc.as_deref(),
+        Some("Nothing is being recorded yet.")
+    );
+    assert_eq!(
+        state_of(&machine, "Running").doc.as_deref(),
+        Some("Capturing audio from the microphone.")
+    );
+    // An undocumented state stays exactly what it was before documentation.
+    assert!(state_of(&machine, "Done").is_bare());
+}
+
+#[test]
+fn enum_doc_becomes_the_machine_description() {
+    let machine = machine_of(&format!(
+        r#"
+        /// Where a recording session lives.
+        ///
+        /// @deprecated
+        /// @tag legacy
+        pub enum State {{ Idle, Running, Done }}
+        pub struct Model {{ state: State }}
+        pub struct App1;
+        {}
+        "#,
+        UPDATE_GO
+    ));
+    assert_eq!(
+        machine.doc.as_deref(),
+        Some("Where a recording session lives.")
+    );
+    assert_eq!(machine.markers, [crux_analyzer_model::Marker::Deprecated]);
+    assert_eq!(machine.tags, ["legacy"]);
+}
+
+#[test]
+fn declared_markers_and_tags_reach_the_state() {
+    let machine = machine_of(&format!(
+        r#"
+        pub enum State {{
+            Idle,
+            /// The upload failed. The session is kept so the user can retry.
+            ///
+            /// @failure
+            /// @tag retryable
+            Running,
+            /// @deprecated
+            Done,
+        }}
+        pub struct Model {{ state: State }}
+        pub struct App1;
+        {}
+        "#,
+        UPDATE_GO
+    ));
+    let running = state_of(&machine, "Running");
+    assert_eq!(
+        running.doc.as_deref(),
+        Some("The upload failed. The session is kept so the user can retry.")
+    );
+    assert_eq!(running.markers, [crux_analyzer_model::Marker::Failure]);
+    assert_eq!(running.tags, ["retryable"]);
+
+    // A marker with no prose is still a documented state.
+    let done = state_of(&machine, "Done");
+    assert!(done.doc.is_none());
+    assert_eq!(done.markers, [crux_analyzer_model::Marker::Deprecated]);
+    assert!(done.is_documented());
+}
+
+#[test]
+fn composite_children_inherit_the_parent_documentation() {
+    let machine = machine_of(
+        r#"
+        /// The machine.
+        pub enum State {
+            /// Nothing yet.
+            Idle,
+            /// A session is live.
+            ///
+            /// @deprecated
+            /// @tag region
+            Active(Phase),
+        }
+        pub enum Phase {
+            /// Fetching the manifest.
+            ///
+            /// @failure
+            Loading,
+            Ready,
+        }
+        pub struct Model { state: State }
+        pub struct App1;
+        pub enum Event { Go }
+        impl App for App1 {
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {
+                match event {
+                    Event::Go if matches!(model.state, State::Active(Phase::Loading)) => {
+                        model.state = State::Idle;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        "#,
+    );
+    let loading = state_of(&machine, "Active/Loading");
+    // Parent prose first, then the leaf's — the parent has no node of its own.
+    assert_eq!(
+        loading.doc.as_deref(),
+        Some("A session is live.\n\nFetching the manifest.")
+    );
+    assert_eq!(
+        loading.markers,
+        [
+            crux_analyzer_model::Marker::Deprecated,
+            crux_analyzer_model::Marker::Failure
+        ]
+    );
+    assert_eq!(loading.tags, ["region"]);
+
+    // An undocumented child still inherits the superstate's statement.
+    let ready = state_of(&machine, "Active/Ready");
+    assert_eq!(ready.doc.as_deref(), Some("A session is live."));
+    assert_eq!(ready.markers, [crux_analyzer_model::Marker::Deprecated]);
+}
+
+#[test]
+fn ordinary_documentation_never_warns() {
+    let (_, warnings) = transitions_of(&format!(
+        r#"
+        /// Prose that mentions `@Generable` mid-sentence, and an address like
+        /// support@example.com, and a fenced sample:
+        ///
+        /// ```
+        /// @failure
+        /// ```
+        pub enum State {{ Idle, Running, Done }}
+        pub struct Model {{ state: State }}
+        pub struct App1;
+        {}
+        "#,
+        UPDATE_GO
+    ));
+    assert!(warnings.is_empty(), "{warnings:?}");
+}
+
+#[test]
+fn an_unrecognized_annotation_warns_once_per_line() {
+    let (_, warnings) = transitions_of(&format!(
+        r#"
+        pub enum State {{
+            /// @failur
+            Idle,
+            Running,
+            Done,
+        }}
+        pub struct Model {{ state: State }}
+        pub struct App1;
+        {}
+        "#,
+        UPDATE_GO
+    ));
+    assert_eq!(warnings.len(), 1, "{warnings:?}");
+    assert!(warnings[0].contains("@failur"), "{warnings:?}");
+}
+
+/// A doc comment on an enum that is not a state machine must stay silent —
+/// warnings are only worth paying for where the annotation would have meant
+/// something.
+#[test]
+fn annotations_on_a_non_machine_enum_are_ignored() {
+    let (_, warnings) = transitions_of(&format!(
+        r#"
+        /// @nonsense
+        pub enum ViewModel {{ Empty, Full }}
+        pub enum State {{ Idle, Running, Done }}
+        pub struct Model {{ state: State }}
+        pub struct App1;
+        {}
+        "#,
+        UPDATE_GO
+    ));
+    assert!(warnings.is_empty(), "{warnings:?}");
+}
+
+/// An aliased state enum is indexed twice; one typo must still warn once.
+#[test]
+fn an_aliased_enum_does_not_duplicate_its_warning() {
+    let sources = sources_from_str(&[
+        (
+            "state.rs",
+            r#"
+            pub enum State {
+                /// @failur
+                Idle,
+                Running,
+            }
+            "#,
+        ),
+        (
+            "lib.rs",
+            r#"
+            use crate::state::State as RecorderState;
+            pub struct Model { state: RecorderState }
+            pub struct App1;
+            pub enum Event { Go }
+            impl App for App1 {
+                type Event = Event;
+                fn update(&self, event: Event, model: &mut Model) {
+                    match event {
+                        Event::Go if matches!(model.state, RecorderState::Idle) => {
+                            model.state = RecorderState::Running;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            "#,
+        ),
+    ]);
+    let outcome = parse_sources(&sources, "test").expect("must parse");
+    let annotation_warnings: Vec<_> = outcome
+        .warnings
+        .iter()
+        .filter(|w| w.kind.code() == "unknown-annotation")
+        .collect();
+    assert_eq!(annotation_warnings.len(), 1, "{:?}", outcome.warnings);
+}
+
+/// A state machine with no documentation at all must produce the same states
+/// it produced before documentation existed — the byte-identity guard.
+#[test]
+fn undocumented_states_carry_no_metadata() {
+    let machine = machine_of(&format!("{PREAMBLE}{UPDATE_GO}"));
+    assert!(machine.doc.is_none());
+    assert!(machine.markers.is_empty());
+    assert!(machine.tags.is_empty());
+    assert!(machine.states.iter().all(|s| s.is_bare()), "{:?}", machine.states);
+}
+
+/// The `update` body shared by the documentation tests above: one transition,
+/// enough to make `State` a machine.
+const UPDATE_GO: &str = r#"
+    pub enum Event { Go }
+    impl App for App1 {
+        type Event = Event;
+        fn update(&self, event: Event, model: &mut Model) {
+            match event {
+                Event::Go if matches!(model.state, State::Idle) => {
+                    model.state = State::Running;
+                }
+                _ => {}
+            }
+        }
+    }
+"#;
