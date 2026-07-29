@@ -79,6 +79,35 @@ dependency); hard-wrapped lines are rejoined into paragraphs
 line breaks in a 260px panel. The generated Markdown document is the client
 that renders Markdown as Markdown.
 
+## Filtering the canvas
+
+Two reading filters live in the toolbar. Both say "these, not the rest" the
+same way the simulation does: the matching states stay at full strength while
+every other state and transition fades back.
+
+- **Filter by tag** — type a fragment of a declared `@tag` name; matching is
+  case-insensitive and the input suggests the active core's own tags. A tag
+  declared on the state enum covers its whole region. The input only renders
+  when the core declares any tag — with nothing to filter by there is no
+  filter.
+- **Undocumented** — an opt-in toggle that keeps only the states with no
+  authored description: the states a reader should not trust yet. Opt-in on
+  purpose, so the default view stays about the machine rather than about
+  documentation coverage (the number itself comes from
+  `crux-analyzer coverage`, see [cli.md](cli.md)).
+
+Both criteria compose as an intersection. A transition stays readable only
+when everything it connects stays; on a wildcard edge the **any state**
+pseudo-node counts as matching — "any state" includes the kept ones — so
+`* → Ready` survives whenever `Ready` does.
+
+The filters are pure domain logic (`src/domain/focus.ts`) and reach the Graph
+through the same highlight prop the simulation drives — a quiet `kept` tier
+that only escapes the dimming, so a filter match never borrows the
+simulation's colors. While a simulation runs the filters are disabled: the
+emphasis belongs to the replay. Switching cores clears them — each core
+declares its own tags.
+
 ## Data source
 
 On load the app fetches `model.json` relative to its base (see

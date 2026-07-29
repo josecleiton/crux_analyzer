@@ -56,19 +56,24 @@ enum, que é exatamente o tipo de número para o qual uma catraca serve.
 
 ---
 
-## 2. Fechar o loop das etiquetas
+## 2. Fechar o loop das etiquetas ✅ **feito**
 
-`@tag` existe no modelo e renderiza como chips, mas é **inerte**: dá para
-declarar uma etiqueta e olhar para ela, não para *usá-la*. Com oito estados isso
-não incomoda; com trinta é a diferença entre um diagrama e uma ferramenta.
+`@tag` existia no modelo e renderizava como chips, mas era **inerte**: dava
+para declarar uma etiqueta e olhar para ela, não para *usá-la*. Com oito
+estados isso não incomoda; com trinta é a diferença entre um diagrama e uma
+ferramenta. As duas metades saíram em um incremento só; veja
+[web-ui.md](web-ui.md#filtrando-o-canvas).
 
-- **Filtro e busca por etiqueta na UI web.** Digite `retryable`, mantenha os
-  estados que a carregam, esmaeça o resto. O grafo já esmaece nós durante a
-  simulação, então o vocabulário visual existe.
-- **Destacar estados não documentados.** A contraparte visual do §1.3 — os
-  estados em que um leitor ainda não deveria confiar. Deliberadamente opt-in,
-  para que a visão padrão continue sendo sobre a máquina e não sobre nossas
-  métricas.
+- **Filtro e busca por etiqueta na UI web** — digite `retryable` (ou um
+  fragmento; o campo sugere as etiquetas do próprio núcleo), mantenha os
+  estados que a carregam, esmaeça o resto. O esmaecimento *é* o da simulação,
+  alcançado pela mesma prop de destaque via um nível `kept` silencioso, então
+  o Graph continuou um renderizador puro e a lógica de casamento é um módulo
+  de domínio testado (`src/domain/focus.ts`).
+- **Destacar estados não documentados** — um botão opt-in **Sem documentação**
+  mantém apenas os estados sem descrição autoral. Opt-in como planejado: a
+  visão padrão continua sendo sobre a máquina, e o *número* continua com o
+  `crux-analyzer coverage`.
 
 ---
 

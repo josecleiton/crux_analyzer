@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-The original roadmap is fully implemented: syn-based parser (predicate guards, `==`/closure guards, `Default` resets, wildcard sources AND targets, value-flow analysis for runtime-assigned targets, hierarchical/composite states as `Parent/Child` paths, per-transition effects, multiple state machines per core, plus state/machine documentation and `@failure` / `@deprecated` / `@tag` annotations read from `///` doc comments), CLI (`crux-analyzer generate | docs`, both with `--watch`), doc generators (Mermaid with composite blocks and per-state notes, Markdown with a states table), and the web UI (machine sections, inspector with effects and authored documentation, Simulation Engine). The corpus test against a real app is gated on `QUIPU_SRC` and extracts it warning-free. `init.md` is the original project spec (in Portuguese).
+The original roadmap is fully implemented: syn-based parser (predicate guards, `==`/closure guards, `Default` resets, wildcard sources AND targets, value-flow analysis for runtime-assigned targets, hierarchical/composite states as `Parent/Child` paths, per-transition effects, multiple state machines per core, plus state/machine documentation and `@failure` / `@deprecated` / `@tag` annotations read from `///` doc comments), CLI (`crux-analyzer generate | docs`, both with `--watch`), doc generators (Mermaid with composite blocks and per-state notes, Markdown with a states table), and the web UI (machine sections, inspector with effects and authored documentation, Simulation Engine, tag filter + undocumented-states highlight). The corpus test against a real app is gated on `QUIPU_SRC` and extracts it warning-free. `init.md` is the original project spec (in Portuguese).
 
 ## Documentation
 
@@ -77,5 +77,6 @@ deliberately *not* being done and why. Keep it updated instead of starting a
 list here; the pt-BR twin is `docs/pt-BR/roadmap.md`.
 
 The short version: the parser is complete against `init.md`, so the open work is
-adoption and keeping the documentation honest — CI, `--deny-warnings` and a
-`coverage` subcommand first, then tag filtering, then the VS Code extension.
+adoption and keeping the documentation honest — the ratchet (CI,
+`--deny-warnings`, `coverage`) and tag filtering are done; the VS Code
+extension is next.

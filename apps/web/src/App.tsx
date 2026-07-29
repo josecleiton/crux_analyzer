@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { loadProject } from './data/loadProject';
 import type { DomainProject } from './domain/types';
 import { machineOf } from './domain/fromParserJson';
+import { declaredTags, focusFor } from './domain/focus';
 import { stateRole } from './domain/stateRole';
 import { toFlowModel } from './flow/toFlowModel';
 import type { LayoutEngine, LayoutResult } from './layout/LayoutEngine';
@@ -31,6 +32,8 @@ export default function App() {
   const [activeCoreId, setActiveCoreId] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const [simulation, setSimulation] = useState<Simulation | null>(null);
+  const [tagQuery, setTagQuery] = useState('');
+  const [undocumentedOnly, setUndocumentedOnly] = useState(false);
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [layouted, setLayouted] = useState<LayoutResult>({ nodes: [], edges: [] });
   const { theme, toggleTheme } = useTheme();
@@ -81,8 +84,22 @@ export default function App() {
     [activeCore, simulation],
   );
 
+  const tagOptions = useMemo(() => (activeCore ? declaredTags(activeCore) : []), [activeCore]);
+
   const highlight: GraphHighlight | undefined = useMemo(() => {
-    if (!simulation || !simulatedMachine) return undefined;
+    // The simulation owns the emphasis while it runs; the reading filters
+    // (tag query, undocumented-only) take over when it does not.
+    if (!simulation || !simulatedMachine) {
+      if (!activeCore) return undefined;
+      const focus = focusFor(activeCore, { tagQuery, undocumentedOnly });
+      if (!focus) return undefined;
+      return {
+        nodeIds: [],
+        edgeIds: [],
+        kept: { nodeIds: focus.stateIds, edgeIds: focus.transitionIds },
+        dimOthers: true,
+      };
+    }
     const last = lastStep(simulation);
     const current = simulatedMachine.states.find((s) => s.id === simulation.currentStateId);
     const traveled = traveledPath(simulatedMachine, simulation);
@@ -101,12 +118,15 @@ export default function App() {
       failure: current ? stateRole(simulatedMachine, current).failure : false,
       step: simulation.trail.length,
     };
-  }, [simulation, simulatedMachine]);
+  }, [simulation, simulatedMachine, activeCore, tagQuery, undocumentedOnly]);
 
   function selectCore(coreId: string) {
     setActiveCoreId(coreId);
     setSelection(null);
     setSimulation(null);
+    // each core declares its own tags, so a filter does not survive the switch
+    setTagQuery('');
+    setUndocumentedOnly(false);
   }
 
   function toggleSimulation() {
@@ -141,6 +161,11 @@ export default function App() {
         coreName={activeCore?.name ?? null}
         simulating={simulation !== null}
         theme={theme}
+        tagQuery={tagQuery}
+        tagOptions={tagOptions}
+        undocumentedOnly={undocumentedOnly}
+        onTagQueryChange={setTagQuery}
+        onToggleUndocumented={() => setUndocumentedOnly((on) => !on)}
         onToggleSimulation={toggleSimulation}
         onRelayout={() => setLayoutVersion((v) => v + 1)}
         onToggleTheme={toggleTheme}

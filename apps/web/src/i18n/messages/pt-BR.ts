@@ -13,6 +13,9 @@ export const ptBR: Catalog = {
   'toolbar.simulate': 'Simular',
   'toolbar.stopSimulation': 'Parar simulação',
   'toolbar.relayout': 'Reorganizar',
+  'toolbar.filterByTag': 'Filtrar por etiqueta',
+  'toolbar.undocumented': 'Sem documentação',
+  'toolbar.undocumentedHint': 'Destacar estados sem documentação',
 
   'themeToggle.switchToLight': 'Mudar para o modo claro',
   'themeToggle.switchToDark': 'Mudar para o modo escuro',
