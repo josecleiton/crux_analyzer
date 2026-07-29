@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Theme } from '../../theme/theme';
 import { useTranslate } from '../../i18n/useI18n';
 import { LocaleToggle } from './LocaleToggle';
@@ -41,6 +42,13 @@ export function Toolbar({
         {coreName ? <span className="toolbar-core"> / {coreName}</span> : null}
       </span>
       <div className="toolbar-actions">
+        {/* Simulate leads: it is the primary action of the toolbar. While a
+            simulation runs the icon is a stop square, not a pause — stopping
+            discards the run, and an icon must not promise a resume. */}
+        <button className={simulating ? 'active' : ''} onClick={onToggleSimulation}>
+          {simulating ? <StopIcon /> : <PlayIcon />}
+          {simulating ? t('toolbar.stopSimulation') : t('toolbar.simulate')}
+        </button>
         {/* The reading filters step aside while the simulation owns the
             emphasis — disabled rather than hidden, so they don't reflow.
             A core with no declared tags has nothing to filter by, so the
@@ -89,13 +97,56 @@ export function Toolbar({
           </svg>
           {t('toolbar.undocumented')}
         </button>
-        <button className={simulating ? 'active' : ''} onClick={onToggleSimulation}>
-          {simulating ? t('toolbar.stopSimulation') : t('toolbar.simulate')}
+        <button onClick={onRelayout}>
+          <RelayoutIcon />
+          {t('toolbar.relayout')}
         </button>
-        <button onClick={onRelayout}>{t('toolbar.relayout')}</button>
         <LocaleToggle />
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
       </div>
     </header>
+  );
+}
+
+/** Shared frame of the small toolbar icons (decorative, 16-unit grid). */
+function ToolbarIcon({ children, filled = false }: { children: ReactNode; filled?: boolean }) {
+  return (
+    <svg
+      className="toolbar-icon"
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke={filled ? 'none' : 'currentColor'}
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {children}
+    </svg>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <ToolbarIcon filled>
+      <path d="M4.8 2.9v10.2c0 .5.5.7.9.5l8-5.1a.6.6 0 0 0 0-1l-8-5.1a.6.6 0 0 0-.9.5Z" />
+    </ToolbarIcon>
+  );
+}
+
+function StopIcon() {
+  return (
+    <ToolbarIcon filled>
+      <rect x="3.4" y="3.4" width="9.2" height="9.2" rx="1.6" />
+    </ToolbarIcon>
+  );
+}
+
+function RelayoutIcon() {
+  return (
+    <ToolbarIcon>
+      <path d="M13.2 8A5.2 5.2 0 1 1 11 3.7" />
+      <polyline points="11.2 1.6 11.2 4.2 8.6 4.2" transform="rotate(28 11.2 4.2)" />
+    </ToolbarIcon>
   );
 }

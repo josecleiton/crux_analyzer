@@ -222,20 +222,36 @@ body {
   border-color: var(--sim);
 }
 
-/* The undocumented toggle carries a warning triangle: it is about the states
-   a reader should not trust yet, and amber is the caution color the
-   deprecated styling already established. */
-.toolbar button.undocumented-toggle {
-  display: flex;
+/* Action buttons carry small leading icons. */
+.toolbar-actions > button {
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
 }
 
+.toolbar-icon {
+  flex: none;
+  width: 13px;
+  height: 13px;
+}
+
+/* The undocumented toggle carries a warning triangle: it is about the states
+   a reader should not trust yet, and amber is the caution color the
+   deprecated styling already established. */
 .undocumented-toggle-icon {
   flex: none;
   width: 13px;
   height: 13px;
   color: var(--state-deprecated);
+}
+
+/* Active it stays in its own caution color — green belongs to the
+   simulation, and this toggle warns rather than runs anything. */
+.toolbar button.undocumented-toggle.active {
+  background: var(--state-deprecated-bg);
+  border-color: var(--state-deprecated);
+  color: var(--state-deprecated-text);
 }
 
 .toolbar input.toolbar-filter:disabled {

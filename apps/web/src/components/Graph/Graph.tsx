@@ -8,7 +8,7 @@
 import { ReactFlow, Background, Controls } from '@xyflow/react';
 import type { Edge, Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Selection } from '../../state/selection';
 import type { Theme } from '../../theme/theme';
 import { useTranslate } from '../../i18n/useI18n';
@@ -65,15 +65,30 @@ interface GraphProps {
   selection: Selection;
   onSelect: (selection: Selection) => void;
   highlight?: GraphHighlight;
+  /** Bumped by the host to re-frame the whole graph (an explicit Re-layout). */
+  fitSignal?: number;
   theme: Theme;
 }
 
-export function Graph({ nodes, edges, selection, onSelect, highlight, theme }: GraphProps) {
+export function Graph({
+  nodes,
+  edges,
+  selection,
+  onSelect,
+  highlight,
+  fitSignal = 0,
+  theme,
+}: GraphProps) {
   const colors = useGraphColors(theme);
   const t = useTranslate();
   // Framing a section is a viewport reaction to a click, not graph state: a
   // fresh request object per click re-frames even the same section.
   const [fitRequest, setFitRequest] = useState<FitRequest | null>(null);
+
+  // An explicit Re-layout frames the whole graph: a fresh, node-less request.
+  useEffect(() => {
+    if (fitSignal > 0) setFitRequest({});
+  }, [fitSignal]);
 
   // The simulation already tells us where it is; the camera tags along.
   const currentStateId = highlight?.nodeIds[0];

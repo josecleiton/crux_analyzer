@@ -12,9 +12,9 @@ import { useEffect } from 'react';
 import { useReactFlow, useStoreApi } from '@xyflow/react';
 import { isRectInView, rectCenter } from './viewport';
 
-/** Frame this node: pan *and* zoom until it fills the pane. */
+/** Frame this node — or the whole graph when no node is named. */
 export interface FitRequest {
-  nodeId: string;
+  nodeId?: string;
 }
 
 /** Keep this node in sight, without ever changing the zoom. */
@@ -50,7 +50,7 @@ export function ViewportFocus({ fit, follow, padding }: ViewportFocusProps) {
     if (!fit) return;
     // maxZoom keeps a small section from being blown up to fill the screen.
     void fitView({
-      nodes: [{ id: fit.nodeId }],
+      ...(fit.nodeId ? { nodes: [{ id: fit.nodeId }] } : {}),
       padding,
       maxZoom: 1,
       duration: animationDuration(),
