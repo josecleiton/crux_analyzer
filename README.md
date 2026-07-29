@@ -2,53 +2,72 @@
 
 Semantic analyzer for **Rust + Crux** applications: turns the code into living
 documentation. The parser (Rust, via `syn`) produces an **intermediate model**;
-the web UI (React) is just one client of that model — CLI, VS Code extension
-and documentation generators are future clients.
+every client — the web UI, the CLI doc generators — consumes only that model
+through the JSON Schema contract.
 
 ## Structure
 
 ```
-apps/web/        React + TypeScript + React Flow + ELKJS — visualization only
-crates/parser/   Rust lib: walks the syn AST and extracts states/transitions
-crates/cli/      `crux-analyzer` binary: runs the parser, emits model JSON
-crates/model/    Rust lib: semantic structs (Project, Core, State, ...)
-shared/schema/   JSON Schema contract — the UI depends ONLY on this
+apps/web/        React + TypeScript + React Flow + ELKJS — visualization + simulation
+crates/parser/   Rust lib: walks the syn AST and extracts states/transitions/effects
+crates/docgen/   Rust lib: Mermaid + Markdown generators (consume only the model)
+crates/cli/      `crux-analyzer` binary: generate | docs, with --watch
+crates/model/    Rust lib: semantic structs (Project, Core, Machine, State, ...)
+shared/schema/   JSON Schema contract — every client depends ONLY on this
 ```
 
 UI data flow (layers):
 
 ```
 Parser JSON → Domain Model → React Flow Model → Components
+                    ↘ Simulation Engine (pure, drives the graph via props)
 ```
+
+## What the parser understands
+
+The parser never depends on Crux — it analyzes sources statically:
+
+- Cores: `impl App for X`; events via the `Event` associated type, following
+  nested event enums and import aliases; effects via the `Effect` closure.
+- State machines by assignment analysis (no naming convention): every
+  `(enum, field)` written in the code becomes a machine — statechart-style
+  orthogonal regions, rendered as sections in the UI.
+- Source states from `matches!` guards, `match`-on-state arms (wildcards
+  resolve to the complement of earlier arms), `==`/`!=` comparisons (also
+  inside `find(|d| ...)` closures, `if let` and `let-else`), and predicate
+  methods on the state enum (resolved from their bodies, negation included).
+- Targets from direct variant assignments and `T::default()` struct resets
+  (landing on the `#[default]` variant).
+- Transitions with no state evidence fire from any state (`"*"` in the
+  contract); unresolvable evidence and runtime-value targets are reported as
+  warnings instead of being silently dropped.
+- Effects per transition: the operations each event arm requests
+  (`AudioOperation::Start`, crux `render()` → `Render`, ...).
 
 ## Running
 
 ```sh
-# Analyze a Crux app and feed the UI
+# Analyze a Crux app and feed the UI (add --watch for living docs)
 cargo run -p crux-analyzer-cli -- generate \
   --src path/to/app/src --name MyApp --out apps/web/public/model.json
 
+# Generate documentation
+cargo run -p crux-analyzer-cli -- docs --src path/to/app/src            # Markdown
+cargo run -p crux-analyzer-cli -- docs --src path/to/app/src --format mermaid
+
 # UI — shows the generated model, or the bundled fake example without one
 pnpm install
-pnpm dev            # opens the web app (Vite)
-pnpm test           # mapping-layer tests
+pnpm dev            # web app (Vite): graph sections, inspector, simulation
+pnpm test           # mapping layers + simulation engine
 
 # Crates
 cargo check
-cargo test          # parser unit + fixture tests
+cargo test          # parser unit + fixture + docgen tests
 QUIPU_SRC=path/to/quipu_app_crux/shared/src cargo test  # + real-app corpus test
 ```
 
-## How the parser extracts the model
+## Simulation
 
-The parser never depends on Crux — it analyzes sources statically:
-
-1. Every `impl App for X` block becomes a Core; its `Event` associated type
-   seeds the event-enum set (nested event enums are followed).
-2. State machines are detected by assignment analysis (`*.state = Enum::V`
-   plus matches against the same field) — no naming convention required.
-3. Transitions come from walking `update` and its helpers (cross-file),
-   combining `matches!` guards / `match`-on-state arms (`from`), event arm
-   patterns (`event`) and state assignments (`to`).
-4. What cannot be inferred statically (e.g. predicate-method guards) is
-   dropped and reported as a warning by the CLI.
+Select a state (optional) and hit **Simulate**: the right panel shows the
+events that can fire from the current state, firing them walks the machine —
+the graph highlights the current state and the last transition taken.
