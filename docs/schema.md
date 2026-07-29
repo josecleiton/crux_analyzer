@@ -1,5 +1,7 @@
 # Schema — the model contract
 
+> 🌐 **English** · [Português (Brasil)](pt-BR/schema.md)
+
 The contract lives at [`shared/schema/crux-model.schema.json`](../shared/schema/crux-model.schema.json)
 (JSON Schema draft 2020-12). Every client — the web UI, the doc generators,
 anything future — depends only on this document. A bundled example is kept at
@@ -45,6 +47,15 @@ and a round-trip test in `crates/model` keeps the Rust structs aligned with it.
 | `transitions[].event` | Leaf event variant name that triggers the transition. |
 | `transitions[].to` | Target state, or `"*"` — the target is decided at **runtime** (e.g. carried by the event payload). |
 | `transitions[].effects[]` | Optional. Effects requested when the transition fires: `"Render"`, `"AudioOperation::Start"`, ... Omitted when empty. |
+
+## The contract is locale-independent
+
+Every string in the model is an identifier read out of the analyzed
+application — no translated text ever enters it. `crux-analyzer generate`
+therefore produces byte-identical JSON in every locale, and clients localize
+their own chrome (the prose standing in for `"*"`, table headers, panel
+titles). Adding a locale must never add a field here. See
+[i18n.md](i18n.md).
 
 ## Wildcards
 

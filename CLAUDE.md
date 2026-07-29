@@ -8,11 +8,12 @@ The original roadmap is fully implemented: syn-based parser (predicate guards, `
 
 ## Documentation
 
-The full documentation set lives in `docs/` (index at `docs/README.md`): architecture, parser semantics + warnings reference, schema contract, CLI, web UI, development guide, and a CLI-generated example at `docs/examples/mini-recorder.md` (regenerate with `just example-docs`). Keep it in sync: parser semantics changes update `docs/parser.md`; schema changes update `docs/schema.md`; new commands update `docs/cli.md` and the `justfile`.
+The full documentation set lives in `docs/` (index at `docs/README.md`): architecture, parser semantics + warnings reference, schema contract, CLI, web UI, internationalization, development guide, and a CLI-generated example at `docs/examples/mini-recorder.md` (regenerate with `just example-docs`). `docs/pt-BR/` is the Portuguese mirror of that set. Keep it in sync: parser semantics changes update `docs/parser.md`; schema changes update `docs/schema.md`; new commands update `docs/cli.md` and the `Justfile`; new user-facing strings update the locale catalogs and, when the rules change, `docs/i18n.md`. A change to an English doc should update its `docs/pt-BR/` counterpart too.
 
 ## Conventions
 
-- **English everywhere**: all git commit messages and all code — identifiers, comments, doc comments, error messages, UI strings, schema descriptions — must be written in English.
+- **English is the source language**: all git commit messages and all code — identifiers, comments, doc comments, schema descriptions — must be written in English.
+- **User-facing text is localized**: UI strings, CLI output, parser diagnostics and generated-document labels live in the locale catalogs (`en` + `pt-BR`), never as inline literals. Add a key instead of a string. Identifiers read out of the analyzed application (core/machine/state/event/effect names) are data and are never translated. See `docs/i18n.md`.
 - **Parser honesty rule**: what cannot be inferred statically is surfaced as a `Warning` (never silently dropped, never guessed). An assignment with *no* state evidence legitimately fires from any state (`"*"`).
 
 ## Commands
@@ -28,9 +29,9 @@ just clippy                  # lint the workspace
 just check                   # full validation: corpus + clippy + web tests + build
 just model <src> <name>      # analyze an app into apps/web/public/model.json
 just model-watch <src> <name># same, regenerating on every save
-just docs <src> <name> [markdown|mermaid]
+just docs <src> <name> [markdown|mermaid] [en|pt-BR]
 just quipu                   # shortcut: analyze the Quipu corpus into the UI
-just example-docs            # regenerate docs/examples/mini-recorder.md
+just example-docs            # regenerate the example docs in every locale
 ```
 
 Raw `cargo`/`pnpm` equivalents are documented in `docs/development.md`. The full increment validation pipeline (tests + live UI check with screenshots + English commits + push) is described there too.
@@ -54,7 +55,8 @@ crux_analyzer/
   crates/
     parser/       # Rust lib: walks syn AST, identifies Core/State/Event/Effect/transitions, emits the model. Never knows about React.
     docgen/       # Rust lib: Mermaid/Markdown generators. Consume only the model.
-    cli/          # `crux-analyzer` binary: generate | docs, --watch. Reuses parser + model + docgen.
+    cli/          # `crux-analyzer` binary: generate | docs, --watch, --locale. Reuses parser + model + docgen.
+    i18n/         # Rust lib: the shared `Locale` type + env detection. No message catalogs — each crate owns its own.
     model/        # Rust lib: semantic structs only (Project, Core, Machine, State, Event, Effect, Transition). No parsing logic, no UI logic.
   shared/
     schema/       # JSON Schema contract. Every client depends ONLY on this.
@@ -65,6 +67,7 @@ Hard rules:
 - Layered UI data flow: `Parser JSON → Domain Model → React Flow Model → Components`. Swapping the parser must never require UI changes.
 - Graph geometry (node positions AND edge routes/labels) is owned by the `LayoutEngine`; swapping ELK only touches `apps/web/src/layout/`. The `Graph` component is a pure renderer driven by props — the Simulation Engine highlights through props, never by modifying the graph.
 - Cores contain `machines[]` (statechart-style orthogonal regions); each machine is one state enum detected by assignment analysis, no naming convention required.
+- Localization is a presentation concern: `crates/model`, parser extraction and the web `domain/`/`flow/`/`layout/` layers hold no translated text. Diagnostics travel as data (`WarningKind`), generators take a `Locale`, and translated chrome is injected at the boundary. The model JSON is locale-independent.
 
 ## Known future work
 

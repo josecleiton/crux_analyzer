@@ -1,5 +1,7 @@
 # Parser
 
+> 🌐 **English** · [Português (Brasil)](pt-BR/parser.md)
+
 `crates/parser` statically reconstructs a Crux app's state machines from its
 Rust sources. It never executes code and never depends on Crux — everything
 is derived from the `syn` AST.
@@ -116,12 +118,17 @@ An arm that produces several transitions shares its effect set among them
 The honesty rule: what cannot be inferred statically is surfaced, never
 silently dropped, never guessed. All warnings carry `file:line`.
 
-| Warning | Meaning |
-| --- | --- |
-| `could not infer the triggering event` | a state assignment was reached with no event label in scope (e.g. under a catch-all arm with unknown context) |
-| `source-state condition could not be resolved statically` | the guard references the state but defeats analysis (e.g. an unresolvable predicate) |
-| `target state is dynamic (assigned from a runtime value)` | the assigned value has no payload typing and no resolvable constraints |
-| `core X: no update method found` | an `impl App` block without an `update` fn |
+A warning is **data**, not a string: `Warning { file, line, kind }` where
+`kind` is a `WarningKind`. `kind.code()` is the stable, locale-independent
+identifier — key tooling and documentation on that, since the message text is
+localized ([i18n.md](i18n.md)). The English rendering is shown below.
+
+| Code | Message (`en`) | Meaning |
+| --- | --- | --- |
+| `unknown-event` | `could not infer the triggering event` | a state assignment was reached with no event label in scope (e.g. under a catch-all arm with unknown context) |
+| `unresolvable-source` | `source-state condition could not be resolved statically` | the guard references the state but defeats analysis (e.g. an unresolvable predicate) |
+| `dynamic-target` | `target state is dynamic (assigned from a runtime value)` | the assigned value has no payload typing and no resolvable constraints |
+| `no-update-method` | `core X: no update method found` | an `impl App` block without an `update` fn |
 
 A clean corpus run (the Quipu test) extracts with **zero** warnings.
 

@@ -1,5 +1,7 @@
 # Development
 
+> 🌐 **English** · [Português (Brasil)](pt-BR/development.md)
+
 ## Setup
 
 Requirements: Rust (stable), Node + pnpm, and optionally
@@ -23,8 +25,8 @@ just            # lists every recipe
 | Clippy | `just clippy` | `cargo clippy --workspace` |
 | Everything | `just check` | — |
 | Model for the UI | `just model <src> <name>` | `cargo run -p crux-analyzer-cli -- generate ...` |
-| Docs | `just docs <src> <name> [format]` | `cargo run -p crux-analyzer-cli -- docs ...` |
-| Example docs refresh | `just example-docs` | — |
+| Docs | `just docs <src> <name> [format] [locale]` | `cargo run -p crux-analyzer-cli -- docs ...` |
+| Example docs refresh (all locales) | `just example-docs` | — |
 
 ## Test layers
 
@@ -39,10 +41,14 @@ just            # lists every recipe
    production app, gated on the `QUIPU_SRC` env var (skips with a message
    when unset). Asserts the full expected transition sets and **zero
    warnings**. This is the ground truth for extraction quality.
-4. **Docgen tests** (`crates/docgen`) — generator output assertions.
-5. **Web tests** (vitest) — the mapping layers (`schema → domain → flow`)
-   and the simulation engine. UI components are deliberately not unit-tested;
-   the layers around them are.
+4. **Docgen tests** (`crates/docgen`) — generator output assertions, per
+   locale: that prose is translated *and* that identifiers and Mermaid node
+   ids are not.
+5. **Web tests** (vitest) — the mapping layers (`schema → domain → flow`),
+   the simulation engine, and the message catalogs (key parity, no empty or
+   untranslated entries). UI components are deliberately not unit-tested; the
+   layers around them are. Catalog parity is also enforced by `tsc`, so
+   `just web-build` is part of that guarantee.
 
 ## Validation pipeline for an increment
 
@@ -54,14 +60,21 @@ Every increment lands only after:
    at the result (states, transitions, inspector, simulation);
 4. logical commits in English, pushed.
 
+Changes that touch user-facing text add two steps: regenerate the committed
+examples (`just example-docs` must leave no diff for `en`) and check the UI in
+**both** locales — a longer translation changes node widths, so the graph is
+re-laid out, not just re-rendered.
+
 For parser changes that alter extraction semantics, add an adversarial
 cross-check: independently derive the expected transitions from the corpus
 source and compare against the CLI output before trusting the tests.
 
 ## Conventions
 
-- **English everywhere** — commits, code, comments, UI strings, schema
-  descriptions.
+- **English is the source language** — commits, code, comments, schema
+  descriptions. User-facing text (UI, CLI output, warnings, generated labels)
+  is localized: it lives in the locale catalogs, never as an inline literal.
+  See [i18n.md](i18n.md).
 - **Honesty rule** — the parser warns about anything it cannot infer; it
   never guesses and never drops silently. New inference features must keep
   the corpus warning-free or explain each remaining warning.
@@ -74,7 +87,8 @@ source and compare against the CLI output before trusting the tests.
 ## Repository docs map
 
 - `README.md` — front door; quick start.
-- `docs/` — this documentation set.
+- `docs/` — this documentation set (English, the source); `docs/pt-BR/` is its
+  Portuguese mirror.
 - `CLAUDE.md` — working agreements for AI-assisted development (kept in sync
   with the architecture rules).
 - `init.md` — the original project spec (Portuguese, historical).
