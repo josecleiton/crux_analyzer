@@ -29,6 +29,8 @@ just            # lista todas as receitas
 | Cobertura da aplicação alvo (privada, local) | — | `just coverage <caminho> <nome> <piso>` |
 | Clippy | `just clippy` | `cargo clippy --workspace` |
 | Gate de cadeia de suprimentos | `just security` | `cargo deny check` + `pnpm audit --audit-level high` |
+| Notas de terceiros | `just notices` | `cargo about generate about.hbs` (+ o build web) |
+| Notas estão atualizadas | `just notices-current` | — |
 | Tudo | `just check` | — |
 | Modelo para a UI | `just model <src> <nome>` | `cargo run -p crux-analyzer-cli -- generate ...` |
 | Documentação | `just docs <src> <nome> [formato] [locale]` | `cargo run -p crux-analyzer-cli -- docs ...` |
@@ -100,12 +102,22 @@ quais este projeto pode apodrecer em silêncio:
 | --- | --- |
 | `just check` | testes quebrados, clippy, uma chave faltando no catálogo de mensagens (`tsc`) |
 | `security` | um aviso de segurança em dependência, uma licença fora do conjunto permitido, uma dependência git ou com wildcard |
+| `notices-current` | uma dependência adicionada sem a nota dela chegar ao `THIRD-PARTY-NOTICES.md` |
 | `fixture-guard` | o fixture começando a emitir avisos, ou sua documentação regredindo abaixo do piso |
 | `docs-current` | um exemplo gerado versionado que não corresponde mais ao gerador |
 
-O `just security` instala o `cargo-deny` no primeiro uso — um gate que as pessoas
-pulam porque precisa de setup não é um gate. A política vive no `deny.toml`, e o
-[security.md](security.md) explica o que ela está defendendo.
+O `just security` instala o `cargo-deny` no primeiro uso, e o `just notices`
+instala o `cargo-about` do mesmo jeito — um gate que as pessoas pulam porque
+precisa de setup não é um gate. As políticas vivem no `deny.toml` e no
+`about.toml` (as listas de licenças aceitas precisam concordar), e o
+[security.md](security.md) explica o que elas defendem.
+
+O `THIRD-PARTY-NOTICES.md` é gerado a partir do **que cada artefato realmente
+distribui**, não do que está instalado: a metade web a partir dos chunks que o
+bundler emitiu (`apps/web/notices.ts`), a metade Rust a partir das crates ligadas
+ao binário. Então adicionar uma dependência muda esse arquivo, e o
+`notices-current` é o que torna esquecer isso um build vermelho em vez de uma
+violação de licença silenciosa.
 
 Note que `pnpm install --frozen-lockfile` ainda executa scripts de ciclo de vida
 das dependências, então o CI executa os hooks de instalação de cada dependência

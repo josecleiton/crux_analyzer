@@ -132,8 +132,17 @@ so a variant added later cannot forget to.
 
 ### 8. The webview stays locked down
 
-`default-src 'none'`, scripts under a per-render nonce, no `unsafe-inline` or
-`unsafe-eval` for scripts, `localResourceRoots` limited to the bundle directory.
+`default-src 'none'`, no `unsafe-inline` or `unsafe-eval` for scripts,
+`localResourceRoots` limited to the bundle directory.
+
+`script-src` is the per-render nonce **plus the webview's own resource origin**.
+Both halves are load-bearing: the nonce authorizes the inline scripts (pre-paint
+blocks, model injection), and the origin is required because the bundle is
+code-split and **a nonce does not extend to modules a nonced script imports**.
+With the nonce alone, every split chunk is blocked and the webview renders an
+empty page — verified in a browser, not inferred. The origin is not a widening:
+`localResourceRoots` confines it to the bundle directory, and arbitrary inline
+script still needs the nonce.
 The injected model escapes `<` and U+2028/U+2029 so author prose can neither
 close the script tag nor break the statement. **There is no webview↔host message
 channel** — the model flows one way, by injection. Do not add one without
@@ -149,6 +158,39 @@ validating every message.
   are mutable refs. Dependabot keeps the pins from rotting.
 - Workflows declare `permissions:` explicitly, and untrusted `${{ }}` values
   reach a `run:` block through `env:`, never by string interpolation.
+
+### 10. Every artifact carries its third-party notices
+
+Not a security property, but the same class of obligation and the same failure
+mode: something true of the repository that was not true of what shipped.
+
+Permissive is not obligation-free. MIT requires its notice "in all copies or
+substantial portions", BSD-3-Clause clause 2 requires binary redistributions to
+reproduce it in accompanying materials, and elkjs's EPL-2.0 §3.1(a) requires a
+statement of where its source can be obtained. The built bundle used to contain
+**zero** copyright notices — the minifier dropped even the `@license` header
+React ships — while being published to GitHub Pages on every push and embedded in
+every VSIX.
+
+The rules:
+
+- `THIRD-PARTY-NOTICES.md` is **generated from what each artifact ships**, never
+  hand-maintained and never derived from the installed tree: the web half from
+  the chunks the bundler emitted, the Rust half from the crates linked into the
+  binary. `just notices-current` (inside `just check`) makes a missing notice a
+  red build.
+- **Legal comments stay in the bundle** (`comments: { legal: true }`). Stripping a
+  copyright header out of code you redistribute is the plainest version of this
+  problem.
+- **A package with no determinable license fails the build.** A notices file that
+  quietly omits one is worse than none, because it looks complete.
+- **elkjs is used under the EPL-2.0**, elected from its `EPL-2.0 OR
+  GPL-3.0-or-later` offer, unmodified, and emitted as its own chunk so no output
+  file mixes it with this project's code. Its notice states the version, the
+  election and where to get the source.
+- `about.toml`'s accepted licenses and `deny.toml`'s allow-list must agree — one
+  decides what may enter the tree, the other what gets reproduced, and a
+  divergence means one of them is wrong.
 
 ## What is deliberately guaranteed
 

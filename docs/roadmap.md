@@ -258,22 +258,40 @@ English string is the catalog key**, so rewording it orphans the pt-BR entry in
 English with no test failing. A parity test would make that a red build; the web
 side already has the pattern.
 
-### 5.5 Already overdue, not future work
+### 5.5 Third-party license compliance ✅ **done**
 
-Two license obligations are unmet **today**, so they are bugs rather than plans:
+Two obligations that were unmet on every push to `main`, closed together. The
+generated `THIRD-PARTY-NOTICES.md` now ships in `apps/web/dist/` (so on Pages and
+inside `media/web`), at the VSIX root, and at the repository root as the union of
+both artifacts' notices; `just notices-current` inside `just check` keeps it
+honest. The rules are `docs/security.md` §10.
 
-- **The elkjs EPL-2.0 notice is absent from the built bundle.** Vite strips it
-  and `apps/web/dist/` carries no NOTICE, but EPL-2.0 §3.1/§3.2 require that
-  recipients of the object code get the license text. `README.md` attributes
-  elkjs correctly, and the README does not travel with the artifact — so the
-  Pages preview has been redistributing it uncovered on every push to `main`. A
-  committed `THIRD-PARTY-NOTICES.md` copied into `dist/` by `web-build` covers
-  Pages, every VSIX (`media/web` is already allow-listed) and any release archive
-  at once.
-- **Every VSIX ships MIT code with no license text.** `.vscodeignore` already
-  allow-lists `!LICENSE*`, but `apps/vscode/LICENSE` does not exist. Fix it the
-  way the web bundle is already handled — copied at build time by `ext-build`, so
-  there is one source of truth and nothing to drift.
+Investigating it corrected two things this section used to assert:
+
+- **The binding EPL-2.0 clause is §3.1(a), not §3.2.** §3.2 ("a copy of this
+  Agreement must be included with each copy") is scoped to *"When the Program is
+  Distributed as **Source Code**"*. We distribute object code, where §3.1(a)
+  applies: accompany it with a statement that the source is available under the
+  Agreement, and say how to obtain it. The notices file does both, plus the full
+  text.
+- **Nothing was "stripping" the elkjs notice** — `elk.bundled.js` ships with no
+  copyright header at all, so §3.3 was never the live issue. What *was* being
+  stripped, by the minifier, was **React's** `@license` header and its
+  `Copyright (c) Meta Platforms` line: the bundle carried zero copyright notices
+  of any kind. `comments: { legal: true }` restored them for the 1,687 bytes it
+  costs, and the notices file covers the packages that ship no inline header.
+
+Scope was also larger than "every VSIX ships MIT code": 68 packages contribute
+code to the bundle, and MIT, ISC and BSD-3-Clause all carry notice-retention
+terms. The generator is driven by the chunks the bundler emitted rather than by
+the installed tree — which is both the correct scope (no `@types/*`, which ship
+nothing) and the only one that works, since `pnpm licenses list` reports store
+paths that do not resolve in this install layout.
+
+elkjs also became its own chunk. Two payoffs: no output file mixes EPL-2.0 code
+with ours, so EPL-2.0's "any new file that contains any contents of the Program"
+never has to be argued — and since elkjs was 82% of the bundle, it is also the
+answer to the 500 kB chunk warning.
 
 ### 5.6 Refused, with a revisit trigger
 

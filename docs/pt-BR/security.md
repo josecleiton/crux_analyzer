@@ -140,9 +140,17 @@ atacante sendo escrito no terminal de alguém. `WarningKind::message` e
 
 ### 8. O webview permanece trancado
 
-`default-src 'none'`, scripts sob um nonce por renderização, sem `unsafe-inline`
-nem `unsafe-eval` para scripts, `localResourceRoots` limitado ao diretório do
-bundle. O modelo injetado escapa `<` e U+2028/U+2029 para que a prosa do autor
+`default-src 'none'`, sem `unsafe-inline` nem `unsafe-eval` para scripts,
+`localResourceRoots` limitado ao diretório do bundle.
+
+O `script-src` é o nonce por renderização **mais a origem de recursos do próprio
+webview**. As duas metades são estruturais: o nonce autoriza os scripts inline
+(blocos de pré-pintura, injeção do modelo), e a origem é necessária porque o bundle
+é dividido em chunks e **um nonce não se estende aos módulos que um script com
+nonce importa**. Só com o nonce, todo chunk dividido é bloqueado e o webview
+renderiza uma página vazia — verificado num navegador, não inferido. A origem não é
+uma ampliação: o `localResourceRoots` a confina ao diretório do bundle, e script
+inline arbitrário continua precisando do nonce. O modelo injetado escapa `<` e U+2028/U+2029 para que a prosa do autor
 não possa fechar a tag de script nem quebrar o comando. **Não existe canal de
 mensagens webview↔host** — o modelo flui em uma direção, por injeção. Não
 adicione um sem validar cada mensagem.
@@ -158,6 +166,40 @@ adicione um sem validar cada mensagem.
 - Workflows declaram `permissions:` explicitamente, e valores `${{ }}` não
   confiáveis chegam a um bloco `run:` via `env:`, nunca por interpolação de
   string.
+
+### 10. Todo artefato carrega suas notas de terceiros
+
+Não é uma propriedade de segurança, mas é a mesma classe de obrigação e o mesmo
+modo de falha: algo verdadeiro no repositório que não era verdadeiro no que foi
+distribuído.
+
+Permissiva não quer dizer sem obrigação. A MIT exige sua nota "em todas as cópias
+ou porções substanciais", a cláusula 2 da BSD-3-Clause exige que redistribuições
+binárias a reproduzam nos materiais acompanhantes, e a EPL-2.0 §3.1(a) do elkjs
+exige uma declaração de onde obter o fonte dele. O bundle construído continha
+**zero** notas de copyright — o minificador removia até o cabeçalho `@license` que
+o React distribui — enquanto era publicado no GitHub Pages a cada push e embutido
+em todo VSIX.
+
+As regras:
+
+- O `THIRD-PARTY-NOTICES.md` é **gerado a partir do que cada artefato distribui**,
+  nunca mantido à mão e nunca derivado da árvore instalada: a metade web a partir
+  dos chunks que o bundler emitiu, a metade Rust a partir das crates ligadas ao
+  binário. O `just notices-current` (dentro do `just check`) transforma uma nota
+  faltando em build vermelho.
+- **Comentários legais permanecem no bundle** (`comments: { legal: true }`).
+  Remover um cabeçalho de copyright de código que você redistribui é a versão mais
+  crua deste problema.
+- **Um pacote sem licença determinável quebra o build.** Um arquivo de notas que
+  omite um em silêncio é pior que nenhum, porque parece completo.
+- **O elkjs é usado sob a EPL-2.0**, eleita da oferta `EPL-2.0 OR
+  GPL-3.0-or-later`, sem modificação, e emitido como chunk próprio para que nenhum
+  arquivo de saída misture ele com o código deste projeto. A nota dele declara a
+  versão, a eleição e onde obter o fonte.
+- As licenças aceitas no `about.toml` e a lista permitida no `deny.toml` precisam
+  concordar — uma decide o que pode entrar na árvore, a outra o que é reproduzido,
+  e uma divergência significa que uma das duas está errada.
 
 ## O que é garantido deliberadamente
 

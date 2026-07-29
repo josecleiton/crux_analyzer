@@ -1,0 +1,23 @@
+{{! Markdown template for `cargo about generate` — the notices of the }}
+{{! `crux-analyzer` binary. Kept in the same shape as the web bundle's }}
+{{! THIRD-PARTY-NOTICES.md so both halves read alike. }}
+## Rust crates (the `crux-analyzer` binary)
+
+{{#if overview}}{{#each overview}}{{count}} crate{{#if (ne count 1)}}s{{/if}} under {{name}}.
+{{/each}}
+{{/if}}
+| Crate | License |
+| --- | --- |
+{{#each licenses}}{{#each used_by}}| [{{crate.name}} {{crate.version}}]({{#if crate.repository}}{{crate.repository}}{{else}}https://crates.io/crates/{{crate.name}}{{/if}}) | {{../name}} |
+{{/each}}{{/each}}
+
+### Crate license texts
+
+{{#each licenses}}
+#### {{name}} — {{#each used_by}}{{crate.name}} {{crate.version}}{{#unless @last}}, {{/unless}}{{/each}}
+
+```
+{{text}}
+```
+
+{{/each}}

@@ -268,23 +268,40 @@ pt-BR em `apps/vscode/l10n/bundle.l10n.pt-br.json` e o usuário pt-BR passa a ve
 inglês em silêncio, sem nenhum teste falhar. Um teste de paridade tornaria isso
 um build vermelho; o lado web já tem o padrão.
 
-### 5.5 Já vencido, não trabalho futuro
+### 5.5 Conformidade de licenças de terceiros ✅ **feito**
 
-Duas obrigações de licença estão descumpridas **hoje**, então são defeitos e não
-planos:
+Duas obrigações que estavam descumpridas a cada push em `main`, fechadas juntas. O
+`THIRD-PARTY-NOTICES.md` gerado agora vai em `apps/web/dist/` (portanto no Pages e
+dentro de `media/web`), na raiz do VSIX, e na raiz do repositório como a união das
+notas dos dois artefatos; o `just notices-current` dentro do `just check` o mantém
+honesto. As regras estão em `docs/security.md` §10.
 
-- **O aviso EPL-2.0 do elkjs não está no bundle compilado.** O Vite o remove e
-  `apps/web/dist/` não carrega nenhum NOTICE, mas a EPL-2.0 §3.1/§3.2 exige que
-  quem recebe o código objeto receba o texto da licença. O `README.md` atribui o
-  elkjs corretamente, e o README não viaja com o artefato — então o preview no
-  Pages vem redistribuindo o elkjs a descoberto em todo push para `main`. Um
-  `THIRD-PARTY-NOTICES.md` versionado e copiado para `dist/` pelo `web-build`
-  cobre o Pages, todo VSIX (`media/web` já está na lista de permissão) e qualquer
-  arquivo de release de uma vez.
-- **Todo VSIX publica código MIT sem o texto da licença.** O `.vscodeignore` já
-  permite `!LICENSE*`, mas `apps/vscode/LICENSE` não existe. Consertar do jeito
-  que o bundle web já é tratado — copiado no momento do build pelo `ext-build`,
-  para haver uma fonte de verdade só e nada para divergir.
+Investigar o assunto corrigiu duas coisas que esta seção afirmava:
+
+- **A cláusula vinculante da EPL-2.0 é a §3.1(a), não a §3.2.** A §3.2 ("uma cópia
+  deste Agreement deve ser incluída com cada cópia") é escopada a *"When the
+  Program is Distributed as **Source Code**"*. Nós distribuímos código-objeto, onde
+  vale a §3.1(a): acompanhar de uma declaração de que o fonte está disponível sob o
+  Agreement, e dizer como obtê-lo. O arquivo de notas faz as duas coisas, mais o
+  texto integral.
+- **Nada estava "removendo" a nota do elkjs** — o `elk.bundled.js` é distribuído
+  sem nenhum cabeçalho de copyright, então a §3.3 nunca foi o problema real. O que
+  *estava* sendo removido, pelo minificador, era o cabeçalho `@license` do **React**
+  e a linha `Copyright (c) Meta Platforms`: o bundle não carregava nota de copyright
+  nenhuma. `comments: { legal: true }` as restaurou pelos 1.687 bytes que custa, e o
+  arquivo de notas cobre os pacotes que não distribuem cabeçalho inline.
+
+O escopo também era maior que "todo VSIX embarca código MIT": 68 pacotes
+contribuem código para o bundle, e MIT, ISC e BSD-3-Clause todas carregam termos de
+retenção de nota. O gerador é dirigido pelos chunks que o bundler emitiu em vez da
+árvore instalada — o que é ao mesmo tempo o escopo correto (sem `@types/*`, que não
+distribuem nada) e o único que funciona, já que o `pnpm licenses list` reporta
+caminhos de store que não resolvem neste layout de instalação.
+
+O elkjs também passou a ser um chunk próprio. Dois ganhos: nenhum arquivo de saída
+mistura código EPL-2.0 com o nosso, então o "qualquer novo arquivo que contenha
+qualquer conteúdo do Program" da EPL-2.0 nunca precisa ser discutido — e, como o
+elkjs era 82% do bundle, é também a resposta ao aviso de 500 kB.
 
 ### 5.6 Recusado, com gatilho de revisita
 

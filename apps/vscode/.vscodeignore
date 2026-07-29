@@ -7,3 +7,6 @@
 !package.nls*.json
 !LICENSE*
 !README*
+# The notices of the bundled web code. Also present under media/web, but at the
+# package root it is where a reader — and the marketplace listing — looks.
+!THIRD-PARTY-NOTICES.md

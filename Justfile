@@ -34,6 +34,11 @@ ext-build: web-build
     mkdir -p apps/vscode/media
     cp -R apps/web/dist apps/vscode/media/web
     rm -f apps/vscode/media/web/model.json
+    # Every VSIX must carry its own license text and the notices of the code it
+    # embeds. Copied rather than committed, so the repository root stays the one
+    # source of truth (both are gitignored).
+    cp LICENSE apps/vscode/LICENSE
+    cp apps/web/dist/THIRD-PARTY-NOTICES.md apps/vscode/THIRD-PARTY-NOTICES.md
 
 # Package the extension into a .vsix (installable via code --install-extension)
 ext-package: ext-build
@@ -65,11 +70,34 @@ security:
     cargo deny check
     pnpm audit --audit-level high
 
+# --- Licenses --------------------------------------------------------------
+
+# Regenerate THIRD-PARTY-NOTICES.md: the union of what the two artifacts ship.
+#
+# Two generators because the two artifacts are different: the web half comes
+# from the chunks the bundler actually emitted (`apps/web/notices.ts`), the Rust
+# half from the crates linked into the binary (`about.toml` + `about.hbs`).
+# Neither is derived from what merely happens to be installed.
+notices: web-build
+    @command -v cargo-about >/dev/null || cargo install --locked cargo-about --features cli
+    @cp apps/web/dist/THIRD-PARTY-NOTICES.md THIRD-PARTY-NOTICES.md
+    @printf '\n---\n\n' >> THIRD-PARTY-NOTICES.md
+    @cargo about generate about.hbs >> THIRD-PARTY-NOTICES.md
+    @echo "THIRD-PARTY-NOTICES.md regenerated"
+
+# The committed notices must be what the generators produce right now — the same
+# ratchet shape as `docs-current`. A new dependency either appears here or turns
+# the build red; there is no third outcome, which is how this debt stays paid.
+notices-current: notices
+    @git diff --exit-code -- THIRD-PARTY-NOTICES.md \
+      || { echo "THIRD-PARTY-NOTICES.md is stale — commit the regenerated file"; exit 1; }
+
 # --- Everything ------------------------------------------------------------
 
 # Full validation: Rust tests + clippy + web tests + extension tests + builds
-# (ext-build includes web-build) + fixture guard + the supply-chain gate
-check: rust-test clippy security web-test ext-test ext-build fixture-guard
+# (ext-build includes web-build) + fixture guard + the supply-chain and license
+# gates
+check: rust-test clippy security notices-current web-test ext-test ext-build fixture-guard
 
 # The fixture is the public stand-in for a real app: it must extract with zero
 # warnings, and the documentation it declares must not regress. The floor sits

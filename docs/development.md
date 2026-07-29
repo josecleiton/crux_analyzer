@@ -29,6 +29,8 @@ just            # lists every recipe
 | Target-app coverage (private, local) | — | `just coverage <path> <name> <floor>` |
 | Clippy | `just clippy` | `cargo clippy --workspace` |
 | Supply-chain gate | `just security` | `cargo deny check` + `pnpm audit --audit-level high` |
+| Third-party notices | `just notices` | `cargo about generate about.hbs` (+ the web build) |
+| Notices are current | `just notices-current` | — |
 | Everything | `just check` | — |
 | Model for the UI | `just model <src> <name>` | `cargo run -p crux-analyzer-cli -- generate ...` |
 | Docs | `just docs <src> <name> [format] [locale]` | `cargo run -p crux-analyzer-cli -- docs ...` |
@@ -98,12 +100,20 @@ ways this project can silently rot:
 | --- | --- |
 | `just check` | broken tests, clippy, a missing message-catalog key (`tsc`) |
 | `security` | a dependency advisory, a license outside the allowed set, a git or wildcard dependency |
+| `notices-current` | a dependency added without its notice reaching `THIRD-PARTY-NOTICES.md` |
 | `fixture-guard` | the fixture starting to warn, or its documentation regressing below the floor |
 | `docs-current` | a committed generated example that no longer matches the generator |
 
-`just security` installs `cargo-deny` on first use — a gate people skip because
-it needs setup is not a gate. The policy lives in `deny.toml`, and
-[security.md](security.md) explains what it is defending.
+`just security` installs `cargo-deny` on first use, and `just notices` installs
+`cargo-about` the same way — a gate people skip because it needs setup is not a
+gate. The policies live in `deny.toml` and `about.toml` (their accepted-license
+lists must agree), and [security.md](security.md) explains what they defend.
+
+`THIRD-PARTY-NOTICES.md` is generated from **what each artifact actually ships**,
+not from what is installed: the web half from the chunks the bundler emitted
+(`apps/web/notices.ts`), the Rust half from the crates linked into the binary. So
+adding a dependency changes that file, and `notices-current` is what makes
+forgetting it a red build rather than a silent license violation.
 
 Note that `pnpm install --frozen-lockfile` still runs dependency lifecycle
 scripts, so CI executes the install hooks of every transitive dependency. That is

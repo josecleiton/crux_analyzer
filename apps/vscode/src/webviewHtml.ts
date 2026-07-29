@@ -37,7 +37,17 @@ export function buildWebviewHtml(options: WebviewHtmlOptions): string {
     // the bundle sets style attributes at runtime (React, React Flow)
     `style-src ${cspSource} 'unsafe-inline'`,
     `font-src ${cspSource}`,
-    `script-src 'nonce-${nonce}'`,
+    // The nonce authorizes the *inline* scripts (the pre-paint blocks and the
+    // model injection). `cspSource` is needed for the bundle's own module
+    // files, because a nonce does not extend to modules a nonced script
+    // imports — and the bundle is code-split, so the entry chunk statically
+    // imports `elk-*.js` and the rolldown runtime. Verified: with the nonce
+    // alone, both imports are blocked and the webview renders nothing.
+    //
+    // This is not a widening of what may run: `cspSource` is the webview's own
+    // resource origin, and `localResourceRoots` limits that to the bundle
+    // directory. Arbitrary inline script still needs the nonce.
+    `script-src 'nonce-${nonce}' ${cspSource}`,
   ].join('; ');
 
   // `</script>` inside author prose must not close the injection script;

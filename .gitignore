@@ -10,6 +10,10 @@ apps/web/public/model.json
 apps/vscode/out/
 apps/vscode/media/
 *.vsix
+# Copied from the repository root at build time, so there is one source of truth
+# for the license text the VSIX ships (see `just ext-build`).
+apps/vscode/LICENSE
+apps/vscode/THIRD-PARTY-NOTICES.md
 
 # Misc
 .DS_Store

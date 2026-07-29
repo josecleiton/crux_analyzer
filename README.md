@@ -14,6 +14,33 @@ The UI and the generated docs speak English and Brazilian Portuguese
 (`--locale en|pt-BR`, plus a toggle in the web toolbar) — see
 [docs/i18n.md](docs/i18n.md).
 
+## Demo
+
+![The web UI analyzing the mini_recorder fixture: two orthogonal regions, the
+inspector, a simulation run, tag filtering and dark
+mode](docs/assets/demo.gif)
+
+Nothing in that recording was authored by hand. It is the web UI on
+[crates/parser/fixtures/mini_recorder/](crates/parser/fixtures/mini_recorder/),
+the same fixture [mini_recorder.rs](crates/parser/tests/mini_recorder.rs)
+asserts against — so every state, transition, event, effect and description
+you see is what the parser extracted from that Rust source:
+
+- the **two orthogonal regions** (`RecorderState`, `UploadState`) found by
+  assignment analysis, each rendered as its own section;
+- the **inspector** on a selected state — its incoming/outgoing events, the
+  effects requested on entry (`AudioOperation::Stop`), and the `///`
+  documentation the fixture itself wrote;
+- a **simulation** walking `Idle → Recording → Paused → Recording →
+  Uploading → Failed → Uploading → Completed`, with the graph highlighting the
+  current state and last transition, until a `FINAL` state offers no events;
+- the **tag filter** (`retryable`, a `@tag` declared in a doc comment), the
+  undocumented-states highlight, and the locale and theme toggles.
+
+Reproduce it with `just model` + `just dev` against the fixture, or read the
+CLI's take on the same input in
+[docs/examples/mini-recorder.md](docs/examples/mini-recorder.md).
+
 ## Structure
 
 ```
@@ -103,8 +130,14 @@ the graph highlights the current state and the last transition taken.
 
 MIT — see [LICENSE](LICENSE).
 
-Third-party dependencies keep their own licenses. All Rust dependencies and
-most web dependencies are permissive (MIT / Apache-2.0 / Unlicense); the one
-exception is [elkjs](https://github.com/kieler/elkjs), used unmodified for
-graph layout, which is available under `EPL-2.0 OR GPL-3.0-or-later` — this
-project relies on it under the terms of the EPL-2.0.
+Third-party dependencies keep their own licenses, and every artifact ships their
+notices: **[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)** is generated from
+what each artifact actually contains — regenerate it with `just notices`, and
+`just check` fails if it is out of date.
+
+Everything is permissive (MIT / ISC / BSD-3-Clause / CC0 / Unicode-3.0) except
+[elkjs](https://github.com/kieler/elkjs), used unmodified for graph layout, which
+is available under `EPL-2.0 OR GPL-3.0-or-later` — this project **elects the
+EPL-2.0** and emits elkjs as its own bundle chunk. This imposes nothing on your
+use of crux_analyzer: EPL-2.0 is file-level weak copyleft and crux_analyzer only
+calls ELK's API.

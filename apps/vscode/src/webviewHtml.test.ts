@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { buildWebviewHtml } from './webviewHtml';
 
-// The shape Vite actually emits: inline pre-paint scripts in <head>, one
-// module script and one stylesheet, all root-absolute.
+// The shape Vite actually emits: inline pre-paint scripts in <head>, one entry
+// module script, `modulepreload` links for the chunks it imports (the bundle is
+// code-split — elkjs has its own chunk), and one stylesheet, all root-absolute.
 const INDEX_HTML = `<!doctype html>
 <html lang="en">
   <head>
@@ -13,6 +14,7 @@ const INDEX_HTML = `<!doctype html>
       document.documentElement.dataset.theme = 'dark';
     </script>
     <script type="module" crossorigin src="/assets/index-abc123.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/elk-ghi789.js">
     <link rel="stylesheet" crossorigin href="/assets/index-def456.css">
   </head>
   <body>
@@ -55,6 +57,33 @@ describe('buildWebviewHtml', () => {
     expect(modelAt).toBeLessThan(firstOtherScript);
     expect(html).toContain("script-src 'nonce-NONCE'");
     expect(html).toContain("default-src 'none'");
+  });
+
+  /**
+   * The bundle is code-split, so the entry chunk statically *imports* other
+   * chunks. A nonce authorizes the element it sits on and does not extend to
+   * modules that element imports — so a nonce-only `script-src` blocks every
+   * split chunk and the webview renders an empty page. Verified in a browser
+   * before this was allowed: 0 nodes with the nonce alone, the full graph with
+   * the bundle origin permitted.
+   */
+  it('lets the bundle load its own split chunks, not just the nonced scripts', () => {
+    const html = build();
+    const csp = html.match(/content="([^"]*default-src[^"]*)"/)![1];
+    const scriptSrc = csp.split('; ').find((d) => d.startsWith('script-src'))!;
+    expect(scriptSrc).toContain("'nonce-NONCE'");
+    expect(scriptSrc).toContain('vscode-resource://ext');
+    // Still no blanket permission: inline script needs the nonce.
+    expect(scriptSrc).not.toContain("'unsafe-inline'");
+    expect(scriptSrc).not.toContain("'unsafe-eval'");
+    expect(scriptSrc).not.toMatch(/(^|\s)\*/);
+  });
+
+  it('re-roots the modulepreload of a split chunk', () => {
+    // A preload the webview cannot fetch is a chunk the page cannot import.
+    expect(build()).toContain(
+      'href="vscode-resource://ext/media/web/assets/elk-ghi789.js"',
+    );
   });
 
   it('keeps author prose from closing the injection script', () => {
