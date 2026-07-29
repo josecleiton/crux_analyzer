@@ -1,0 +1,11 @@
+{
+  "name": "crux-analyzer",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "test": "pnpm --filter web test"
+  },
+  "packageManager": "pnpm@9.0.0"
+}
