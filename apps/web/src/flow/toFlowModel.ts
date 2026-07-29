@@ -81,11 +81,12 @@ function machineEdges(machine: DomainMachine): Edge[] {
     source: transition.from,
     target: transition.to,
     label: transition.event,
+    // The arrowhead color is theme-dependent and applied by the renderer:
+    // SVG marker attributes cannot read CSS variables.
     markerEnd: {
       type: 'arrowclosed' as const,
       width: 14,
       height: 14,
-      color: '#8792a2',
     },
   }));
 }

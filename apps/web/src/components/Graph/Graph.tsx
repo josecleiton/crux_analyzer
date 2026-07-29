@@ -9,6 +9,8 @@ import { ReactFlow, Background, Controls } from '@xyflow/react';
 import type { Edge, Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { Selection } from '../../state/selection';
+import type { Theme } from '../../theme/theme';
+import { useGraphColors } from '../../theme/useTheme';
 import { StateNode } from './StateNode';
 import { AnyStateNode } from './AnyStateNode';
 import { MachineGroupNode } from './MachineGroupNode';
@@ -29,9 +31,12 @@ interface GraphProps {
   selection: Selection;
   onSelect: (selection: Selection) => void;
   highlight?: GraphHighlight;
+  theme: Theme;
 }
 
-export function Graph({ nodes, edges, selection, onSelect, highlight }: GraphProps) {
+export function Graph({ nodes, edges, selection, onSelect, highlight, theme }: GraphProps) {
+  const colors = useGraphColors(theme);
+
   const styledNodes = nodes.map((node) => ({
     ...node,
     selected: selection?.kind === 'state' && selection.id === node.id,
@@ -39,15 +44,19 @@ export function Graph({ nodes, edges, selection, onSelect, highlight }: GraphPro
   }));
   const styledEdges = edges.map((edge) => {
     const selected = selection?.kind === 'transition' && selection.id === edge.id;
+    const highlighted = highlight?.edgeIds.includes(edge.id) ?? false;
+    // keep the arrowhead in sync with the stroke color of its state
+    const stroke = selected
+      ? colors.edgeSelected
+      : highlighted
+        ? colors.edgeHighlighted
+        : colors.edge;
     return {
       ...edge,
       selected,
-      className: highlight?.edgeIds.includes(edge.id) ? 'highlighted' : undefined,
-      // keep the arrowhead in sync with the selected stroke color
+      className: highlighted ? 'highlighted' : undefined,
       markerEnd:
-        selected && typeof edge.markerEnd === 'object'
-          ? { ...edge.markerEnd, color: '#6366f1' }
-          : edge.markerEnd,
+        typeof edge.markerEnd === 'object' ? { ...edge.markerEnd, color: stroke } : edge.markerEnd,
     };
   });
 
@@ -64,6 +73,7 @@ export function Graph({ nodes, edges, selection, onSelect, highlight }: GraphPro
       onPaneClick={() => onSelect(null)}
       nodesDraggable={false}
       nodesConnectable={false}
+      colorMode={theme}
       fitView
       fitViewOptions={{ padding: 0.15 }}
       proOptions={{ hideAttribution: true }}
