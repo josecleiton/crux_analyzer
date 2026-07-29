@@ -17,8 +17,16 @@ import type { DomainProject } from '../domain/types';
 const GENERATED_MODEL_URL = '/model.json';
 
 export async function loadProject(): Promise<DomainProject> {
-  const raw = (await fetchGeneratedModel()) ?? bundledExample;
-  return fromParserJson(parseProjectJson(raw));
+  const raw = await fetchGeneratedModel();
+  if (raw !== null) {
+    try {
+      return fromParserJson(parseProjectJson(raw));
+    } catch (error) {
+      // A stale artifact (e.g. from an older schema) must not break the app.
+      console.warn('Ignoring invalid generated model, using bundled example:', error);
+    }
+  }
+  return fromParserJson(parseProjectJson(bundledExample));
 }
 
 async function fetchGeneratedModel(): Promise<unknown | null> {

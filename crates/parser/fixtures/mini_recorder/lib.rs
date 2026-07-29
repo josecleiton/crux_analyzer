@@ -3,6 +3,7 @@
 //! Not a compiled crate — parsed as plain sources by the integration test.
 
 mod recorder;
+mod upload;
 
 pub enum Event {
     Recorder(recorder::RecorderEvent),
@@ -10,6 +11,7 @@ pub enum Event {
 
 pub struct Model {
     recorder: recorder::RecorderModel,
+    uploads: upload::UploadModel,
 }
 
 pub struct MiniRecorder;
@@ -20,7 +22,10 @@ impl App for MiniRecorder {
 
     fn update(&self, event: Event, model: &mut Model) {
         match event {
-            Event::Recorder(event) => Self::update_recorder(event, model),
+            Event::Recorder(event) => {
+                Self::update_upload(event.clone(), model);
+                Self::update_recorder(event, model)
+            }
         }
     }
 }

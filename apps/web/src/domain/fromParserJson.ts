@@ -3,34 +3,38 @@
  * Generates stable ids and derives each state's incoming/outgoing transitions.
  */
 
-import type { ParserProjectJson } from '../schema/parserJson';
-import type { DomainCore, DomainProject, DomainState, DomainTransition } from './types';
+import type { ParserMachineJson, ParserProjectJson } from '../schema/parserJson';
+import { ANY_STATE } from '../schema/parserJson';
+import type { DomainCore, DomainMachine, DomainProject, DomainState, DomainTransition } from './types';
+import { wildcardStateId } from './types';
 
 export function fromParserJson(json: ParserProjectJson): DomainProject {
   return {
     name: json.project,
-    cores: json.cores.map(mapCore),
+    cores: json.cores.map((core) => ({
+      id: core.name,
+      name: core.name,
+      machines: core.machines.map((machine) => mapMachine(core.name, machine)),
+    })),
   };
 }
 
-function mapCore(core: {
-  name: string;
-  states: string[];
-  transitions: { from: string; event: string; to: string }[];
-}): DomainCore {
-  const coreId = core.name;
-  const stateId = (stateName: string) => `${coreId}/${stateName}`;
+function mapMachine(coreId: string, machine: ParserMachineJson): DomainMachine {
+  const machineId = `${coreId}/${machine.name}`;
+  const stateId = (stateName: string) =>
+    stateName === ANY_STATE ? wildcardStateId(machineId) : `${machineId}/${stateName}`;
 
-  const transitions: DomainTransition[] = core.transitions.map((t, index) => ({
-    id: `${coreId}/t${index}:${t.from}-${t.event}->${t.to}`,
+  const transitions: DomainTransition[] = machine.transitions.map((t, index) => ({
+    id: `${machineId}/t${index}:${t.from}-${t.event}->${t.to}`,
     event: t.event,
     from: stateId(t.from),
     to: stateId(t.to),
     fromName: t.from,
     toName: t.to,
+    effects: t.effects ?? [],
   }));
 
-  const states: DomainState[] = core.states.map((name) => {
+  const states: DomainState[] = machine.states.map((name) => {
     const id = stateId(name);
     return {
       id,
@@ -40,5 +44,16 @@ function mapCore(core: {
     };
   });
 
-  return { id: coreId, name: core.name, states, transitions };
+  return {
+    id: machineId,
+    name: machine.name,
+    states,
+    transitions,
+    hasWildcardSource: machine.transitions.some((t) => t.from === ANY_STATE),
+  };
+}
+
+/** Finds the machine that owns a state or transition id. */
+export function machineOf(core: DomainCore, id: string): DomainMachine | null {
+  return core.machines.find((machine) => id.startsWith(`${machine.id}/`)) ?? null;
 }

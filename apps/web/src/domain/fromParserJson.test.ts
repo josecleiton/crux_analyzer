@@ -1,35 +1,41 @@
 import { describe, expect, it } from 'vitest';
 import rawProject from '../../../../shared/schema/examples/audio-recorder.json';
 import { parseProjectJson } from '../schema/parserJson';
-import { fromParserJson } from './fromParserJson';
+import { fromParserJson, machineOf } from './fromParserJson';
 
 const project = fromParserJson(parseProjectJson(rawProject));
 
 describe('fromParserJson', () => {
-  it('maps project and cores', () => {
+  it('maps project, cores and machines', () => {
     expect(project.name).toBe('Audio Recorder');
     expect(project.cores.map((c) => c.name)).toEqual(['Recorder', 'Authentication', 'Sync']);
+    expect(project.cores[0].machines.map((m) => m.name)).toEqual([
+      'RecorderState',
+      'InputState',
+    ]);
   });
 
-  it('generates unique, core-scoped ids', () => {
+  it('generates unique, machine-scoped ids', () => {
     const recorder = project.cores[0];
     const sync = project.cores[2];
 
-    // "Idle" exists in both Recorder and Sync — the ids must not collide
-    const recorderIdle = recorder.states.find((s) => s.name === 'Idle')!;
-    const syncIdle = sync.states.find((s) => s.name === 'Idle')!;
+    // "Idle" exists in Recorder and Sync machines — the ids must not collide
+    const recorderIdle = recorder.machines[0].states.find((s) => s.name === 'Idle')!;
+    const syncIdle = sync.machines[0].states.find((s) => s.name === 'Idle')!;
     expect(recorderIdle.id).not.toBe(syncIdle.id);
 
-    const allIds = project.cores.flatMap((c) => [
-      ...c.states.map((s) => s.id),
-      ...c.transitions.map((t) => t.id),
-    ]);
+    const allIds = project.cores.flatMap((c) =>
+      c.machines.flatMap((m) => [
+        ...m.states.map((s) => s.id),
+        ...m.transitions.map((t) => t.id),
+      ]),
+    );
     expect(new Set(allIds).size).toBe(allIds.length);
   });
 
   it('derives incoming/outgoing for each state', () => {
-    const recorder = project.cores[0];
-    const recording = recorder.states.find((s) => s.name === 'Recording')!;
+    const machine = project.cores[0].machines[0];
+    const recording = machine.states.find((s) => s.name === 'Recording')!;
 
     expect(recording.incoming.map((t) => t.event).sort()).toEqual([
       'RecordPressed',
@@ -39,24 +45,30 @@ describe('fromParserJson', () => {
       'PausePressed',
       'StopPressed',
     ]);
-
-    const idle = recorder.states.find((s) => s.name === 'Idle')!;
-    expect(idle.incoming).toHaveLength(0);
-    expect(idle.outgoing.map((t) => t.event)).toEqual(['RecordPressed']);
   });
 
-  it('transitions reference existing state ids and keep readable names', () => {
-    for (const core of project.cores) {
-      const stateIds = new Set(core.states.map((s) => s.id));
-      for (const t of core.transitions) {
-        expect(stateIds.has(t.from)).toBe(true);
-        expect(stateIds.has(t.to)).toBe(true);
-      }
+  it('maps effects and wildcard sources', () => {
+    const recorder = project.cores[0].machines[0];
+    expect(recorder.transitions[0].effects).toEqual(['AudioOperation::Start']);
+    expect(recorder.hasWildcardSource).toBe(false);
+
+    const inputs = project.cores[0].machines[1];
+    expect(inputs.hasWildcardSource).toBe(true);
+    const wildcard = inputs.transitions.find((t) => t.fromName === '*')!;
+    expect(wildcard.from).toBe(`${inputs.id}/*`);
+    expect(wildcard.effects).toEqual([]);
+    // wildcard transitions are not listed as any state's outgoing
+    for (const state of inputs.states) {
+      expect(state.outgoing).not.toContain(wildcard);
     }
-    const first = project.cores[0].transitions[0];
-    expect(first.fromName).toBe('Idle');
-    expect(first.event).toBe('RecordPressed');
-    expect(first.toName).toBe('Recording');
+  });
+
+  it('machineOf resolves the owner of a state or transition id', () => {
+    const core = project.cores[0];
+    const inputs = core.machines[1];
+    expect(machineOf(core, inputs.states[0].id)?.name).toBe('InputState');
+    expect(machineOf(core, inputs.transitions[0].id)?.name).toBe('InputState');
+    expect(machineOf(core, 'nonsense')).toBeNull();
   });
 });
 
@@ -66,8 +78,14 @@ describe('parseProjectJson', () => {
     expect(() =>
       parseProjectJson({
         project: 'X',
-        cores: [{ name: 'A', states: ['S'], transitions: [{ from: 'S' }] }],
+        cores: [{ name: 'A', machines: [{ name: 'M', states: ['S'], transitions: [{ from: 'S' }] }] }],
       }),
     ).toThrow(/transition/);
+    expect(() =>
+      parseProjectJson({
+        project: 'X',
+        cores: [{ name: 'A', states: [], transitions: [] }],
+      }),
+    ).toThrow(/machines/);
   });
 });

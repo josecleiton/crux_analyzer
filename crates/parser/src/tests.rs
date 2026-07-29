@@ -7,9 +7,13 @@ use crux_analyzer_model::Transition;
 fn transitions_of(code: &str) -> (Vec<(String, String, String)>, Vec<String>) {
     let sources = sources_from_str(&[("lib.rs", code)]);
     let outcome = parse_sources(&sources, "test").expect("must parse");
-    let core = &outcome.project.cores[0];
+    let transitions = outcome.project.cores[0]
+        .machines
+        .first()
+        .map(|machine| machine.transitions.clone())
+        .unwrap_or_default();
     (
-        core.transitions
+        transitions
             .iter()
             .map(|t: &Transition| (t.from.0.clone(), t.event.0.clone(), t.to.0.clone()))
             .collect(),
@@ -138,11 +142,11 @@ fn helper_delegation_across_files() {
     "#;
     let sources = sources_from_str(&[("app.rs", &app), ("helper.rs", helper)]);
     let outcome = parse_sources(&sources, "test").unwrap();
-    let core = &outcome.project.cores[0];
-    assert_eq!(core.transitions.len(), 1);
-    assert_eq!(core.transitions[0].from.0, "Idle");
-    assert_eq!(core.transitions[0].event.0, "Start");
-    assert_eq!(core.transitions[0].to.0, "Running");
+    let machine = &outcome.project.cores[0].machines[0];
+    assert_eq!(machine.transitions.len(), 1);
+    assert_eq!(machine.transitions[0].from.0, "Idle");
+    assert_eq!(machine.transitions[0].event.0, "Start");
+    assert_eq!(machine.transitions[0].to.0, "Running");
 }
 
 #[test]
@@ -294,11 +298,14 @@ fn mirror_enum_is_not_a_state_machine() {
     let sources = sources_from_str(&[("lib.rs", &code)]);
     let outcome = parse_sources(&sources, "test").unwrap();
     let core = &outcome.project.cores[0];
+    assert_eq!(core.machines.len(), 1, "only State must be a machine");
+    let machine = &core.machines[0];
+    assert_eq!(machine.name, "State");
     assert_eq!(
-        core.states.iter().map(|s| s.0.clone()).collect::<Vec<_>>(),
+        machine.states.iter().map(|s| s.0.clone()).collect::<Vec<_>>(),
         vec!["Idle", "Running", "Done"]
     );
-    assert_eq!(core.transitions.len(), 1);
+    assert_eq!(machine.transitions.len(), 1);
 }
 
 #[test]
@@ -351,6 +358,41 @@ fn cfg_test_modules_are_ignored() {
     let (transitions, warnings) = transitions_of(&code);
     assert_eq!(transitions, vec![triple("Idle", "Start", "Running")]);
     assert!(warnings.is_empty(), "test code must not produce warnings: {warnings:?}");
+}
+
+#[test]
+fn multiple_state_machines_become_regions() {
+    let code = r#"
+        pub enum State { Idle, Running }
+        pub enum NetState { Offline, Online }
+        pub struct Model { state: State, net: NetState }
+        pub struct App1;
+        pub enum Event { Start, Connected }
+        impl App for App1 {
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {
+                match event {
+                    Event::Start if matches!(model.state, State::Idle) => {
+                        model.state = State::Running;
+                    }
+                    Event::Connected if matches!(model.net, NetState::Offline) => {
+                        model.net = NetState::Online;
+                    }
+                    _ => {}
+                }
+            }
+        }
+    "#;
+    let sources = sources_from_str(&[("lib.rs", code)]);
+    let outcome = parse_sources(&sources, "test").unwrap();
+    let core = &outcome.project.cores[0];
+
+    assert_eq!(core.machines.len(), 2);
+    let names: Vec<&str> = core.machines.iter().map(|m| m.name.as_str()).collect();
+    assert!(names.contains(&"State") && names.contains(&"NetState"), "{names:?}");
+    for machine in &core.machines {
+        assert_eq!(machine.transitions.len(), 1, "one transition per region");
+    }
 }
 
 #[test]

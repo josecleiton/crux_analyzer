@@ -3,35 +3,59 @@
   "cores": [
     {
       "name": "Recorder",
-      "states": ["Idle", "Recording", "Paused", "Uploading", "Completed"],
-      "transitions": [
-        { "from": "Idle", "event": "RecordPressed", "to": "Recording" },
-        { "from": "Recording", "event": "PausePressed", "to": "Paused" },
-        { "from": "Paused", "event": "ResumePressed", "to": "Recording" },
-        { "from": "Recording", "event": "StopPressed", "to": "Uploading" },
-        { "from": "Uploading", "event": "UploadFinished", "to": "Completed" }
+      "machines": [
+        {
+          "name": "RecorderState",
+          "states": ["Idle", "Recording", "Paused", "Uploading", "Completed"],
+          "transitions": [
+            { "from": "Idle", "event": "RecordPressed", "to": "Recording", "effects": ["AudioOperation::Start"] },
+            { "from": "Recording", "event": "PausePressed", "to": "Paused", "effects": ["AudioOperation::Pause"] },
+            { "from": "Paused", "event": "ResumePressed", "to": "Recording", "effects": ["AudioOperation::Resume"] },
+            { "from": "Recording", "event": "StopPressed", "to": "Uploading", "effects": ["AudioOperation::Stop", "HttpOperation::Upload"] },
+            { "from": "Uploading", "event": "UploadFinished", "to": "Completed", "effects": ["Render"] }
+          ]
+        },
+        {
+          "name": "InputState",
+          "states": ["Ready", "Switching"],
+          "transitions": [
+            { "from": "Ready", "event": "InputSelected", "to": "Switching", "effects": ["AudioOperation::SwitchInput"] },
+            { "from": "Switching", "event": "InputSwitched", "to": "Ready", "effects": ["Render"] },
+            { "from": "*", "event": "InputsInvalidated", "to": "Ready" }
+          ]
+        }
       ]
     },
     {
       "name": "Authentication",
-      "states": ["SignedOut", "Authenticating", "SignedIn", "Failed"],
-      "transitions": [
-        { "from": "SignedOut", "event": "LoginPressed", "to": "Authenticating" },
-        { "from": "Authenticating", "event": "AuthSucceeded", "to": "SignedIn" },
-        { "from": "Authenticating", "event": "AuthFailed", "to": "Failed" },
-        { "from": "Failed", "event": "RetryPressed", "to": "Authenticating" },
-        { "from": "SignedIn", "event": "LogoutPressed", "to": "SignedOut" }
+      "machines": [
+        {
+          "name": "AuthState",
+          "states": ["SignedOut", "Authenticating", "SignedIn", "Failed"],
+          "transitions": [
+            { "from": "SignedOut", "event": "LoginPressed", "to": "Authenticating" },
+            { "from": "Authenticating", "event": "AuthSucceeded", "to": "SignedIn" },
+            { "from": "Authenticating", "event": "AuthFailed", "to": "Failed" },
+            { "from": "Failed", "event": "RetryPressed", "to": "Authenticating" },
+            { "from": "SignedIn", "event": "LogoutPressed", "to": "SignedOut" }
+          ]
+        }
       ]
     },
     {
       "name": "Sync",
-      "states": ["Idle", "Syncing", "Conflict", "Done"],
-      "transitions": [
-        { "from": "Idle", "event": "SyncRequested", "to": "Syncing" },
-        { "from": "Syncing", "event": "ConflictDetected", "to": "Conflict" },
-        { "from": "Conflict", "event": "ConflictResolved", "to": "Syncing" },
-        { "from": "Syncing", "event": "SyncFinished", "to": "Done" },
-        { "from": "Done", "event": "SyncRequested", "to": "Syncing" }
+      "machines": [
+        {
+          "name": "SyncState",
+          "states": ["Idle", "Syncing", "Conflict", "Done"],
+          "transitions": [
+            { "from": "Idle", "event": "SyncRequested", "to": "Syncing" },
+            { "from": "Syncing", "event": "ConflictDetected", "to": "Conflict" },
+            { "from": "Conflict", "event": "ConflictResolved", "to": "Syncing" },
+            { "from": "Syncing", "event": "SyncFinished", "to": "Done" },
+            { "from": "Done", "event": "SyncRequested", "to": "Syncing" }
+          ]
+        }
       ]
     }
   ]

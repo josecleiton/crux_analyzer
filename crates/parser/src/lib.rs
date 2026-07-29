@@ -107,7 +107,7 @@ pub(crate) fn parse_sources(
 
     for core in &cores {
         let extraction = transitions::extract(&index, core, &machines, &mut warnings);
-        model_cores.push(emit::to_core(core, &machines, extraction, &mut warnings));
+        model_cores.push(emit::to_core(core, &machines, extraction));
     }
 
     Ok(ParseOutcome {
