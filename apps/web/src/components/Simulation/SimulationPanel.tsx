@@ -6,7 +6,7 @@
 import type { DomainMachine } from '../../domain/types';
 import { stateRole } from '../../domain/stateRole';
 import type { Simulation } from '../../simulation/engine';
-import { availableTransitions } from '../../simulation/engine';
+import { availableTransitions, unreplayableTransitions } from '../../simulation/engine';
 import { useTranslate } from '../../i18n/useI18n';
 import { StateBadges, StateName } from '../Inspector/StateBadges';
 import { DocText, StateTags } from '../Inspector/StateDoc';
@@ -22,6 +22,7 @@ export function SimulationPanel({ machine, simulation, onFire, onRestart }: Simu
   const t = useTranslate();
   const current = machine.states.find((s) => s.id === simulation.currentStateId);
   const available = availableTransitions(machine, simulation);
+  const unreplayable = unreplayableTransitions(machine, simulation);
   const role = current
     ? stateRole(machine, current)
     : { initial: false, failure: false, deprecated: false, final: false };
@@ -51,6 +52,22 @@ export function SimulationPanel({ machine, simulation, onFire, onRestart }: Simu
           ))}
         </ul>
       )}
+
+      {/* Runtime-target transitions are real behavior the replay cannot
+          follow — shown and explained rather than silently hidden. */}
+      {unreplayable.length > 0 ? (
+        <>
+          <ul className="event-list">
+            {unreplayable.map((transition) => (
+              <li key={transition.id} className="event-unreplayable">
+                {transition.event}
+                <span className="event-target"> → {t('state.anyStateRuntime')}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="event-unreplayable-note">{t('simulation.runtimeTargetNote')}</p>
+        </>
+      ) : null}
 
       <h4>{t('simulation.trail')}</h4>
       {simulation.trail.length === 0 ? (

@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import rawProject from '../../../../shared/schema/examples/audio-recorder.json';
 import { parseProjectJson } from '../schema/parserJson';
 import { fromParserJson } from '../domain/fromParserJson';
-import { availableTransitions, fire, lastStep, startSimulation, traveledPath } from './engine';
+import {
+  availableTransitions,
+  fire,
+  lastStep,
+  startSimulation,
+  traveledPath,
+  unreplayableTransitions,
+} from './engine';
 
 const project = fromParserJson(parseProjectJson(rawProject));
 const recorder = project.cores[0].machines[0]; // RecorderState
@@ -25,6 +32,38 @@ describe('simulation engine', () => {
     const events = availableTransitions(inputs, sim).map((t) => t.event);
     expect(events).toContain('InputSelected'); // outgoing of Ready
     expect(events).toContain('InputsInvalidated'); // wildcard
+  });
+
+  it('separates runtime-target transitions instead of hiding them', () => {
+    // A machine with a `to: "*"` transition: real behavior the replay cannot
+    // follow, so it must be reported, never offered.
+    const runtime = fromParserJson(
+      parseProjectJson({
+        project: 'R',
+        cores: [
+          {
+            name: 'C',
+            machines: [
+              {
+                name: 'State',
+                states: ['Idle', 'Busy'],
+                transitions: [
+                  { from: 'Idle', event: 'Start', to: 'Busy' },
+                  { from: 'Idle', event: 'Restore', to: '*' },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    ).cores[0].machines[0];
+
+    const sim = startSimulation(runtime); // Idle
+    expect(availableTransitions(runtime, sim).map((t) => t.event)).toEqual(['Start']);
+    expect(unreplayableTransitions(runtime, sim).map((t) => t.event)).toEqual(['Restore']);
+    // ...and from a state it does not leave, it is not reported either
+    const busy = startSimulation(runtime, runtime.states[1].id);
+    expect(unreplayableTransitions(runtime, busy)).toEqual([]);
   });
 
   it('fires transitions, moves state and records the trail', () => {

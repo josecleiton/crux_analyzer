@@ -46,6 +46,8 @@ export const ptBR: Catalog = {
   'simulation.unknownState': '?',
   'simulation.sendEvent': 'Enviar evento',
   'simulation.noEvents': 'Nenhum evento pode ser disparado a partir daqui.',
+  'simulation.runtimeTargetNote':
+    'Estes levam a um estado decidido em tempo de execução, então o replay não consegue segui-los.',
   'simulation.trail': 'Histórico',
   'simulation.nothingFired': 'Nada foi disparado ainda.',
   'simulation.restart': 'Reiniciar',

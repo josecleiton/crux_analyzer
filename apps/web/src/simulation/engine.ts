@@ -54,6 +54,23 @@ export function availableTransitions(
   );
 }
 
+/**
+ * Transitions that fire from the current state but land on a runtime-decided
+ * target (`to: "*"`) — real behavior the replay cannot follow. Surfaced so
+ * the panel can say so instead of silently hiding them.
+ */
+export function unreplayableTransitions(
+  machine: DomainMachine,
+  simulation: Simulation,
+): DomainTransition[] {
+  const wildcardId = wildcardStateId(machine.id);
+  return machine.transitions.filter(
+    (t) =>
+      (t.from === simulation.currentStateId || t.from === wildcardId) &&
+      t.to === wildcardId,
+  );
+}
+
 /** Fires a transition, moving the simulation to its target state. */
 export function fire(
   machine: DomainMachine,

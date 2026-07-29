@@ -160,8 +160,16 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+.toolbar-lead {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+}
+
 .toolbar-title {
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .toolbar-core {
@@ -202,9 +210,10 @@ body {
   background: var(--bg-panel);
 }
 
-/* Tag filter: an input among buttons, so it borrows their footprint. */
+/* Tag filter: it reads while the buttons act, so it lives on the left with
+   the title — wide enough that its label is never clipped. */
 .toolbar input.toolbar-filter {
-  width: 140px;
+  width: 220px;
   padding: 4px 10px;
   border: 1px solid var(--border-strong);
   border-radius: 6px;
@@ -244,6 +253,18 @@ body {
   width: 13px;
   height: 13px;
   color: var(--state-deprecated);
+}
+
+/* Runtime-target transitions: listed like events, but inert. */
+.event-list li.event-unreplayable {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.event-unreplayable-note {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--text-faint);
 }
 
 /* Active it stays in its own caution color — green belongs to the
