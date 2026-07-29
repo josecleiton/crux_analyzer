@@ -13,17 +13,35 @@ use std::path::{Path, PathBuf};
 
 use crate::loader::SourceFile;
 
+/// A field of an enum variant: its name (for named fields) and the last
+/// segment of its type.
+#[derive(Debug, Clone)]
+pub(crate) struct VariantField {
+    pub name: Option<String>,
+    pub type_name: String,
+}
+
 /// An enum declaration.
 #[derive(Debug, Clone)]
 pub(crate) struct EnumDecl {
     pub file: PathBuf,
     /// Variant names in declaration order.
     pub variants: Vec<String>,
-    /// For each variant, the last-segment type names of its fields (used to
-    /// follow nested event enums like `Event::Recording(RecordingEvent)`).
-    pub variant_field_types: Vec<Vec<String>>,
+    /// For each variant, its fields (used to follow nested event enums like
+    /// `Event::Recording(RecordingEvent)`, event payload bindings, and
+    /// composite states like `State::Active(ActiveState)`).
+    pub variant_fields: Vec<Vec<VariantField>>,
     /// The `#[default]` variant, when the enum derives `Default`.
     pub default_variant: Option<String>,
+}
+
+impl EnumDecl {
+    /// Last-segment type names of a variant's fields.
+    pub fn field_types(&self, variant_index: usize) -> impl Iterator<Item = &str> {
+        self.variant_fields[variant_index]
+            .iter()
+            .map(|f| f.type_name.as_str())
+    }
 }
 
 /// A struct declaration: named fields as `(name, last-segment type)`.
@@ -43,6 +61,9 @@ pub(crate) struct FnInfo<'a> {
     /// `Some("App")` for `impl App { fn f }`, `None` for free functions.
     pub self_ty: Option<String>,
     pub name: String,
+    /// Parameter binding names, in order (`self` receivers excluded;
+    /// non-ident patterns become `"_"`).
+    pub params: Vec<String>,
     pub block: &'a syn::Block,
     pub file: &'a Path,
 }
@@ -125,10 +146,10 @@ fn index_items<'a>(
                     .push(EnumDecl {
                         file: file.to_path_buf(),
                         variants: item_enum.variants.iter().map(|v| v.ident.to_string()).collect(),
-                        variant_field_types: item_enum
+                        variant_fields: item_enum
                             .variants
                             .iter()
-                            .map(|v| field_type_names(&v.fields))
+                            .map(|v| variant_fields(&v.fields))
                             .collect(),
                         default_variant: item_enum
                             .variants
@@ -164,6 +185,7 @@ fn index_items<'a>(
                 index.fns.push(FnInfo {
                     self_ty: None,
                     name: item_fn.sig.ident.to_string(),
+                    params: param_names(&item_fn.sig),
                     block: &item_fn.block,
                     file,
                 });
@@ -187,6 +209,7 @@ fn index_items<'a>(
                         index.fns.push(FnInfo {
                             self_ty: Some(self_ty.clone()),
                             name: method.sig.ident.to_string(),
+                            params: param_names(&method.sig),
                             block: &method.block,
                             file,
                         });
@@ -264,20 +287,37 @@ fn collect_renames(tree: &syn::UseTree, prefix: &mut Vec<String>, out: &mut Vec<
     }
 }
 
-/// Type names of a variant's fields, by last path segment
+/// A variant's fields with names (if any) and last-segment type names
 /// (`Recording(RecordingEvent)` and `Recording(recorder::RecordingEvent)`
-/// both yield `["RecordingEvent"]`); generic types yield nothing.
-fn field_type_names(fields: &syn::Fields) -> Vec<String> {
+/// both yield the type `RecordingEvent`); generic types are skipped.
+fn variant_fields(fields: &syn::Fields) -> Vec<VariantField> {
     fields
         .iter()
         .filter_map(|field| {
             if let syn::Type::Path(type_path) = &field.ty {
                 let segment = type_path.path.segments.last()?;
                 if segment.arguments.is_none() {
-                    return Some(segment.ident.to_string());
+                    return Some(VariantField {
+                        name: field.ident.as_ref().map(|i| i.to_string()),
+                        type_name: segment.ident.to_string(),
+                    });
                 }
             }
             None
+        })
+        .collect()
+}
+
+/// Parameter binding names of a function signature.
+fn param_names(sig: &syn::Signature) -> Vec<String> {
+    sig.inputs
+        .iter()
+        .filter_map(|input| match input {
+            syn::FnArg::Typed(typed) => Some(match &*typed.pat {
+                syn::Pat::Ident(ident) => ident.ident.to_string(),
+                _ => "_".to_string(),
+            }),
+            syn::FnArg::Receiver(_) => None,
         })
         .collect()
 }

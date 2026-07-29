@@ -47,16 +47,20 @@ export function toFlowModel(core: DomainCore): FlowModel {
 function machineNodes(machine: DomainMachine, parentId: string | undefined): Node[] {
   const base = { parentId, position: { x: 0, y: 0 } };
 
-  const nodes: Node[] = machine.states.map((state) => ({
-    ...base,
-    id: state.id,
-    type: 'state',
-    data: { label: state.name },
-    width: nodeWidth(state.name),
-    height: NODE_HEIGHT,
-  }));
+  const nodes: Node[] = machine.states.map((state) => {
+    // Composite leaves ("Active/Loading") read better with spaced separators.
+    const label = state.name.replace(/\//g, ' / ');
+    return {
+      ...base,
+      id: state.id,
+      type: 'state',
+      data: { label },
+      width: nodeWidth(label),
+      height: NODE_HEIGHT,
+    };
+  });
 
-  if (machine.hasWildcardSource) {
+  if (machine.hasWildcard) {
     nodes.push({
       ...base,
       id: wildcardStateId(machine.id),

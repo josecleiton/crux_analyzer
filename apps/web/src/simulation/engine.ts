@@ -32,7 +32,8 @@ export function startSimulation(machine: DomainMachine, initialStateId?: string)
 
 /**
  * Transitions that can fire from the current state: its outgoing ones plus
- * every wildcard-sourced transition of the machine.
+ * every wildcard-sourced transition of the machine. Transitions whose target
+ * is decided at runtime (`to: "*"`) cannot be replayed and are excluded.
  */
 export function availableTransitions(
   machine: DomainMachine,
@@ -40,7 +41,9 @@ export function availableTransitions(
 ): DomainTransition[] {
   const wildcardId = wildcardStateId(machine.id);
   return machine.transitions.filter(
-    (t) => t.from === simulation.currentStateId || t.from === wildcardId,
+    (t) =>
+      (t.from === simulation.currentStateId || t.from === wildcardId) &&
+      t.to !== wildcardId,
   );
 }
 

@@ -50,10 +50,10 @@ describe('fromParserJson', () => {
   it('maps effects and wildcard sources', () => {
     const recorder = project.cores[0].machines[0];
     expect(recorder.transitions[0].effects).toEqual(['AudioOperation::Start']);
-    expect(recorder.hasWildcardSource).toBe(false);
+    expect(recorder.hasWildcard).toBe(false);
 
     const inputs = project.cores[0].machines[1];
-    expect(inputs.hasWildcardSource).toBe(true);
+    expect(inputs.hasWildcard).toBe(true);
     const wildcard = inputs.transitions.find((t) => t.fromName === '*')!;
     expect(wildcard.from).toBe(`${inputs.id}/*`);
     expect(wildcard.effects).toEqual([]);

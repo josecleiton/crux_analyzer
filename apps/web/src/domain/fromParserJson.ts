@@ -49,7 +49,9 @@ function mapMachine(coreId: string, machine: ParserMachineJson): DomainMachine {
     name: machine.name,
     states,
     transitions,
-    hasWildcardSource: machine.transitions.some((t) => t.from === ANY_STATE),
+    hasWildcard: machine.transitions.some(
+      (t) => t.from === ANY_STATE || t.to === ANY_STATE,
+    ),
   };
 }
 

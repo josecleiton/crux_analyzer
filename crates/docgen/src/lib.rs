@@ -11,28 +11,54 @@ mod mermaid;
 pub use markdown::markdown;
 pub use mermaid::{mermaid_diagrams, Diagram};
 
-/// Mermaid identifier for a state (or the wildcard pseudo-state).
+/// Mermaid identifier for a state (or the wildcard pseudo-state). Composite
+/// leaves (`Active/Loading`) become `Active_Loading`.
 fn state_id(state: &str) -> String {
     if state == State::ANY {
         "any_state".to_string()
     } else {
-        state.to_string()
+        state.replace('/', "_")
     }
 }
 
 /// One `stateDiagram-v2` body for a machine (without code fences).
+/// Composite leaves render nested inside their parent's block.
 fn machine_diagram(machine: &Machine) -> String {
     let mut lines = vec!["stateDiagram-v2".to_string()];
 
-    if machine.transitions.iter().any(|t| t.from.0 == State::ANY) {
+    if machine
+        .transitions
+        .iter()
+        .any(|t| t.from.0 == State::ANY || t.to.0 == State::ANY)
+    {
         lines.push("    state \"any state\" as any_state".to_string());
     }
+
+    // Composite blocks: `state Parent { state "Child" as Parent_Child }`.
+    let mut seen_parents: Vec<&str> = Vec::new();
     for state in &machine.states {
-        if !is_referenced(machine, &state.0) {
-            // Orphan states still show up in the diagram.
+        if let Some((parent, _)) = state.0.split_once('/') {
+            if !seen_parents.contains(&parent) {
+                seen_parents.push(parent);
+                lines.push(format!("    state {parent} {{"));
+                for leaf in &machine.states {
+                    if let Some((p, child)) = leaf.0.split_once('/') {
+                        if p == parent {
+                            lines.push(format!(
+                                "        state \"{child}\" as {}",
+                                state_id(&leaf.0)
+                            ));
+                        }
+                    }
+                }
+                lines.push("    }".to_string());
+            }
+        } else if !is_referenced(machine, &state.0) {
+            // Orphan simple states still show up in the diagram.
             lines.push(format!("    {}", state_id(&state.0)));
         }
     }
+
     for transition in &machine.transitions {
         lines.push(format!(
             "    {} --> {}: {}",
@@ -98,6 +124,34 @@ mod tests {
                 }],
             }],
         }
+    }
+
+    #[test]
+    fn mermaid_renders_composite_states_nested() {
+        let project = Project {
+            project: "S".into(),
+            cores: vec![Core {
+                name: "C".into(),
+                machines: vec![Machine {
+                    name: "State".into(),
+                    states: vec![
+                        State("Idle".into()),
+                        State("Active/Loading".into()),
+                        State("Active/Ready".into()),
+                    ],
+                    transitions: vec![Transition {
+                        from: State("Idle".into()),
+                        event: Event("Start".into()),
+                        to: State("Active/Loading".into()),
+                        effects: vec![],
+                    }],
+                }],
+            }],
+        };
+        let body = &mermaid_diagrams(&project)[0].mermaid;
+        assert!(body.contains("state Active {"), "{body}");
+        assert!(body.contains("state \"Loading\" as Active_Loading"), "{body}");
+        assert!(body.contains("Idle --> Active_Loading: Start"), "{body}");
     }
 
     #[test]

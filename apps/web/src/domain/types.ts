@@ -21,8 +21,8 @@ export interface DomainMachine {
   name: string;
   states: DomainState[];
   transitions: DomainTransition[];
-  /** Whether any transition fires from the wildcard "any state". */
-  hasWildcardSource: boolean;
+  /** Whether any transition uses the wildcard "any state" (source or target). */
+  hasWildcard: boolean;
 }
 
 export interface DomainState {

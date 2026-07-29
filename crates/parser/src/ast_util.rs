@@ -46,6 +46,36 @@ pub(crate) fn last_field_name(expr: &syn::Expr) -> Option<String> {
     }
 }
 
+/// Dotted path of an lvalue-ish expression: `known.insight_status` →
+/// `"known.insight_status"`. References, parens and `.clone()`-style calls
+/// with no arguments are looked through.
+pub(crate) fn expr_path_string(expr: &syn::Expr) -> Option<String> {
+    match expr {
+        syn::Expr::Path(path) => Some(
+            path.path
+                .segments
+                .iter()
+                .map(|s| s.ident.to_string())
+                .collect::<Vec<_>>()
+                .join("."),
+        ),
+        syn::Expr::Field(field) => {
+            let base = expr_path_string(&field.base)?;
+            match &field.member {
+                syn::Member::Named(ident) => Some(format!("{base}.{ident}")),
+                syn::Member::Unnamed(index) => Some(format!("{base}.{}", index.index)),
+            }
+        }
+        syn::Expr::Reference(reference) => expr_path_string(&reference.expr),
+        syn::Expr::Paren(paren) => expr_path_string(&paren.expr),
+        syn::Expr::MethodCall(call) if call.args.is_empty() => {
+            // `.clone()`, `.to_owned()`, ... — the value is still the receiver's.
+            expr_path_string(&call.receiver)
+        }
+        _ => None,
+    }
+}
+
 /// The `expr, pat` arguments of a `matches!` invocation.
 pub(crate) struct MatchesArgs {
     pub expr: syn::Expr,
