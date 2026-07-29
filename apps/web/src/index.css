@@ -203,6 +203,52 @@ body {
   pointer-events: none;
 }
 
+.state-node.highlighted,
+.react-flow__node.highlighted .state-node {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.2);
+}
+
+.any-state-node {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 0 12px;
+  background: transparent;
+  border: 1.5px dashed #b3b9c4;
+  border-radius: 999px;
+  font-size: 12px;
+  font-style: italic;
+  color: #6b7280;
+}
+
+.machine-group {
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid #e2e5ea;
+  border-radius: 12px;
+}
+
+.machine-group-title {
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.inspector-machine {
+  margin: -4px 0 8px;
+  font-size: 11px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 /* --- Graph: edges ------------------------------------------------------- */
 
 .routed-edge {
@@ -239,4 +285,18 @@ body {
 
 .edge-label.selected .edge-label-text {
   fill: #4338ca;
+}
+
+.react-flow__edge.highlighted .routed-edge {
+  stroke: #059669;
+  stroke-width: 2.25;
+}
+
+.react-flow__edge.highlighted .edge-label-box {
+  stroke: #059669;
+  fill: #ecfdf5;
+}
+
+.react-flow__edge.highlighted .edge-label-text {
+  fill: #047857;
 }

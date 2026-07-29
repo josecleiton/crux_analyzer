@@ -4,34 +4,51 @@ import { parseProjectJson } from '../schema/parserJson';
 import { fromParserJson } from '../domain/fromParserJson';
 import { toFlowModel } from './toFlowModel';
 
-const recorder = fromParserJson(parseProjectJson(rawProject)).cores[0];
-const { nodes, edges } = toFlowModel(recorder);
+const project = fromParserJson(parseProjectJson(rawProject));
+const recorderCore = project.cores[0]; // two machines
+const syncCore = project.cores[2]; // one machine
 
 describe('toFlowModel', () => {
-  it('turns each state into a node labeled with its name', () => {
-    expect(nodes).toHaveLength(recorder.states.length);
-    expect(nodes.map((n) => n.data.label)).toEqual([
-      'Idle',
-      'Recording',
-      'Paused',
-      'Uploading',
-      'Completed',
-    ]);
+  it('renders a multi-machine core as sections (group nodes)', () => {
+    const { nodes } = toFlowModel(recorderCore);
+    const groups = nodes.filter((n) => n.type === 'machineGroup');
+    expect(groups.map((g) => g.data.label)).toEqual(['RecorderState', 'InputState']);
+
+    // every state node belongs to its machine's group
+    for (const machine of recorderCore.machines) {
+      for (const state of machine.states) {
+        const node = nodes.find((n) => n.id === state.id)!;
+        expect(node.parentId).toBe(machine.id);
+      }
+    }
+  });
+
+  it('renders a single-machine core flat (no groups)', () => {
+    const { nodes } = toFlowModel(syncCore);
+    expect(nodes.every((n) => n.type !== 'machineGroup')).toBe(true);
+    expect(nodes.every((n) => n.parentId === undefined)).toBe(true);
+    expect(nodes.map((n) => n.data.label)).toEqual(['Idle', 'Syncing', 'Conflict', 'Done']);
+  });
+
+  it('adds a pseudo-node for wildcard sources', () => {
+    const { nodes, edges } = toFlowModel(recorderCore);
+    const anyNode = nodes.find((n) => n.type === 'anyState')!;
+    expect(anyNode).toBeDefined();
+    expect(anyNode.parentId).toBe(recorderCore.machines[1].id);
+    // the wildcard transition edge starts at the pseudo-node
+    const wildcardEdge = edges.find((e) => e.source === anyNode.id)!;
+    expect(wildcardEdge.label).toBe('InputsInvalidated');
   });
 
   it('turns each transition into an edge labeled with its event', () => {
-    expect(edges).toHaveLength(recorder.transitions.length);
+    const machine = syncCore.machines[0];
+    const { nodes, edges } = toFlowModel(syncCore);
+    expect(edges).toHaveLength(machine.transitions.length);
     const nodeIds = new Set(nodes.map((n) => n.id));
     for (const edge of edges) {
       expect(nodeIds.has(edge.source)).toBe(true);
       expect(nodeIds.has(edge.target)).toBe(true);
     }
-    const record = edges.find((e) => e.label === 'RecordPressed')!;
-    expect(record.source).toContain('Idle');
-    expect(record.target).toContain('Recording');
-  });
-
-  it('edge ids match the domain transition ids', () => {
-    expect(edges.map((e) => e.id)).toEqual(recorder.transitions.map((t) => t.id));
+    expect(edges.map((e) => e.id)).toEqual(machine.transitions.map((t) => t.id));
   });
 });

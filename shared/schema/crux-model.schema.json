@@ -19,17 +19,33 @@
   "$defs": {
     "core": {
       "type": "object",
-      "required": ["name", "states", "transitions"],
+      "required": ["name", "machines"],
       "additionalProperties": false,
       "properties": {
         "name": {
           "type": "string",
           "description": "Name of the Core (Crux app)."
         },
+        "machines": {
+          "type": "array",
+          "description": "State machines (orthogonal regions) of this Core — one per state enum, statechart style.",
+          "items": { "$ref": "#/$defs/machine" }
+        }
+      }
+    },
+    "machine": {
+      "type": "object",
+      "required": ["name", "states", "transitions"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the state machine (usually the state enum's name)."
+        },
         "states": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "States of the Core."
+          "description": "States of the machine."
         },
         "transitions": {
           "type": "array",
@@ -42,9 +58,17 @@
       "required": ["from", "event", "to"],
       "additionalProperties": false,
       "properties": {
-        "from": { "type": "string", "description": "Source state." },
+        "from": {
+          "type": "string",
+          "description": "Source state, or \"*\" meaning any state."
+        },
         "event": { "type": "string", "description": "Event that triggers the transition." },
-        "to": { "type": "string", "description": "Target state." }
+        "to": { "type": "string", "description": "Target state." },
+        "effects": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Effects requested when this transition fires (e.g. \"Render\", \"AudioOperation::Start\")."
+        }
       }
     }
   }

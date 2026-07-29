@@ -14,6 +14,11 @@ export interface ParserProjectJson {
 
 export interface ParserCoreJson {
   name: string;
+  machines: ParserMachineJson[];
+}
+
+export interface ParserMachineJson {
+  name: string;
   states: string[];
   transitions: ParserTransitionJson[];
 }
@@ -22,7 +27,11 @@ export interface ParserTransitionJson {
   from: string;
   event: string;
   to: string;
+  effects?: string[];
 }
+
+/** Wildcard source state: the transition fires from any state. */
+export const ANY_STATE = '*';
 
 /** Light structural validation — fail early if the JSON breaks the contract. */
 export function parseProjectJson(raw: unknown): ParserProjectJson {
@@ -33,20 +42,34 @@ export function parseProjectJson(raw: unknown): ParserProjectJson {
   for (const core of raw.cores) {
     if (!isRecord(core)) throw invalid('core must be an object');
     if (typeof core.name !== 'string') throw invalid('core.name must be a string');
-    if (!Array.isArray(core.states) || core.states.some((s) => typeof s !== 'string')) {
-      throw invalid(`core "${core.name}": states must be an array of strings`);
+    if (!Array.isArray(core.machines)) {
+      throw invalid(`core "${core.name}": machines must be an array`);
     }
-    if (!Array.isArray(core.transitions)) {
-      throw invalid(`core "${core.name}": transitions must be an array`);
-    }
-    for (const t of core.transitions) {
-      if (
-        !isRecord(t) ||
-        typeof t.from !== 'string' ||
-        typeof t.event !== 'string' ||
-        typeof t.to !== 'string'
-      ) {
-        throw invalid(`core "${core.name}": transition must have from/event/to strings`);
+    for (const machine of core.machines) {
+      if (!isRecord(machine)) throw invalid(`core "${core.name}": machine must be an object`);
+      if (typeof machine.name !== 'string') {
+        throw invalid(`core "${core.name}": machine.name must be a string`);
+      }
+      if (!Array.isArray(machine.states) || machine.states.some((s) => typeof s !== 'string')) {
+        throw invalid(`machine "${machine.name}": states must be an array of strings`);
+      }
+      if (!Array.isArray(machine.transitions)) {
+        throw invalid(`machine "${machine.name}": transitions must be an array`);
+      }
+      for (const t of machine.transitions) {
+        if (
+          !isRecord(t) ||
+          typeof t.from !== 'string' ||
+          typeof t.event !== 'string' ||
+          typeof t.to !== 'string'
+        ) {
+          throw invalid(`machine "${machine.name}": transition must have from/event/to strings`);
+        }
+        if (t.effects !== undefined) {
+          if (!Array.isArray(t.effects) || t.effects.some((e) => typeof e !== 'string')) {
+            throw invalid(`machine "${machine.name}": effects must be an array of strings`);
+          }
+        }
       }
     }
   }

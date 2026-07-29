@@ -28,7 +28,13 @@ fn extracts_quipu_recording_state_machine() {
         .find(|c| c.name == "Quipu")
         .expect("core Quipu not found");
 
-    let states: Vec<&str> = core.states.iter().map(|s| s.0.as_str()).collect();
+    let machine = core
+        .machines
+        .iter()
+        .find(|m| m.name == "RecordingState")
+        .expect("RecordingState machine not found");
+
+    let states: Vec<&str> = machine.states.iter().map(|s| s.0.as_str()).collect();
     assert_eq!(
         states,
         [
@@ -43,7 +49,7 @@ fn extracts_quipu_recording_state_machine() {
         ]
     );
 
-    let triples: Vec<(&str, &str, &str)> = core
+    let triples: Vec<(&str, &str, &str)> = machine
         .transitions
         .iter()
         .map(|t| (t.from.0.as_str(), t.event.0.as_str(), t.to.0.as_str()))
