@@ -96,9 +96,45 @@ function machineNodes(
 ): Node[] {
   const base = { parentId, position: { x: 0, y: 0 } };
 
-  const nodes: Node[] = machine.states.map((state) => {
-    // Composite leaves ("Active/Loading") read better with spaced separators.
-    const label = state.name.replace(/\//g, ' / ');
+  // Composite parents ("Active" in "Active/Loading") become containers, the
+  // same nesting Mermaid renders. A parent is never a state of its own — the
+  // parser fans wildcard patterns out over the children — but guard against
+  // a name collision anyway: a machine that somehow declares a plain state
+  // with a parent's name keeps that family flat rather than nesting a state
+  // inside a state.
+  const plainNames = new Set(
+    machine.states.filter((s) => !s.name.includes('/')).map((s) => s.name),
+  );
+  const compositeParents: string[] = [];
+  for (const state of machine.states) {
+    const parent = state.name.split('/', 1)[0];
+    if (
+      state.name.includes('/') &&
+      !plainNames.has(parent) &&
+      !compositeParents.includes(parent)
+    ) {
+      compositeParents.push(parent);
+    }
+  }
+  const compositeId = (parent: string) => `${machine.id}/${parent}`;
+
+  // containers first: React Flow requires a parent before its children
+  const nodes: Node[] = compositeParents.map((parent) => ({
+    ...base,
+    id: compositeId(parent),
+    type: 'compositeGroup',
+    data: { label: parent },
+  }));
+
+  for (const state of machine.states) {
+    const parent = state.name.split('/', 1)[0];
+    const nested = state.name.includes('/') && !plainNames.has(parent);
+    // Inside a container the parent's name is the container's title, so the
+    // node keeps only the leaf; spaced separators either way ("A / B").
+    const label = (nested ? state.name.slice(parent.length + 1) : state.name).replace(
+      /\//g,
+      ' / ',
+    );
     const role = stateRole(machine, state);
     const data: StateNodeData = {
       label,
@@ -108,8 +144,9 @@ function machineNodes(
       final: role.final,
       doc: state.doc,
     };
-    return {
+    nodes.push({
       ...base,
+      ...(nested ? { parentId: compositeId(parent) } : {}),
       id: state.id,
       type: 'state',
       data,
@@ -120,8 +157,8 @@ function machineNodes(
         (role.initial ? INITIAL_MARKER_WIDTH : 0) +
         (state.doc ? DOC_MARK_WIDTH : 0),
       height: NODE_HEIGHT,
-    };
-  });
+    });
+  }
 
   if (machine.hasWildcard) {
     nodes.push({

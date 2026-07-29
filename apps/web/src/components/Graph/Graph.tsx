@@ -16,12 +16,20 @@ import { useGraphColors } from '../../theme/useTheme';
 import { StateNode } from './StateNode';
 import { AnyStateNode } from './AnyStateNode';
 import { MachineGroupNode } from './MachineGroupNode';
+import { CompositeGroupNode } from './CompositeGroupNode';
 import { RoutedEdge } from './RoutedEdge';
 import { ViewportFocus } from './ViewportFocus';
 import type { FitRequest } from './ViewportFocus';
 
-const nodeTypes = { state: StateNode, anyState: AnyStateNode, machineGroup: MachineGroupNode };
+const nodeTypes = {
+  state: StateNode,
+  anyState: AnyStateNode,
+  machineGroup: MachineGroupNode,
+  compositeGroup: CompositeGroupNode,
+};
 const edgeTypes = { routed: RoutedEdge };
+/** Containers are scenery: they never take part in the emphasis tiers. */
+const GROUP_TYPES = new Set(['machineGroup', 'compositeGroup']);
 /** Room left around the framed content, on load and on every framing. */
 const FIT_PADDING = 0.15;
 
@@ -118,11 +126,9 @@ export function Graph({ nodes, edges, selection, onSelect, highlight, theme }: G
 
   const styledNodes = nodes.map((node) => {
     const current = highlight?.nodeIds.includes(node.id) ?? false;
-    // group containers are scenery: they never take part in the emphasis
-    const classes =
-      node.type === 'machineGroup'
-        ? []
-        : tier(node.id, current, visitedNodes, availableNodes, keptNodes);
+    const classes = GROUP_TYPES.has(node.type ?? '')
+      ? []
+      : tier(node.id, current, visitedNodes, availableNodes, keptNodes);
     if (current) classes.push('highlighted', pulseClass, ...(failureClass ? ['is-failure'] : []));
     return {
       ...node,
