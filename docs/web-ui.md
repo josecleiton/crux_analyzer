@@ -13,6 +13,8 @@ Three areas, LangGraph-Studio style:
   renders flat. Every state is a node, every transition an edge labeled with
   its event. Wildcard transitions (`from`/`to` = `"*"`) connect to a dashed
   **any state** pseudo-node. Composite leaves show as `Parent / Child`.
+  Clicking a section (its title or empty area) selects the machine's **entry
+  state**, so a machine can be inspected — and simulated — in one click.
 - **Inspector** (right panel) — selecting a state shows its role badges and
   its incoming/outgoing events; selecting a transition shows
   `event: from ↓ to` plus the **effects** it requests. The owning machine is
@@ -25,7 +27,8 @@ Roles are painted on the canvas at all times, simulation or not
 
 - **initial** (blue, filled dot before the label) — the machine's entry
   point: a state nothing transitions into. In a fully cyclic machine the
-  first state carries the role, which is where the simulation starts.
+  first state carries the role, which is where the simulation starts. The
+  first state with this role is the machine's entry state (`entryState`).
 - **final** (violet, double border) — a dead end: no outgoing transition of
   its own. A machine-wide wildcard (`from: "*"`) may still leave it; that
   escape stays visible as an edge from the **any state** node.

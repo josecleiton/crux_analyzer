@@ -119,7 +119,15 @@ export function Graph({ nodes, edges, selection, onSelect, highlight, theme }: G
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       onNodeClick={(_, node) => {
-        if (node.type === 'state') onSelect({ kind: 'state', id: node.id });
+        if (node.type === 'state') {
+          onSelect({ kind: 'state', id: node.id });
+          return;
+        }
+        // a machine section resolves to the entry state the mapper put in it
+        const entryStateId = node.data?.entryStateId;
+        if (node.type === 'machineGroup' && typeof entryStateId === 'string') {
+          onSelect({ kind: 'state', id: entryStateId });
+        }
       }}
       onEdgeClick={(_, edge) => onSelect({ kind: 'transition', id: edge.id })}
       onPaneClick={() => onSelect(null)}

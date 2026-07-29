@@ -68,6 +68,15 @@ function isInitial(machine: DomainMachine, state: DomainState): boolean {
   return !anyEntryPoint && machine.states[0]?.id === state.id;
 }
 
+/**
+ * The machine's entry point: the first state carrying the `initial` role.
+ * It stands for the machine as a whole — clicking a machine section selects
+ * it, and it is where the Simulation Engine starts by default.
+ */
+export function entryState(machine: DomainMachine): DomainState | null {
+  return machine.states.find((state) => isInitial(machine, state)) ?? machine.states[0] ?? null;
+}
+
 export function stateRole(machine: DomainMachine, state: DomainState): StateRole {
   return {
     initial: isInitial(machine, state),

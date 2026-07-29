@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import rawProject from '../../../../shared/schema/examples/audio-recorder.json';
 import { parseProjectJson } from '../schema/parserJson';
 import { fromParserJson } from './fromParserJson';
-import { isFailureName, stateRole } from './stateRole';
+import { entryState, isFailureName, stateRole } from './stateRole';
 import type { DomainMachine } from './types';
 
 const project = fromParserJson(parseProjectJson(rawProject));
@@ -81,5 +81,17 @@ describe('stateRole', () => {
     // the first state carries the initial role
     expect(role(inputMachine, 'Ready').initial).toBe(true);
     expect(role(inputMachine, 'Switching').initial).toBe(false);
+  });
+});
+
+describe('entryState', () => {
+  it('returns the state carrying the initial role', () => {
+    expect(entryState(recorderMachine)?.name).toBe('Idle');
+    // fully cyclic machine: the first state stands in as the entry point
+    expect(entryState(authMachine)?.name).toBe('SignedOut');
+  });
+
+  it('returns null for a machine with no states', () => {
+    expect(entryState({ ...recorderMachine, states: [] })).toBeNull();
   });
 });
