@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadProject } from './data/loadProject';
 import type { DomainProject } from './domain/types';
 import { machineOf } from './domain/fromParserJson';
@@ -37,6 +37,11 @@ export default function App() {
   const [undocumentedOnly, setUndocumentedOnly] = useState(false);
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [layouted, setLayouted] = useState<LayoutResult>({ nodes: [], edges: [] });
+  // Bumped when an explicit Re-layout lands, so the Graph re-frames: the
+  // layout is deterministic, and recomputing alone would change nothing on
+  // screen — re-framing is what the click visibly does.
+  const [fitSignal, setFitSignal] = useState(0);
+  const appliedLayoutVersion = useRef(0);
   const { theme, toggleTheme } = useTheme();
   const t = useTranslate();
 
@@ -105,7 +110,12 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     layoutEngine.layout(flowModel.nodes, flowModel.edges).then((result) => {
-      if (!cancelled) setLayouted(result);
+      if (cancelled) return;
+      setLayouted(result);
+      if (layoutVersion !== appliedLayoutVersion.current) {
+        appliedLayoutVersion.current = layoutVersion;
+        setFitSignal((signal) => signal + 1);
+      }
     });
     return () => {
       cancelled = true;
@@ -219,6 +229,7 @@ export default function App() {
             selection={selection}
             onSelect={setSelection}
             highlight={highlight}
+            fitSignal={fitSignal}
             theme={theme}
           />
         </main>
