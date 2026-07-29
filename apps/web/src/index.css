@@ -222,6 +222,22 @@ body {
   border-color: var(--sim);
 }
 
+/* The undocumented toggle carries a warning triangle: it is about the states
+   a reader should not trust yet, and amber is the caution color the
+   deprecated styling already established. */
+.toolbar button.undocumented-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.undocumented-toggle-icon {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: var(--state-deprecated);
+}
+
 .toolbar input.toolbar-filter:disabled {
   opacity: 0.45;
 }

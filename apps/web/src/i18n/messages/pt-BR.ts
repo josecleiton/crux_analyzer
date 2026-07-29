@@ -15,7 +15,8 @@ export const ptBR: Catalog = {
   'toolbar.relayout': 'Reorganizar',
   'toolbar.filterByTag': 'Filtrar por etiqueta',
   'toolbar.undocumented': 'Sem documentação',
-  'toolbar.undocumentedHint': 'Destacar estados sem documentação',
+  'toolbar.undocumentedHint':
+    'Destaca estados sem documentação — os que não têm descrição /// no código-fonte analisado',
 
   'themeToggle.switchToLight': 'Mudar para o modo claro',
   'themeToggle.switchToDark': 'Mudar para o modo escuro',
