@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Theme } from '../../theme/theme';
 import { useTranslate } from '../../i18n/useI18n';
@@ -47,23 +48,12 @@ export function Toolbar({
             whole label. Disabled (not hidden) while a simulation owns the
             emphasis; a core with no declared tags gets no filter at all. */}
         {tagOptions.length > 0 ? (
-          <>
-            <input
-              className={`toolbar-filter${tagQuery.trim() !== '' ? ' active' : ''}`}
-              type="search"
-              list="toolbar-tag-options"
-              value={tagQuery}
-              onChange={(event) => onTagQueryChange(event.target.value)}
-              placeholder={t('toolbar.filterByTag')}
-              aria-label={t('toolbar.filterByTag')}
-              disabled={simulating}
-            />
-            <datalist id="toolbar-tag-options">
-              {tagOptions.map((tag) => (
-                <option value={tag} key={tag} />
-              ))}
-            </datalist>
-          </>
+          <TagFilter
+            query={tagQuery}
+            options={tagOptions}
+            disabled={simulating}
+            onChange={onTagQueryChange}
+          />
         ) : null}
       </div>
       <div className="toolbar-actions">
@@ -107,6 +97,77 @@ export function Toolbar({
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
       </div>
     </header>
+  );
+}
+
+/**
+ * The tag filter input with its own suggestion list. Not a `<datalist>` on
+ * purpose: native datalist popups are inconsistent across engines (Chrome on
+ * macOS does not open one for this shape at all), and a filter whose
+ * suggestions may or may not appear reads as broken. Tag names are data from
+ * the analyzed app, hence monospace in the list.
+ */
+function TagFilter({
+  query,
+  options,
+  disabled,
+  onChange,
+}: {
+  query: string;
+  options: string[];
+  disabled: boolean;
+  onChange: (query: string) => void;
+}) {
+  const t = useTranslate();
+  const [open, setOpen] = useState(false);
+  const fragment = query.trim().toLowerCase();
+  const suggestions = options.filter((tag) => tag.toLowerCase().includes(fragment));
+
+  return (
+    <div className="toolbar-filter-wrap">
+      <input
+        className={`toolbar-filter${query.trim() !== '' ? ' active' : ''}`}
+        type="text"
+        role="combobox"
+        aria-expanded={open && suggestions.length > 0}
+        aria-autocomplete="list"
+        value={query}
+        onChange={(event) => {
+          onChange(event.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setOpen(false);
+          if (event.key === 'ArrowDown') setOpen(true);
+        }}
+        placeholder={t('toolbar.filterByTag')}
+        aria-label={t('toolbar.filterByTag')}
+        disabled={disabled}
+      />
+      {open && suggestions.length > 0 ? (
+        <ul className="tag-suggestions" role="listbox">
+          {suggestions.map((tag) => (
+            <li key={tag}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={tag === query}
+                // mousedown, so the pick lands before the input's blur closes
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  onChange(tag);
+                  setOpen(false);
+                }}
+              >
+                {tag}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 
