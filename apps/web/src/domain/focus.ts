@@ -73,17 +73,22 @@ export function focusFor(core: DomainCore, criteria: FocusCriteria): FocusSet | 
 }
 
 /**
- * Every tag declared in the core (regions and states), sorted, for the filter
- * input's suggestions. An empty list is also the filter's reason not to
- * render: a core with nothing to filter by gets no filter.
+ * Every tag declared in the core (regions and states), for the filter input's
+ * suggestions — most-used first (declaration count), ties alphabetical, so
+ * the tags that structure the machine surface before one-off labels. An
+ * empty list is also the filter's reason not to render: a core with nothing
+ * to filter by gets no filter.
  */
 export function declaredTags(core: DomainCore): string[] {
-  const tags = new Set<string>();
+  const uses = new Map<string, number>();
+  const count = (tag: string) => uses.set(tag, (uses.get(tag) ?? 0) + 1);
   for (const machine of core.machines) {
-    machine.tags.forEach((tag) => tags.add(tag));
-    machine.states.forEach((state) => state.tags.forEach((tag) => tags.add(tag)));
+    machine.tags.forEach(count);
+    machine.states.forEach((state) => state.tags.forEach(count));
   }
-  return [...tags].sort();
+  return [...uses.entries()]
+    .sort(([tagA, usesA], [tagB, usesB]) => usesB - usesA || tagA.localeCompare(tagB))
+    .map(([tag]) => tag);
 }
 
 function matchesTag(tags: string[], query: string): boolean {

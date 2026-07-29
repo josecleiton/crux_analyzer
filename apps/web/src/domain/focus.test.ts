@@ -106,9 +106,25 @@ describe('focusFor when idle', () => {
 });
 
 describe('declaredTags', () => {
-  it('collects the tags of a core, sorted, for suggestions', () => {
+  it('collects the tags of a core for suggestions', () => {
     expect(declaredTags(authCore)).toEqual(['retryable']);
     expect(declaredTags(syncCore)).toEqual(['manual-resolution']);
+  });
+
+  it('orders by declaration count, ties alphabetical', () => {
+    const tagged: DomainCore = {
+      ...syncCore,
+      machines: syncCore.machines.map((machine) => ({
+        ...machine,
+        tags: ['zeta'],
+        states: machine.states.map((state, index) => ({
+          ...state,
+          // "hot" on two states, "alpha"/"zeta" once each
+          tags: index < 2 ? ['hot'] : index === 2 ? ['alpha'] : [],
+        })),
+      })),
+    };
+    expect(declaredTags(tagged)).toEqual(['hot', 'alpha', 'zeta']);
   });
 
   it('is empty for a core with nothing to filter by', () => {
