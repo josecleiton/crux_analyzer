@@ -129,7 +129,8 @@ SVG-only colors (edge arrowheads) are read back from the same tokens
 ## Localization
 
 The toolbar's language toggle switches between English and Portuguese
-(`en` / `pt-BR`); it shows the short code of the locale it will switch *to*.
+(`en` / `pt-BR`); it shows the short code of the **active** locale, while its
+tooltip and accessible name say which language clicking it brings.
 The module (`src/i18n/`) mirrors the theme deliberately: the active locale is
 the `data-locale` attribute on `<html>` (with `lang` set alongside it for
 assistive technology), the choice persists in `localStorage`, a pre-paint script
