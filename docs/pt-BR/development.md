@@ -23,6 +23,7 @@ just            # lista todas as receitas
 | Site estático de docs | `just site <src> <nome> [base]` | `CRUX_BASE=<base> pnpm --filter web build` |
 | Testes Rust | `just rust-test` | `cargo test --workspace` |
 | Testes de corpus | `just corpus` | `QUIPU_SRC=<caminho> cargo test --workspace` |
+| Catraca de cobertura do corpus | `just quipu-coverage [piso]` | `cargo run -p crux-analyzer-cli -- coverage ... --min <piso>` |
 | Clippy | `just clippy` | `cargo clippy --workspace` |
 | Tudo | `just check` | — |
 | Modelo para a UI | `just model <src> <nome>` | `cargo run -p crux-analyzer-cli -- generate ...` |
@@ -91,6 +92,13 @@ O teste do corpus se auto-restringe por `QUIPU_SRC`, e essa fonte não é públi
 então o CI comprova o caminho do fixture e o corpus continua sendo uma guarda
 local. Mantenha assim ao adicionar guardas: o que o CI não consegue rodar não é
 uma guarda.
+
+O corpus tem uma catraca de cobertura própria: `just quipu-coverage` (parte do
+`just check`) falha quando o total de documentação do Quipu cai abaixo do piso
+embutido na receita. Como o teste do corpus, ela pula a si mesma quando a fonte
+está ausente, então no CI o piso do fixture-guard é o substituto público.
+Quando a cobertura subir, eleve o piso no `justfile` — esse é o clique da
+catraca.
 
 Uma guarda que não pode falhar é decoração. Quando adicionar uma, quebre-a de
 propósito uma vez e veja-a ficar vermelha antes de confiar nela.
