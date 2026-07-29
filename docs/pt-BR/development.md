@@ -20,6 +20,7 @@ just            # lista todas as receitas
 | Servidor de dev web | `just dev` | `pnpm --filter web dev` |
 | Testes web | `just web-test` | `pnpm --filter web test` |
 | Build web (tsc + vite) | `just web-build` | `pnpm --filter web build` |
+| Site estático de docs | `just site <src> <nome> [base]` | `CRUX_BASE=<base> pnpm --filter web build` |
 | Testes Rust | `just rust-test` | `cargo test --workspace` |
 | Testes de corpus | `just corpus` | `CORPUS_SRC=<caminho> cargo test --workspace` |
 | Clippy | `just clippy` | `cargo clippy --workspace` |

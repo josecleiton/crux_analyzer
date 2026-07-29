@@ -46,11 +46,44 @@ O Inspetor e o painel de simulação repetem os papéis como selos.
 
 ## Fonte de dados
 
-Ao carregar, a aplicação busca `/model.json` (coloque um modelo gerado em
-`apps/web/public/model.json` — `just model <src> <nome>`, ou `model-watch` para
-mantê-lo fresco). Sem um — ou com um desatualizado/inválido — ela cai no exemplo
-embutido (`shared/schema/examples/audio-recorder.json`) e registra um aviso no
-console. O artefato está no gitignore.
+Ao carregar, a aplicação busca `model.json` relativo à sua base (veja
+[Publicação estática](#publicação-estática) — `/model.json` em
+desenvolvimento). Coloque um modelo gerado em `apps/web/public/model.json` —
+`just model <src> <nome>`, ou `model-watch` para mantê-lo fresco. Sem um — ou
+com um desatualizado/inválido — ela cai no exemplo embutido
+(`shared/schema/examples/audio-recorder.json`) e registra um aviso no console.
+O artefato está no gitignore.
+
+## Publicação estática
+
+A UI é um bundle estático, então publicá-la como documentação interna não exige
+nenhuma lógica de servidor — apenas um host HTTP comum. Uma única recipe faz
+tudo:
+
+```sh
+just site ../meu-app/shared/src MeuApp              # servido na raiz do domínio
+just site ../meu-app/shared/src MeuApp /crux-docs/  # servido em um subcaminho
+# depois publique apps/web/dist/
+```
+
+`site` analisa a crate para `apps/web/public/model.json` e só então faz o
+build, de modo que o modelo vai *dentro* de `dist/` — a página publicada nunca
+volta a chamar o analisador, e atualizar a documentação é rodar a recipe de
+novo. Os dois passos ficam numa recipe só de propósito: fazer o build sem gerar
+antes publica o exemplo embutido, o que parece um site funcionando em vez de um
+erro.
+
+O terceiro argumento é o `base` do Vite (`CRUX_BASE=<base>` para chamadas
+diretas de `pnpm build`, normalizado em `vite.config.ts`). Ele é **obrigatório
+sempre que o site não estiver na raiz do domínio** — GitHub/GitLab Pages por
+projeto, por exemplo: as URLs dos assets e o fetch do `model.json` são
+resolvidos a partir dele, e um build com caminhos absolutos servido em um
+subcaminho falha silenciosamente no exemplo embutido. Uma origem completa
+(`https://cdn.exemplo.com/docs/`) também funciona.
+
+Duas coisas que não esperar: o bundle precisa ser servido por HTTP (`file://`
+bloqueia tanto o módulo ES quanto o fetch do modelo), e nenhuma regra de
+fallback de SPA é necessária — há uma única página e nenhum roteador.
 
 ## Simulação
 

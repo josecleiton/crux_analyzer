@@ -29,6 +29,7 @@ just clippy                  # lint the workspace
 just check                   # full validation: corpus + clippy + web tests + build
 just model <src> <name>      # analyze an app into apps/web/public/model.json
 just model-watch <src> <name># same, regenerating on every save
+just site <src> <name> [base] # static doc site in apps/web/dist (model baked in)
 just docs <src> <name> [markdown|mermaid] [en|pt-BR]
 just corpus-model                   # shortcut: analyze the private corpus into the UI
 just example-docs            # regenerate the example docs in every locale

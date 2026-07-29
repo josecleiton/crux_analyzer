@@ -20,6 +20,7 @@ just            # lists every recipe
 | Web dev server | `just dev` | `pnpm --filter web dev` |
 | Web tests | `just web-test` | `pnpm --filter web test` |
 | Web build (tsc + vite) | `just web-build` | `pnpm --filter web build` |
+| Static doc site | `just site <src> <name> [base]` | `CRUX_BASE=<base> pnpm --filter web build` |
 | Rust tests | `just rust-test` | `cargo test --workspace` |
 | Corpus tests | `just corpus` | `CORPUS_SRC=<path> cargo test --workspace` |
 | Clippy | `just clippy` | `cargo clippy --workspace` |

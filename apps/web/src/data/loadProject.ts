@@ -14,7 +14,10 @@ import { parseProjectJson } from '../schema/parserJson';
 import { fromParserJson } from '../domain/fromParserJson';
 import type { DomainProject } from '../domain/types';
 
-const GENERATED_MODEL_URL = '/model.json';
+// Relative to the app's base (Vite's `BASE_URL`, always slash-terminated), so
+// a static site served from a subpath fetches its own model instead of the
+// domain root's. `/` in dev and in a default build.
+const GENERATED_MODEL_URL = `${import.meta.env.BASE_URL}model.json`;
 
 export async function loadProject(): Promise<DomainProject> {
   const raw = await fetchGeneratedModel();
