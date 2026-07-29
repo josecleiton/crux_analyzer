@@ -22,6 +22,14 @@ pub(crate) struct EnumDecl {
     /// For each variant, the last-segment type names of its fields (used to
     /// follow nested event enums like `Event::Recording(RecordingEvent)`).
     pub variant_field_types: Vec<Vec<String>>,
+    /// The `#[default]` variant, when the enum derives `Default`.
+    pub default_variant: Option<String>,
+}
+
+/// A struct declaration: named fields as `(name, last-segment type)`.
+#[derive(Debug, Clone)]
+pub(crate) struct StructDecl {
+    pub fields: Vec<(String, String)>,
 }
 
 impl EnumDecl {
@@ -58,6 +66,8 @@ struct UseRename {
 pub(crate) struct CrateIndex<'a> {
     /// Every declaration known by a given name — declared idents plus aliases.
     pub enums: HashMap<String, Vec<EnumDecl>>,
+    /// Struct declarations by name (used to resolve `T::default()` resets).
+    pub structs: HashMap<String, StructDecl>,
     pub fns: Vec<FnInfo<'a>>,
     pub trait_impls: Vec<TraitImplInfo<'a>>,
 }
@@ -75,11 +85,6 @@ impl<'a> CrateIndex<'a> {
         self.enums.get(name).map_or(&[], Vec::as_slice)
     }
 
-    /// Whether any enum known by `name` declares `variant`.
-    pub fn any_enum_has_variant(&self, name: &str, variant: &str) -> bool {
-        self.enum_decls(name).iter().any(|d| d.has_variant(variant))
-    }
-
     /// The declaration for `name`, preferring one in `file` (same-file
     /// declarations shadow same-named enums from other modules).
     pub fn resolve_enum(&self, name: &str, file: &Path) -> Option<&EnumDecl> {
@@ -91,6 +96,7 @@ impl<'a> CrateIndex<'a> {
 pub(crate) fn build_index<'a>(sources: &'a [SourceFile]) -> CrateIndex<'a> {
     let mut index = CrateIndex {
         enums: HashMap::new(),
+        structs: HashMap::new(),
         fns: Vec::new(),
         trait_impls: Vec::new(),
     };
@@ -124,7 +130,32 @@ fn index_items<'a>(
                             .iter()
                             .map(|v| field_type_names(&v.fields))
                             .collect(),
+                        default_variant: item_enum
+                            .variants
+                            .iter()
+                            .find(|v| v.attrs.iter().any(|a| a.path().is_ident("default")))
+                            .map(|v| v.ident.to_string()),
                     });
+            }
+            syn::Item::Struct(item_struct) => {
+                index.structs.insert(
+                    item_struct.ident.to_string(),
+                    StructDecl {
+                        fields: item_struct
+                            .fields
+                            .iter()
+                            .filter_map(|field| {
+                                let name = field.ident.as_ref()?.to_string();
+                                let ty = if let syn::Type::Path(p) = &field.ty {
+                                    p.path.segments.last()?.ident.to_string()
+                                } else {
+                                    return None;
+                                };
+                                Some((name, ty))
+                            })
+                            .collect(),
+                    },
+                );
             }
             syn::Item::Use(item_use) => {
                 collect_renames(&item_use.tree, &mut Vec::new(), renames);

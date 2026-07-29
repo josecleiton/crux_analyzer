@@ -66,6 +66,11 @@ fn extracts_quipu_recording_state_machine() {
         ("PausedByInterruption", "StopTapped", "Stopping"),
         ("Resuming", "StopTapped", "Stopping"),
         ("FinishedAwaitingDecision", "DecisionDismissed", "PausedByUser"),
+        // settle(): CaptureSession::default() reset → #[default] Idle
+        ("FinishedAwaitingDecision", "FinalizeTapped", "Idle"),
+        ("FinishedAwaitingDecision", "SaveDraftTapped", "Idle"),
+        // settle() via confirmation flow: no state guard → wildcard source
+        ("*", "ConfirmationAccepted", "Idle"),
         // capture reports
         ("Starting", "RecordingStarted", "Recording"),
         ("Resuming", "RecordingResumed", "Recording"),
@@ -77,23 +82,35 @@ fn extracts_quipu_recording_state_machine() {
         ("PausedByInterruption", "RecordingFailed", "PausedByUser"),
         ("Resuming", "RecordingFailed", "PausedByUser"),
         ("Stopping", "RecordingFailed", "PausedByUser"),
+        // bury_dead_capture: guarded by the has_capture_in_flight() predicate
+        ("Recording", "CaptureDied", "FinishedAwaitingDecision"),
+        ("PausedByUser", "CaptureDied", "FinishedAwaitingDecision"),
+        ("PausedByInterruption", "CaptureDied", "FinishedAwaitingDecision"),
+        ("Resuming", "CaptureDied", "FinishedAwaitingDecision"),
+        ("Stopping", "CaptureDied", "FinishedAwaitingDecision"),
         // recovery + interruptions
         ("Idle", "RecoveredRecordings", "FinishedAwaitingDecision"),
         ("Recording", "InterruptionBegan", "PausedByInterruption"),
         ("PausedByInterruption", "InterruptionEnded", "Resuming"),
+        // drafts
+        ("Idle", "DraftResumeRequested", "PausedByUser"),
     ];
     for triple in &expected {
         assert!(triples.contains(triple), "missing transition {triple:?} in {triples:#?}");
     }
+    assert_eq!(triples.len(), expected.len(), "unexpected extras: {triples:#?}");
 
-    // `bury_dead_capture` (CaptureDied) is guarded by a predicate method and
-    // must surface as a dropped-transition warning, not silence.
+    // A second region exists in the corpus: the insight pipeline status.
     assert!(
-        outcome
-            .warnings
-            .iter()
-            .any(|w| w.message.contains("could not infer the source state")),
-        "expected a predicate-guard warning, got: {:#?}",
+        core.machines.iter().any(|m| m.name == "InsightStatus"),
+        "expected the InsightStatus machine, got: {:?}",
+        core.machines.iter().map(|m| &m.name).collect::<Vec<_>>()
+    );
+
+    // Everything in the capture flow is now statically resolvable.
+    assert!(
+        outcome.warnings.is_empty(),
+        "expected no warnings, got: {:#?}",
         outcome.warnings
     );
 }

@@ -1,16 +1,17 @@
 //! State machine detection by assignment analysis.
 //!
-//! An enum `E` and a field name `f` form a state machine when the crate both
-//! assigns `*.f = E::Variant` somewhere and matches `*.f` against `E`
-//! patterns (via `match` or `matches!`). Requiring both signals keeps
-//! ViewModel mirror enums (assigned nowhere) and plain data enums (matched
-//! nowhere as a field) out.
+//! An enum `E` and a field name `f` form a state machine when the crate
+//! assigns that field somewhere — directly (`*.f = E::Variant`) or through a
+//! struct reset (`*.x = T::default()` where `T` has a field `f: E`).
+//! Assignment is the discriminating signal: ViewModel mirror enums are only
+//! ever *constructed* into view structs, never assigned to a model field, so
+//! they stay out without needing a match-usage requirement.
 
 use std::collections::BTreeSet;
 
 use syn::visit::Visit;
 
-use crate::ast_util::{as_matches_macro, enum_variant_of_expr, last_field_name, pattern_variants};
+use crate::ast_util::enum_variant_of_expr;
 use crate::index::CrateIndex;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,7 +26,6 @@ pub(crate) fn find_state_machines(index: &CrateIndex) -> Vec<StateMachine> {
     let mut collector = Collector {
         index,
         assigned: BTreeSet::new(),
-        matched: BTreeSet::new(),
     };
     for fn_info in &index.fns {
         collector.visit_block(fn_info.block);
@@ -33,69 +33,71 @@ pub(crate) fn find_state_machines(index: &CrateIndex) -> Vec<StateMachine> {
 
     collector
         .assigned
-        .intersection(&collector.matched)
+        .into_iter()
         .map(|(enum_name, field_name)| StateMachine {
-            enum_name: enum_name.clone(),
-            field_name: field_name.clone(),
-            // With colliding names, prefer the declaration with most variants
-            // (states enums are matched exhaustively somewhere by definition).
             variants: index
-                .enum_decls(enum_name)
+                .enum_decls(&enum_name)
                 .iter()
+                // With colliding names, prefer the declaration with most
+                // variants (state enums are the ones driven exhaustively).
                 .max_by_key(|decl| decl.variants.len())
                 .map(|decl| decl.variants.clone())
                 .unwrap_or_default(),
+            enum_name,
+            field_name,
         })
         .collect()
 }
 
 struct Collector<'a> {
     index: &'a CrateIndex<'a>,
-    /// (enum, field) pairs seen as `*.field = Enum::Variant`.
+    /// (enum, field) pairs with assignment evidence.
     assigned: BTreeSet<(String, String)>,
-    /// (enum, field) pairs seen as `match *.field { Enum::V.. }` or
-    /// `matches!(*.field, Enum::V..)`.
-    matched: BTreeSet<(String, String)>,
-}
-
-impl<'a> Collector<'a> {
-    fn record_match(&mut self, scrutinee: &syn::Expr, pat: &syn::Pat) {
-        let Some(field) = last_field_name(scrutinee) else {
-            return;
-        };
-        let mut variants = Vec::new();
-        pattern_variants(pat, &mut variants);
-        for (enum_name, variant) in variants {
-            if self.index.any_enum_has_variant(&enum_name, &variant) {
-                self.matched.insert((enum_name, field.clone()));
-            }
-        }
-    }
 }
 
 impl<'a, 'ast> Visit<'ast> for Collector<'a> {
     fn visit_expr_assign(&mut self, assign: &'ast syn::ExprAssign) {
-        if let Some(field) = last_field_name(&assign.left) {
+        // Direct: `*.field = Enum::Variant`.
+        if let Some(field) = crate::ast_util::last_field_name(&assign.left) {
             if let Some((enum_name, variant)) = enum_variant_of_expr(&assign.right) {
-                if self.index.any_enum_has_variant(&enum_name, &variant) {
+                if self
+                    .index
+                    .enum_decls(&enum_name)
+                    .iter()
+                    .any(|decl| decl.has_variant(&variant))
+                {
                     self.assigned.insert((enum_name, field));
                 }
             }
         }
+
+        // Reset: `*.x = T::default()` assigns every enum-typed field of `T`.
+        if let Some(type_name) = default_call_type(&assign.right) {
+            if let Some(strct) = self.index.structs.get(&type_name) {
+                for (field_name, field_type) in &strct.fields {
+                    if !self.index.enum_decls(field_type).is_empty() {
+                        self.assigned.insert((field_type.clone(), field_name.clone()));
+                    }
+                }
+            }
+        }
+
         syn::visit::visit_expr_assign(self, assign);
     }
+}
 
-    fn visit_expr_match(&mut self, expr_match: &'ast syn::ExprMatch) {
-        for arm in &expr_match.arms {
-            self.record_match(&expr_match.expr, &arm.pat);
-        }
-        syn::visit::visit_expr_match(self, expr_match);
-    }
-
-    fn visit_macro(&mut self, mac: &'ast syn::Macro) {
-        if let Some(args) = as_matches_macro(mac) {
-            self.record_match(&args.expr, &args.pat);
-        }
-        syn::visit::visit_macro(self, mac);
+/// `T::default()` → `T`.
+fn default_call_type(expr: &syn::Expr) -> Option<String> {
+    let syn::Expr::Call(call) = expr else { return None };
+    let syn::Expr::Path(path) = &*call.func else { return None };
+    let segments: Vec<String> = path
+        .path
+        .segments
+        .iter()
+        .map(|s| s.ident.to_string())
+        .collect();
+    match segments.as_slice() {
+        [.., type_name, method] if method == "default" => Some(type_name.clone()),
+        _ => None,
     }
 }
