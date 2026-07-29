@@ -1,0 +1,38 @@
+{
+  "project": "Audio Recorder",
+  "cores": [
+    {
+      "name": "Recorder",
+      "states": ["Idle", "Recording", "Paused", "Uploading", "Completed"],
+      "transitions": [
+        { "from": "Idle", "event": "RecordPressed", "to": "Recording" },
+        { "from": "Recording", "event": "PausePressed", "to": "Paused" },
+        { "from": "Paused", "event": "ResumePressed", "to": "Recording" },
+        { "from": "Recording", "event": "StopPressed", "to": "Uploading" },
+        { "from": "Uploading", "event": "UploadFinished", "to": "Completed" }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "states": ["SignedOut", "Authenticating", "SignedIn", "Failed"],
+      "transitions": [
+        { "from": "SignedOut", "event": "LoginPressed", "to": "Authenticating" },
+        { "from": "Authenticating", "event": "AuthSucceeded", "to": "SignedIn" },
+        { "from": "Authenticating", "event": "AuthFailed", "to": "Failed" },
+        { "from": "Failed", "event": "RetryPressed", "to": "Authenticating" },
+        { "from": "SignedIn", "event": "LogoutPressed", "to": "SignedOut" }
+      ]
+    },
+    {
+      "name": "Sync",
+      "states": ["Idle", "Syncing", "Conflict", "Done"],
+      "transitions": [
+        { "from": "Idle", "event": "SyncRequested", "to": "Syncing" },
+        { "from": "Syncing", "event": "ConflictDetected", "to": "Conflict" },
+        { "from": "Conflict", "event": "ConflictResolved", "to": "Syncing" },
+        { "from": "Syncing", "event": "SyncFinished", "to": "Done" },
+        { "from": "Done", "event": "SyncRequested", "to": "Syncing" }
+      ]
+    }
+  ]
+}

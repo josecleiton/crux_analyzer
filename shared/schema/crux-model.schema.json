@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crux-analyzer.dev/schemas/crux-model.schema.json",
+  "title": "CruxModel",
+  "description": "Contract of the semantic model emitted by the parser. The UI and every other client depend only on this contract.",
+  "type": "object",
+  "required": ["project", "cores"],
+  "additionalProperties": false,
+  "properties": {
+    "project": {
+      "type": "string",
+      "description": "Name of the analyzed project."
+    },
+    "cores": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/core" }
+    }
+  },
+  "$defs": {
+    "core": {
+      "type": "object",
+      "required": ["name", "states", "transitions"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the Core (Crux app)."
+        },
+        "states": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "States of the Core."
+        },
+        "transitions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/transition" }
+        }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "required": ["from", "event", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "from": { "type": "string", "description": "Source state." },
+        "event": { "type": "string", "description": "Event that triggers the transition." },
+        "to": { "type": "string", "description": "Target state." }
+      }
+    }
+  }
+}
