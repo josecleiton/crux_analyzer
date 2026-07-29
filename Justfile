@@ -57,16 +57,21 @@ model-watch src name:
     cargo run -q -p crux-analyzer-cli -- generate --src {{src}} --name {{name}} \
       --out apps/web/public/model.json --watch
 
-# Generate docs: just docs path/to/app/src MyApp [markdown|mermaid]
-docs src name format="markdown":
-    cargo run -q -p crux-analyzer-cli -- docs --src {{src}} --name {{name}} --format {{format}}
+# Generate docs: just docs path/to/app/src MyApp [markdown|mermaid] [en|pt-BR]
+docs src name format="markdown" locale="en":
+    cargo run -q -p crux-analyzer-cli -- docs --src {{src}} --name {{name}} \
+      --format {{format}} --locale {{locale}}
 
 # Analyze the private corpus into the web UI (CORPUS_SRC to override the path)
 corpus:
     just model {{corpus_src}} Corpus
 
-# Regenerate the committed example docs from the test fixture
-example-docs:
+# Regenerate the committed example docs, every locale
+example-docs: (example-docs-locale "en" "docs/examples/mini-recorder.md") (example-docs-locale "pt-BR" "docs/pt-BR/examples/mini-recorder.md")
+
+# One locale of the committed example docs (see `example-docs`)
+[private]
+example-docs-locale locale out:
     cargo run -q -p crux-analyzer-cli -- docs \
       --src crates/parser/fixtures/mini_recorder --name "Mini Recorder" \
-      --out docs/examples/mini-recorder.md
+      --locale {{locale}} --out {{out}}

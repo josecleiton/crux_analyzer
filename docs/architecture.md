@@ -1,5 +1,7 @@
 # Architecture
 
+> 🌐 **English** · [Português (Brasil)](pt-BR/architecture.md)
+
 ## Monorepo layout
 
 ```
@@ -10,6 +12,7 @@ crux_analyzer/
     parser/       Rust lib: walks the syn AST, extracts Cores/machines/transitions/effects
     docgen/       Rust lib: Mermaid + Markdown generators
     cli/          `crux-analyzer` binary: generate | docs, both with --watch
+    i18n/         Rust lib: the shared `Locale` type + detection — no messages
     model/        Rust lib: semantic structs only — no parsing, no UI logic
   shared/
     schema/       JSON Schema contract — every client depends ONLY on this
@@ -59,6 +62,13 @@ These are the non-negotiable constraints the codebase is built around
 5. **Honesty rule (parser)** — whatever cannot be inferred statically is
    surfaced as a `Warning`, never silently dropped and never guessed. See
    [parser.md](parser.md#warnings-reference).
+6. **Localization is a presentation concern** — `crates/model`, the parser's
+   extraction, and the web app's `domain/` / `flow/` / `layout/` layers hold no
+   translated text. Diagnostics travel as data (`WarningKind`) and generators
+   take a locale; translated chrome is injected at the boundary (component
+   props, `Labels`, `FlowLabels`). The model JSON stays locale-independent, and
+   identifiers from the analyzed app are never translated.
+   See [i18n.md](i18n.md).
 
 ## Web app layering
 
@@ -95,7 +105,14 @@ flowchart TD
     parser --> model[crates/model]
     docgen --> model
     cli --> model
+    parser --> i18n[crates/i18n]
+    docgen --> i18n
+    cli --> i18n
 ```
 
 `crates/model` sits at the bottom and contains only serde structs matching
 the schema; a round-trip test against the bundled example keeps them aligned.
+
+`crates/i18n` sits beside it and holds only the `Locale` type — every crate
+keeps the catalog for its *own* strings, so the graph stays a fan-in with no
+crate depending on another's message set.

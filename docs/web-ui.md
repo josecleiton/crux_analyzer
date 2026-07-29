@@ -1,5 +1,7 @@
 # Web UI
 
+> 🌐 **English** · [Português (Brasil)](pt-BR/web-ui.md)
+
 `apps/web` — React + TypeScript + React Flow + ELKJS. Start it with
 `just dev` (or `pnpm --filter web dev`).
 
@@ -86,6 +88,31 @@ property defined per theme in `src/index.css`, so adding a theme is one
 flash), and with no explicit choice the app follows the OS preference live.
 SVG-only colors (edge arrowheads) are read back from the same tokens
 (`src/theme/theme.ts`), keeping CSS the single source of truth.
+
+## Localization
+
+The toolbar's language toggle switches between English and Portuguese
+(`en` / `pt-BR`); it shows the short code of the locale it will switch *to*.
+The module (`src/i18n/`) mirrors the theme deliberately: the active locale is
+the `data-locale` attribute on `<html>` (with `lang` set alongside it for
+assistive technology), the choice persists in `localStorage`, a pre-paint script
+in `index.html` applies it before first render, and with no explicit choice the
+app follows `navigator.languages` — any Portuguese resolves to `pt-BR`.
+
+Two differences from theming are worth knowing:
+
+- translations reach components through **context** (`I18nProvider` in
+  `main.tsx`), not props — every panel needs `t`, while only two components
+  need the theme;
+- switching locale **re-runs layout**. Node widths are estimated from the
+  label text, so the translated `any state` / `qualquer estado` pseudo-node
+  changes geometry; `toFlowModel` receives the label as a `FlowLabels`
+  parameter rather than importing the catalog, keeping the mapping layers
+  language-free.
+
+State, event, effect, machine and core names are never translated — they are
+identifiers from the analyzed app. The monospace/sans-serif split in
+`index.css` mirrors that distinction. See [i18n.md](i18n.md).
 
 ## Layout
 
