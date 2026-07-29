@@ -212,6 +212,45 @@ body {
 
 /* Tag filter: it reads while the buttons act, so it lives on the left with
    the title — wide enough that its label is never clipped. */
+.toolbar-filter-wrap {
+  position: relative;
+}
+
+/* The filter's own suggestion list (no native datalist — see Toolbar.tsx). */
+.tag-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
+}
+
+.tag-suggestions button {
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  /* tag names are data from the analyzed app */
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.tag-suggestions button:hover {
+  background: var(--bg-hover);
+}
+
 .toolbar input.toolbar-filter {
   width: 220px;
   padding: 4px 10px;
