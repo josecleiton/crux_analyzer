@@ -15,12 +15,14 @@
 //! emitted with the wildcard source `"*"`. Only assignments whose evidence
 //! exists but cannot be resolved statically are dropped with a [`Warning`].
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use syn::spanned::Spanned;
 
 use crate::ast_util::{
-    as_matches_macro, enum_variant_of_expr, is_catch_all, last_field_name, pattern_variants,
+    as_matches_macro, enum_variant_of_expr, enum_variant_path, is_catch_all, last_field_name,
+    pattern_variants,
 };
 use crate::core_finder::CoreInfo;
 use crate::index::CrateIndex;
@@ -40,6 +42,8 @@ pub(crate) struct RawTransition {
     pub from: String,
     pub event: String,
     pub to: String,
+    /// Effects requested by the event arm this transition came from.
+    pub effects: Vec<String>,
 }
 
 /// What a condition says about a machine's current state.
@@ -61,6 +65,9 @@ struct Ctx<'a> {
     conditions: Vec<&'a syn::Expr>,
     /// Facts from `match`-on-state arms: (machine enum, possible states).
     facts: Vec<(String, Vec<String>)>,
+    /// The event arm this code belongs to — transitions and effects found
+    /// under the same arm are associated with each other.
+    arm: usize,
 }
 
 pub(crate) fn extract(
@@ -84,6 +91,8 @@ pub(crate) fn extract(
         machines,
         warnings,
         out: Vec::new(),
+        effects_by_arm: HashMap::new(),
+        arm_counter: 0,
         call_stack: vec![(Some(core.name.clone()), "update".to_string())],
     };
     walker.walk_block(
@@ -92,11 +101,21 @@ pub(crate) fn extract(
             events: None,
             conditions: Vec::new(),
             facts: Vec::new(),
+            arm: 0,
         },
         update.self_ty.clone(),
         update.file,
     );
-    walker.out
+
+    // Attach the effects observed under each event arm to its transitions.
+    let effects_by_arm = walker.effects_by_arm;
+    let mut out = walker.out;
+    for (transition, arm) in &mut out {
+        if let Some(effects) = effects_by_arm.get(arm) {
+            transition.effects = effects.clone();
+        }
+    }
+    out.into_iter().map(|(transition, _)| transition).collect()
 }
 
 struct Walker<'w, 'a> {
@@ -104,7 +123,10 @@ struct Walker<'w, 'a> {
     core: &'w CoreInfo,
     machines: &'w [StateMachine],
     warnings: &'w mut Vec<Warning>,
-    out: Vec<RawTransition>,
+    out: Vec<(RawTransition, usize)>,
+    /// Effect labels observed under each event arm.
+    effects_by_arm: HashMap<usize, Vec<String>>,
+    arm_counter: usize,
     /// Functions currently being walked — breaks recursion cycles while still
     /// allowing the same helper to be re-walked under a different context.
     call_stack: Vec<(Option<String>, String)>,
@@ -143,14 +165,22 @@ impl<'w, 'a> Walker<'w, 'a> {
         self_ty: Option<String>,
         file: &Path,
     ) {
+        // let-else statements narrow the context for the REST of the block:
+        // `let Some(d) = list.find(|d| d.state == State::X) else { return }`
+        // guarantees the closure's constraints below it.
+        let mut running_ctx = ctx.clone();
+
         for stmt in &block.stmts {
             match stmt {
-                syn::Stmt::Expr(expr, _) => self.walk_expr(expr, ctx, &self_ty, file),
+                syn::Stmt::Expr(expr, _) => self.walk_expr(expr, &running_ctx, &self_ty, file),
                 syn::Stmt::Local(local) => {
                     if let Some(init) = &local.init {
-                        self.walk_expr(&init.expr, ctx, &self_ty, file);
+                        self.walk_expr(&init.expr, &running_ctx, &self_ty, file);
                         if let Some((_, else_branch)) = &init.diverge {
-                            self.walk_expr(else_branch, ctx, &self_ty, file);
+                            self.walk_expr(else_branch, &running_ctx, &self_ty, file);
+                            for closure_body in closure_bodies(&init.expr) {
+                                running_ctx.conditions.push(closure_body);
+                            }
                         }
                     }
                 }
@@ -183,6 +213,10 @@ impl<'w, 'a> Walker<'w, 'a> {
                 }
             }
             syn::Expr::Call(call) => {
+                // `AudioOperation::Start(..)` — a tuple-variant effect.
+                if let syn::Expr::Path(path) = &*call.func {
+                    self.record_effect_path(&path.path, ctx);
+                }
                 for arg in &call.args {
                     self.walk_expr(arg, ctx, self_ty, file);
                 }
@@ -226,7 +260,11 @@ impl<'w, 'a> Walker<'w, 'a> {
             syn::Expr::Try(try_expr) => self.walk_expr(&try_expr.expr, ctx, self_ty, file),
             syn::Expr::Await(await_expr) => self.walk_expr(&await_expr.base, ctx, self_ty, file),
             syn::Expr::Field(field) => self.walk_expr(&field.base, ctx, self_ty, file),
+            // `AudioOperation::Pause` — a unit-variant effect.
+            syn::Expr::Path(path) => self.record_effect_path(&path.path, ctx),
             syn::Expr::Struct(strct) => {
+                // `SomeOperation::Variant { .. }` — a struct-variant effect.
+                self.record_effect_path(&strct.path, ctx);
                 for field in &strct.fields {
                     self.walk_expr(&field.expr, ctx, self_ty, file);
                 }
@@ -236,6 +274,8 @@ impl<'w, 'a> Walker<'w, 'a> {
                     self.walk_expr(element, ctx, self_ty, file);
                 }
             }
+            // Iterator closures can mutate state (`for_each(|d| d.state = ..)`).
+            syn::Expr::Closure(closure) => self.walk_expr(&closure.body, ctx, self_ty, file),
             _ => {}
         }
     }
@@ -263,7 +303,11 @@ impl<'w, 'a> Walker<'w, 'a> {
             return; // recursion cycle
         }
         let Some(callee) = self.index.find_fn(callee_self.as_deref(), &callee_name) else {
-            return; // external function (e.g. crux_core::render)
+            // External function: `render()` is crux_core's render effect.
+            if callee_self.is_none() && callee_name == "render" {
+                self.record_effect(ctx, "Render".to_string());
+            }
+            return;
         };
 
         self.call_stack.push(key);
@@ -388,11 +432,34 @@ impl<'w, 'a> Walker<'w, 'a> {
 
             let mut arm_ctx = ctx.clone();
             arm_ctx.events = events;
+            // Each event arm gets its own effect scope.
+            self.arm_counter += 1;
+            arm_ctx.arm = self.arm_counter;
             if let Some((_, guard)) = &arm.guard {
                 arm_ctx.conditions.push(guard);
                 self.walk_expr(guard, ctx, self_ty, file);
             }
             self.walk_expr(&arm.body, &arm_ctx, self_ty, file);
+        }
+    }
+
+    // ---- effect collection ----------------------------------------------
+
+    /// Records `Enum::Variant` as an effect when `Enum` belongs to the core's
+    /// effect closure.
+    fn record_effect_path(&mut self, path: &syn::Path, ctx: &Ctx<'a>) {
+        let Some((enum_name, variant)) = enum_variant_path(path) else {
+            return;
+        };
+        if self.core.is_effect_enum(&enum_name) {
+            self.record_effect(ctx, format!("{enum_name}::{variant}"));
+        }
+    }
+
+    fn record_effect(&mut self, ctx: &Ctx<'a>, label: String) {
+        let effects = self.effects_by_arm.entry(ctx.arm).or_default();
+        if !effects.contains(&label) {
+            effects.push(label);
         }
     }
 
@@ -500,8 +567,35 @@ impl<'w, 'a> Walker<'w, 'a> {
                     self.eval_condition(&binary.left, machine, self_fields, depth),
                     self.eval_condition(&binary.right, machine, self_fields, depth),
                 ),
+                // `state == State::X` and `state != State::X` comparisons.
+                syn::BinOp::Eq(_) | syn::BinOp::Ne(_) => {
+                    let Some(variant) =
+                        self.comparison_variant(&binary.left, &binary.right, machine, self_fields)
+                    else {
+                        return GuardEval::NoConstraint;
+                    };
+                    if matches!(binary.op, syn::BinOp::Eq(_)) {
+                        GuardEval::Known(vec![variant])
+                    } else {
+                        GuardEval::Known(
+                            machine
+                                .variants
+                                .iter()
+                                .filter(|v| **v != variant)
+                                .cloned()
+                                .collect(),
+                        )
+                    }
+                }
                 _ => GuardEval::NoConstraint,
             },
+            // Constraints inside `if let Some(x) = list.find(|d| ...)`: the
+            // closures' bodies hold for the bound element in the then-branch.
+            syn::Expr::Let(let_expr) => closure_bodies(&let_expr.expr)
+                .into_iter()
+                .fold(GuardEval::NoConstraint, |acc, body| {
+                    and(acc, self.eval_condition(body, machine, self_fields, depth))
+                }),
             syn::Expr::Unary(unary) if matches!(unary.op, syn::UnOp::Not(_)) => {
                 match self.eval_condition(&unary.expr, machine, self_fields, depth) {
                     GuardEval::Known(states) => GuardEval::Known(
@@ -521,7 +615,45 @@ impl<'w, 'a> Walker<'w, 'a> {
             syn::Expr::Group(group) => {
                 self.eval_condition(&group.expr, machine, self_fields, depth)
             }
+            // A block condition (e.g. a closure body) is its trailing expression.
+            syn::Expr::Block(block) => match block.block.stmts.last() {
+                Some(syn::Stmt::Expr(trailing, None)) => {
+                    self.eval_condition(trailing, machine, self_fields, depth)
+                }
+                _ => GuardEval::NoConstraint,
+            },
             _ => GuardEval::NoConstraint,
+        }
+    }
+
+    /// `state == State::X` (either side order) → the variant, when the other
+    /// side is the machine's state field.
+    fn comparison_variant(
+        &self,
+        left: &syn::Expr,
+        right: &syn::Expr,
+        machine: &StateMachine,
+        self_fields: &[&str],
+    ) -> Option<String> {
+        let is_state_field = |expr: &syn::Expr| {
+            last_field_name(expr).is_some_and(|field| {
+                field == machine.field_name || self_fields.contains(&field.as_str())
+            })
+        };
+        let variant_of = |expr: &syn::Expr| {
+            enum_variant_of_expr(expr).and_then(|(enum_name, variant)| {
+                ((enum_name == machine.enum_name || enum_name == "Self")
+                    && machine.variants.contains(&variant))
+                .then_some(variant)
+            })
+        };
+
+        if is_state_field(left) {
+            variant_of(right)
+        } else if is_state_field(right) {
+            variant_of(left)
+        } else {
+            None
         }
     }
 
@@ -557,6 +689,21 @@ impl<'w, 'a> Walker<'w, 'a> {
                         self.emit(&machine, to, ctx, assign, file);
                         return;
                     }
+                }
+                // The state field is written from a runtime value (an event
+                // payload, another field): the target cannot be known
+                // statically. Surface it instead of staying silent.
+                if self.default_reset_targets(&assign.right).is_none() {
+                    self.warnings.push(Warning {
+                        file: file.to_path_buf(),
+                        line: assign.span().start().line,
+                        message: format!(
+                            "transition of `{}` dropped: target state is dynamic \
+                             (assigned from a runtime value)",
+                            machine.enum_name
+                        ),
+                    });
+                    return;
                 }
             }
         }
@@ -634,13 +781,13 @@ impl<'w, 'a> Walker<'w, 'a> {
             GuardEval::NoConstraint => {
                 // No state evidence: the transition fires from any state.
                 for event in events {
-                    self.push(machine, ANY_STATE.to_string(), event.clone(), to.clone());
+                    self.push(machine, ANY_STATE.to_string(), event.clone(), to.clone(), ctx.arm);
                 }
             }
             GuardEval::Known(from_states) => {
                 for event in events {
                     for from in &from_states {
-                        self.push(machine, from.clone(), event.clone(), to.clone());
+                        self.push(machine, from.clone(), event.clone(), to.clone(), ctx.arm);
                     }
                 }
             }
@@ -657,14 +804,36 @@ impl<'w, 'a> Walker<'w, 'a> {
         }
     }
 
-    fn push(&mut self, machine: &StateMachine, from: String, event: String, to: String) {
-        self.out.push(RawTransition {
-            machine: machine.enum_name.clone(),
-            from,
-            event,
-            to,
-        });
+    fn push(&mut self, machine: &StateMachine, from: String, event: String, to: String, arm: usize) {
+        self.out.push((
+            RawTransition {
+                machine: machine.enum_name.clone(),
+                from,
+                event,
+                to,
+                effects: Vec::new(),
+            },
+            arm,
+        ));
     }
+}
+
+/// All closure bodies found inside an expression (e.g. the predicate of a
+/// `list.iter_mut().find(|d| ...)` chain), without entering nested closures'
+/// own subtrees twice.
+fn closure_bodies(expr: &syn::Expr) -> Vec<&syn::Expr> {
+    struct Closures<'ast> {
+        found: Vec<&'ast syn::Expr>,
+    }
+    impl<'ast> syn::visit::Visit<'ast> for Closures<'ast> {
+        fn visit_expr_closure(&mut self, closure: &'ast syn::ExprClosure) {
+            self.found.push(&closure.body);
+            syn::visit::visit_expr_closure(self, closure);
+        }
+    }
+    let mut visitor = Closures { found: Vec::new() };
+    syn::visit::Visit::visit_expr(&mut visitor, expr);
+    visitor.found
 }
 
 /// Conjunction of two evaluations: constraints intersect; concrete knowledge

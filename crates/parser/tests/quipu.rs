@@ -100,17 +100,41 @@ fn extracts_quipu_recording_state_machine() {
     }
     assert_eq!(triples.len(), expected.len(), "unexpected extras: {triples:#?}");
 
-    // A second region exists in the corpus: the insight pipeline status.
-    assert!(
-        core.machines.iter().any(|m| m.name == "InsightStatus"),
-        "expected the InsightStatus machine, got: {:?}",
-        core.machines.iter().map(|m| &m.name).collect::<Vec<_>>()
+    // Effects: transitions carry the operations their arm requests.
+    let start = machine
+        .transitions
+        .iter()
+        .find(|t| t.event.0 == "StartTapped")
+        .unwrap();
+    assert_eq!(
+        start.effects.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(),
+        ["Render", "AudioOperation::Start"]
     );
 
-    // Everything in the capture flow is now statically resolvable.
+    // A second region exists in the corpus: the insight pipeline status.
+    // Its one statically-resolvable transition is guarded by an `==`
+    // comparison inside a `let-else` find closure.
+    let insights = core
+        .machines
+        .iter()
+        .find(|m| m.name == "InsightStatus")
+        .expect("InsightStatus machine not found");
+    let insight_triples: Vec<(&str, &str, &str)> = insights
+        .transitions
+        .iter()
+        .map(|t| (t.from.0.as_str(), t.event.0.as_str(), t.to.0.as_str()))
+        .collect();
+    assert_eq!(insight_triples, [("Pending", "DraftInsightsRequested", "Summarizing")]);
+
+    // The capture flow is fully resolvable; the only remaining warnings are
+    // the two InsightStatus writes whose target comes from a runtime value.
+    assert_eq!(outcome.warnings.len(), 2, "warnings: {:#?}", outcome.warnings);
     assert!(
-        outcome.warnings.is_empty(),
-        "expected no warnings, got: {:#?}",
+        outcome
+            .warnings
+            .iter()
+            .all(|w| w.message.contains("target state is dynamic")),
+        "unexpected warning kind: {:#?}",
         outcome.warnings
     );
 }
