@@ -26,7 +26,7 @@ Roles are painted on the canvas at all times, simulation or not
 - **initial** (blue, filled dot before the label) — the machine's entry
   point: a state nothing transitions into. In a fully cyclic machine the
   first state carries the role, which is where the simulation starts.
-- **final** (amber, double border) — a dead end: no outgoing transition of
+- **final** (violet, double border) — a dead end: no outgoing transition of
   its own. A machine-wide wildcard (`from: "*"`) may still leave it; that
   escape stays visible as an edge from the **any state** node.
 - **failure** (red) — a naming heuristic, the only guess of the three: the
@@ -53,8 +53,12 @@ Select a state (optional) and hit **Simulate**:
   can fire from it (wildcard-sourced ones are always available;
   runtime-target `to: "*"` transitions are excluded from replay), and the
   trail of what already fired;
-- the canvas highlights the current state and the last transition taken in
-  green, and animates the step: the transition's stroke flows as dashes with a
+- the canvas reads as a path, in three tiers of emphasis: everything already
+  **traveled** is bold green (states and transitions, starting state
+  included), what can **fire from here** keeps a green outline, and everything
+  else fades back — including the other machines' sections;
+- the current state and the last transition taken are the strongest of all,
+  and the step is animated: the transition's stroke flows as dashes with a
   pulse traveling along its route, the state that was just entered pops and
   then breathes, and the new trail entry slides in;
 - landing on a **failure** state turns that whole highlight red (edge, label,
@@ -65,7 +69,9 @@ Select a state (optional) and hit **Simulate**:
 Every animation is skipped under `prefers-reduced-motion`.
 
 The engine (`src/simulation/engine.ts`) is pure domain logic; it drives the
-Graph exclusively through highlight props.
+Graph exclusively through highlight props — `traveledPath` and
+`availableTransitions` are the facts, the Graph only maps them to emphasis
+tiers.
 
 ## Theming
 

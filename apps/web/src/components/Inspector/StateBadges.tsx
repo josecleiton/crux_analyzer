@@ -1,6 +1,6 @@
 /**
  * A state's name and role badges, mirroring the graph colors: blue for the
- * initial state, red for failures, amber for finals (domain/stateRole.ts).
+ * initial state, red for failures, violet for finals (domain/stateRole.ts).
  */
 
 import type { StateRole } from '../../domain/stateRole';

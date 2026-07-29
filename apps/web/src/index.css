@@ -49,9 +49,9 @@
   --state-failure-bg: #fef2f2;
   --state-failure-ring: rgba(239, 68, 68, 0.22);
 
-  --state-final: #d97706;
-  --state-final-text: #b45309;
-  --state-final-bg: #fffbeb;
+  --state-final: #7c3aed;
+  --state-final-text: #6d28d9;
+  --state-final-bg: #f5f3ff;
 
   --state-initial: #0284c7;
   --state-initial-text: #0369a1;
@@ -100,9 +100,9 @@
   --state-failure-bg: #2b1719;
   --state-failure-ring: rgba(248, 113, 113, 0.26);
 
-  --state-final: #fbbf24;
-  --state-final-text: #fcd34d;
-  --state-final-bg: #2a2113;
+  --state-final: #a78bfa;
+  --state-final-text: #c4b5fd;
+  --state-final-bg: #241f3a;
 
   --state-initial: #38bdf8;
   --state-initial-text: #7dd3fc;
@@ -513,6 +513,58 @@ body {
     inset 0 0 0 2px var(--state-failure-bg),
     inset 0 0 0 3.5px var(--state-failure),
     var(--node-shadow);
+}
+
+/* --- Graph: simulation emphasis tiers ----------------------------------- */
+
+/* Everything the replay cannot reach from here fades back... */
+.react-flow__node.dimmed,
+.react-flow__edge.dimmed {
+  opacity: 0.22;
+}
+
+/* ...what can fire from the current state stays fully readable... */
+.react-flow__node.available .state-node {
+  border-color: var(--sim);
+}
+
+.react-flow__edge.available .routed-edge {
+  stroke: var(--sim);
+  stroke-opacity: 0.6;
+}
+
+.react-flow__edge.available .edge-label-box {
+  stroke: var(--sim);
+}
+
+/* ...and the traveled path is the boldest thing on the canvas. */
+.react-flow__node.visited .state-node {
+  border-color: var(--sim);
+  background: var(--sim-soft);
+  color: var(--sim-text);
+  font-weight: 700;
+}
+
+.react-flow__edge.visited .routed-edge {
+  stroke: var(--edge-stroke-highlighted);
+  stroke-width: 2.5;
+}
+
+.react-flow__edge.visited .edge-label-box {
+  stroke: var(--sim);
+  fill: var(--sim-soft);
+}
+
+.react-flow__edge.visited .edge-label-text {
+  fill: var(--sim-text);
+  font-weight: 700;
+}
+
+/* the "any state" pseudo-node takes part too when a wildcard can fire */
+.react-flow__node.available .any-state-node,
+.react-flow__node.visited .any-state-node {
+  border-color: var(--sim);
+  color: var(--sim-text);
 }
 
 /* --- Graph: simulation highlight + animations --------------------------- */
