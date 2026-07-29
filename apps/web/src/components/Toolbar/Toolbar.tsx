@@ -64,12 +64,29 @@ export function Toolbar({
             </datalist>
           </>
         ) : null}
+        {/* The warning triangle says what this toggle is about — the states
+            a reader should not trust yet; the title explains it on hover. */}
         <button
-          className={undocumentedOnly ? 'active' : ''}
+          className={`undocumented-toggle${undocumentedOnly ? ' active' : ''}`}
           onClick={onToggleUndocumented}
           title={t('toolbar.undocumentedHint')}
+          aria-label={t('toolbar.undocumentedHint')}
           disabled={simulating}
         >
+          <svg
+            className="undocumented-toggle-icon"
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M8 2.2 14.6 13.4H1.4L8 2.2Z" />
+            <line x1="8" y1="6.8" x2="8" y2="9.8" />
+            <circle cx="8" cy="11.9" r="0.4" fill="currentColor" stroke="none" />
+          </svg>
           {t('toolbar.undocumented')}
         </button>
         <button className={simulating ? 'active' : ''} onClick={onToggleSimulation}>

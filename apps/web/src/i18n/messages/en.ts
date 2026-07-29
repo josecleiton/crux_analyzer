@@ -19,7 +19,8 @@ export const en = {
   // only this chrome around them is localized.
   'toolbar.filterByTag': 'Filter by tag',
   'toolbar.undocumented': 'Undocumented',
-  'toolbar.undocumentedHint': 'Highlight states without documentation',
+  'toolbar.undocumentedHint':
+    'Highlight states without documentation — the ones with no /// description in the analyzed source',
 
   // Two complete sentences rather than one template: the interpolated word
   // would need adjective agreement in some locales.
