@@ -115,7 +115,7 @@ jobs:
           REPO_NAME: ${{ github.event.repository.name }}
         run: just site crates/parser/fixtures/mini_recorder "Mini Recorder" "/$REPO_NAME/"
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: apps/web/dist
 
