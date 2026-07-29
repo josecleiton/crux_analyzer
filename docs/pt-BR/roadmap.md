@@ -98,29 +98,31 @@ fino.
 
 ---
 
-## 4. Lacunas menores que valem correção
+## 4. Lacunas menores que valem correção ✅ **feito**
 
-Observadas durante a construção, mais ou menos em ordem de visibilidade:
+Observadas durante a construção; as seis fechadas, na ordem em que foram
+listadas:
 
-- **Estados compostos renderizam planos no grafo web** (nós `Pai / Filho`)
-  enquanto o Mermaid já os aninha. A inconsistência mais visível do produto hoje.
-  Toca apenas `flow/` e `layout/` — o React Flow suporta nós-pai, que as seções
-  de máquina já usam.
-- **Nenhum estado de seleção na URL.** Não existe link para "este estado desta
-  máquina". Para documentação feita para ser compartilhada e referenciada em uma
-  revisão, isso custa mais do que parece.
-- **Comentários de documentação em eventos e efeitos.** Estados e máquinas estão
-  cobertos; um evento com um `///` explicando *quando* ele dispara é o pedido
-  natural seguinte. Precisa de um tipo mais rico para `Transition.event`, então é
-  mudança de contrato e não aditiva.
-- **Efeitos só aparecem por transição**, nunca agregados por estado. "O que
-  entrar em `Uploading` de fato faz" exige a união das transições de entrada.
-- **A simulação não consegue reproduzir destinos curinga** (`to: "*"`), já que
-  não há nada estático em que aterrissar. Está bem assim, mas merece uma
-  explicação visível no painel em vez de silêncio.
-- **Markdown dentro de descrições é literal na UI web.** O documento gerado
-  renderiza direito; a UI mostra a sintaxe crua. Corrigir significa uma
-  dependência de Markdown, e foi por isso que ficou adiado em vez de feito.
+- **Estados compostos aninham no grafo web** — um pai composto é um contêiner
+  segurando suas folhas, o aninhamento que o Mermaid sempre teve. O motor de
+  layout generalizou para agrupamento de profundidade arbitrária (uma execução
+  hierárquica do ELK por máquina, arestas declaradas no menor ancestral
+  comum).
+- **A seleção é uma URL** — `#state=Core/Máquina/Nome`; links colados aplicam
+  sem recarregar e os velhos caem de volta limpos.
+- **Comentários de documentação em eventos e efeitos** — entrou *aditivamente*
+  em vez da quebra de contrato prevista: catálogos `events` / `effects` por
+  núcleo de `{ name, doc }`, apenas nomes documentados e usados, então uma
+  aplicação sem documentação emite JSON byte-idêntico. Renderizados pelo
+  gerador Markdown (tabelas por núcleo) e pelo Inspetor (doc do evento sob a
+  transição, marcas + tooltips nas listas).
+- **Efeitos agregam por estado** — os *Efeitos ao entrar* do Inspetor: a união
+  sobre as transições de chegada, apresentada como união.
+- **Transições com destino de runtime são explicadas no painel de simulação** —
+  listadas inertes com uma nota, em vez de silêncio.
+- **Markdown renderiza nos painéis web** (react-markdown — a dependência de
+  que tratava o adiamento). HTML cru na prosa autoral fica texto inerte,
+  verificado com um modelo hostil; tooltips nativos continuam texto puro.
 
 ---
 

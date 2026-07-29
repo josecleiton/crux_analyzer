@@ -14,13 +14,20 @@ Três áreas, no estilo LangGraph Studio:
   ortogonais) renderiza cada uma como uma **seção titulada**; um core de máquina
   única renderiza plano. Todo estado é um nó, toda transição é uma aresta
   rotulada com seu evento. Transições curinga (`from`/`to` = `"*"`) se conectam a
-  um pseudo-nó tracejado **qualquer estado**. Folhas de compostos aparecem como
-  `Pai / Filho`. Clicar em uma seção (no título ou na área vazia) seleciona o
-  **estado de entrada** da máquina e enquadra essa máquina na view, então uma
-  máquina pode ser inspecionada — e simulada — em um clique.
+  um pseudo-nó tracejado **qualquer estado**. Um **estado composto** renderiza
+  como um contêiner segurando suas folhas — o mesmo aninhamento da saída
+  Mermaid; o pai nunca é um estado próprio, então o contêiner não seleciona
+  nada (e uma máquina que por acaso declare um estado plano colidindo com o
+  nome de um pai mantém essa família plana). Clicar em uma seção (no título ou
+  na área vazia) seleciona o **estado de entrada** da máquina e enquadra essa
+  máquina na view, então uma máquina pode ser inspecionada — e simulada — em
+  um clique.
 - **Inspetor** (painel direito) — selecionar um estado mostra seus selos de papel,
-  a descrição e as etiquetas escritas nele na fonte analisada, e seus eventos de
-  entrada/saída; selecionar uma transição mostra `evento: de ↓ para` mais os
+  a descrição e as etiquetas escritas nele na fonte analisada, seus eventos de
+  entrada/saída (os documentados carregam uma marca e um tooltip) e os
+  **Efeitos ao entrar**: a união dos efeitos que suas transições de chegada
+  solicitam — "alguns destes disparam", nunca "todos". Selecionar uma transição
+  mostra a descrição autoral do próprio evento, `de ↓ para`, mais os
   **efeitos** que ela solicita. Em ambos os casos a descrição da própria máquina
   encerra o painel. A máquina proprietária é etiquetada quando o core tem mais de
   uma.
@@ -79,27 +86,33 @@ descrição de um estado fica logo abaixo do seu nome, sem título; a descriçã
 própria máquina vem por último, sob *Sobre esta máquina*, junto com quaisquer
 marcadores declarados na região.
 
-Sintaxe Markdown dentro de um comentário de documentação **não** é renderizada
-aqui (nenhuma dependência de Markdown); linhas quebradas à mão são rejuntadas em
-parágrafos (`docParagraphs`), porque quebrar em 80 colunas no `///` não é um
-pedido de quebra de linha em um painel de 260px. O documento Markdown gerado é o
-cliente que renderiza Markdown como Markdown.
+Markdown dentro de um comentário de documentação **renderiza como Markdown**
+nos painéis (react-markdown): trechos de código, listas, ênfase — a mesma
+leitura que o documento gerado sempre deu. HTML cru na prosa autoral fica
+deliberadamente inerte (mostrado como texto, nunca executado — react-markdown
+constrói elementos React e não injeta HTML), e linhas `///` quebradas à mão se
+rejuntam naturalmente, já que Markdown trata uma quebra simples como quebra
+suave. Tooltips de nós e seções são atributos `title` nativos, então ali a
+prosa continua texto puro.
 
 ## Filtrando o canvas
 
-Dois filtros de leitura vivem na barra de ferramentas. Ambos dizem "estes, não
-o resto" do mesmo jeito que a simulação: os estados que casam ficam em força
-total enquanto todos os outros estados e transições esmaecem.
+Dois filtros de leitura. Ambos dizem "estes, não o resto" do mesmo jeito que a
+simulação: os estados que casam ficam em força total enquanto todos os outros
+estados e transições esmaecem.
 
-- **Filtrar por etiqueta** — digite um fragmento de um nome de `@tag`
-  declarado; a comparação ignora maiúsculas e o campo sugere as etiquetas do
-  próprio núcleo ativo. Uma etiqueta declarada no enum de estado cobre a
-  região inteira. O campo só é renderizado quando o núcleo declara alguma
-  etiqueta — sem nada para filtrar, não há filtro.
-- **Sem documentação** — um botão opt-in que mantém apenas os estados sem
-  descrição autoral: os estados em que um leitor ainda não deveria confiar.
-  Opt-in de propósito, para que a visão padrão continue sendo sobre a máquina
-  e não sobre cobertura de documentação (o número em si vem do
+- **Filtrar por etiqueta** — o campo ao lado do título (ele lê, enquanto os
+  botões da barra agem): digite um fragmento de um nome de `@tag` declarado,
+  sem diferenciar maiúsculas. Ele carrega sua própria lista de sugestões —
+  etiquetas mais usadas primeiro, aberta no foco — em vez de um `<datalist>`
+  nativo, cujo popup é inconsistente entre engines. Uma etiqueta declarada no
+  enum de estado cobre a região inteira. O campo só é renderizado quando o
+  núcleo declara alguma etiqueta — sem nada para filtrar, não há filtro.
+- **Sem documentação** — um botão opt-in (triângulo de aviso âmbar; âmbar
+  quando ativo — o verde pertence à simulação) que mantém apenas os estados
+  sem descrição autoral: os estados em que um leitor ainda não deveria
+  confiar. Opt-in de propósito, para que a visão padrão continue sendo sobre a
+  máquina e não sobre cobertura de documentação (o número em si vem do
   `crux-analyzer coverage`, veja [cli.md](cli.md)).
 
 Os dois critérios compõem como interseção. Uma transição continua legível
@@ -113,6 +126,18 @@ silencioso que apenas escapa do esmaecimento, então um resultado de filtro
 nunca toma emprestadas as cores da simulação. Enquanto uma simulação roda os
 filtros ficam desabilitados: a ênfase pertence ao replay. Trocar de núcleo os
 limpa — cada núcleo declara suas próprias etiquetas.
+
+## Links diretos
+
+A seleção vive no hash da URL — `#state=Core/Máquina/Nome`,
+`#transition=<id>`, `#core=<nome>` — então "este estado desta máquina" é um
+link que pode ser colado em um review. Cliques se espelham na barra de
+endereço via `replaceState` (sem acumular histórico), a visão padrão mantém a
+URL limpa, um hash colado aplica sem recarregar, e um link velho ou estrangeiro
+cai de volta para o núcleo (ou para nada) em vez de uma UI quebrada. Baseado em
+hash de propósito: a publicação estática não tem roteador nem regra de
+fallback de SPA, e um hash sobrevive intocado a qualquer host
+(`src/state/urlSelection.ts`).
 
 ## Fonte de dados
 
@@ -160,9 +185,11 @@ fallback de SPA é necessária — há uma única página e nenhum roteador.
 Selecione um estado (opcional) e clique em **Simular**:
 
 - o painel direito passa para a simulação: estado atual, os eventos que podem
-  disparar a partir dele (os de origem curinga estão sempre disponíveis;
-  transições com destino de tempo de execução `to: "*"` são excluídas do replay) e
-  o histórico do que já disparou;
+  disparar a partir dele (os de origem curinga estão sempre disponíveis) e o
+  histórico do que já disparou. Transições com destino de tempo de execução
+  `to: "*"` não podem ser reproduzidas — não há nada estático onde aterrissar —
+  então são listadas inertes sob as disparáveis, com uma nota dizendo
+  exatamente isso, em vez de escondidas em silêncio;
 - o canvas se lê como um caminho, em três níveis de ênfase: tudo que já foi
   **percorrido** fica verde em negrito (estados e transições, incluindo o estado
   inicial), o que pode **disparar daqui** mantém um contorno verde, e todo o resto
@@ -231,8 +258,13 @@ com cantos arredondados, e a caixa que cada rótulo de aresta ocupa — o ELK as
 calcula (`ElkLayoutEngine`, `elk.algorithm: layered` com rótulos de aresta
 inline), então as arestas nunca cruzam nós e os rótulos nunca se sobrepõem. As
 seções de máquina usam o layout hierárquico do ELK (nós de grupo do React Flow com
-posições relativas dos filhos). Os nós não são arrastáveis — as rotas pertencem ao
-motor; use **Reorganizar** para recalcular.
+posições relativas dos filhos), e o agrupamento tem profundidade arbitrária:
+contêineres de compostos aninham dentro das seções, com cada máquina calculada
+como uma execução hierárquica única (`INCLUDE_CHILDREN`) para que arestas
+possam cruzar a fronteira de um composto, e cada aresta declarada no menor
+ancestral comum dos seus extremos. Os nós não são arrastáveis — as rotas
+pertencem ao motor. **Reorganizar** recalcula *e* re-enquadra a viewport: o
+layout é determinístico, então só recalcular não mudaria nada visível.
 
 ## Estendendo
 

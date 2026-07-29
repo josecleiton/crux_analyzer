@@ -95,30 +95,29 @@ unit-tested module; the extension host part is thin plumbing.
 
 ---
 
-## 4. Smaller gaps worth fixing
+## 4. Smaller gaps worth fixing ✅ **done**
 
-Observed while building, in rough order of how visible they are:
+Observed while building; all six closed, in the order they were listed:
 
-- **Composite states render flat in the web graph** (`Parent / Child` nodes)
-  while Mermaid already nests them. The most visible inconsistency in the
-  product today. Touches `flow/` and `layout/` only — React Flow supports
-  parent nodes, which the machine sections already use.
-- **No selection state in the URL.** There is no link to "this state of this
-  machine". For documentation meant to be shared and referenced in a review,
-  that costs more than it looks.
-- **Doc comments on events and effects.** States and machines are covered; an
-  event with a `///` explaining *when* it fires is the natural next request.
-  Needs a richer type for `Transition.event`, so it is a contract change rather
-  than an additive one.
-- **Effects are only shown per transition**, never aggregated per state. "What
-  does entering `Uploading` actually do" needs a union over its incoming
-  transitions.
-- **The simulation cannot replay wildcard targets** (`to: "*"`), since there is
-  nothing static to land on. Fine as-is, but it deserves a visible explanation
-  in the panel rather than silence.
-- **Markdown inside descriptions is literal in the web UI.** The generated
-  document renders it properly; the UI shows the raw syntax. Fixing it means a
-  Markdown dependency, which is why it was deferred rather than done.
+- **Composite states nest in the web graph** — a composite parent is a
+  container holding its leaves, the nesting Mermaid always had. The layout
+  engine generalized to arbitrary-depth grouping (one hierarchical ELK run
+  per machine, edges declared in the lowest common ancestor).
+- **The selection is a URL** — `#state=Core/Machine/Name`; pasted links
+  apply without a reload and stale ones fall back cleanly.
+- **Doc comments on events and effects** — landed *additively* instead of
+  the predicted contract break: per-core `events` / `effects` catalogs of
+  `{ name, doc }`, only documented-and-used names, so an undocumented app
+  emits byte-identical JSON. Rendered by the Markdown generator (per-core
+  tables) and the Inspector (event doc under the transition, marks +
+  tooltips on lists).
+- **Effects aggregate per state** — the Inspector's *Effects on entry*: the
+  union over incoming transitions, presented as a union.
+- **Runtime-target transitions are explained in the simulation panel** —
+  listed inert with a note, instead of silence.
+- **Markdown renders in the web panels** (react-markdown — the dependency
+  the deferral was about). Raw HTML in author prose stays inert text,
+  verified with a hostile model; native tooltips stay plain.
 
 ---
 

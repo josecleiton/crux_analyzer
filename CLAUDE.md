@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-The original roadmap is fully implemented: syn-based parser (predicate guards, `==`/closure guards, `Default` resets, wildcard sources AND targets, value-flow analysis for runtime-assigned targets, hierarchical/composite states as `Parent/Child` paths, per-transition effects, multiple state machines per core, plus state/machine documentation and `@failure` / `@deprecated` / `@tag` annotations read from `///` doc comments), CLI (`crux-analyzer generate | docs`, both with `--watch`), doc generators (Mermaid with composite blocks and per-state notes, Markdown with a states table), and the web UI (machine sections, inspector with effects and authored documentation, Simulation Engine, tag filter + undocumented-states highlight). The VS Code extension (`apps/vscode`) embeds the built web bundle in a webview, spawning the CLI and regenerating on save. The corpus test against a real app is gated on `CORPUS_SRC` and extracts it warning-free. `init.md` is the original project spec (in Portuguese).
+The original roadmap is fully implemented: syn-based parser (predicate guards, `==`/closure guards, `Default` resets, wildcard sources AND targets, value-flow analysis for runtime-assigned targets, hierarchical/composite states as `Parent/Child` paths, per-transition effects, multiple state machines per core, plus state/machine documentation and `@failure` / `@deprecated` / `@tag` annotations read from `///` doc comments), CLI (`crux-analyzer generate | docs`, both with `--watch`), doc generators (Mermaid with composite blocks and per-state notes, Markdown with a states table), and the web UI (machine sections, nested composite containers, inspector with effects — per transition and aggregated per state — and authored documentation rendered as Markdown, event/effect doc catalogs, Simulation Engine, tag filter + undocumented-states highlight, selection-in-URL deep links). The VS Code extension (`apps/vscode`) embeds the built web bundle in a webview, spawning the CLI and regenerating on save. The corpus test against a real app is gated on `CORPUS_SRC` and extracts it warning-free. `init.md` is the original project spec (in Portuguese).
 
 ## Documentation
 
@@ -79,7 +79,8 @@ Hard rules:
 deliberately *not* being done and why. Keep it updated instead of starting a
 list here; the pt-BR twin is `docs/pt-BR/roadmap.md`.
 
-The short version: the parser is complete against `init.md`, and the three
-adoption fronts are done too — the ratchet (CI, `--deny-warnings`, `coverage`,
-the corpus floor), tag filtering, and the VS Code extension. What remains are
-the smaller gaps (§4) and the deliberate "not yet" list (§5).
+The short version: everything planned is done — the parser against `init.md`,
+the adoption fronts (ratchet, tag filtering, VS Code extension), and the §4
+smaller gaps (composite nesting, URL selection, event/effect docs, per-state
+effects, wildcard-target notes, Markdown rendering). What remains is the
+deliberate "not yet" list (§5) and whatever adoption teaches next.
