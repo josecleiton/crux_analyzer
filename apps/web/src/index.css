@@ -1,0 +1,162 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  color: #1f2430;
+  background: #f6f7f9;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 48px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e5ea;
+}
+
+.toolbar-title {
+  font-weight: 600;
+}
+
+.toolbar-core {
+  font-weight: 400;
+  color: #6b7280;
+}
+
+.toolbar button {
+  padding: 4px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.toolbar button:hover {
+  background: #f3f4f6;
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.sidebar,
+.inspector {
+  width: 220px;
+  padding: 16px;
+  background: #ffffff;
+  overflow-y: auto;
+}
+
+.sidebar {
+  border-right: 1px solid #e2e5ea;
+}
+
+.inspector {
+  width: 260px;
+  border-left: 1px solid #e2e5ea;
+}
+
+.panel-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
+.sidebar ul {
+  list-style: none;
+}
+
+.core-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.core-item:hover {
+  background: #f3f4f6;
+}
+
+.core-item.active {
+  background: #eef2ff;
+  color: #4338ca;
+  font-weight: 600;
+}
+
+.graph-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.inspector h4 {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 12px 0 4px;
+}
+
+.inspector-name {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.inspector-empty {
+  color: #9ca3af;
+}
+
+.event-list {
+  list-style: none;
+}
+
+.event-list li {
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.transition-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  background: #f3f4f6;
+  border-radius: 6px;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.transition-arrow {
+  color: #6b7280;
+}
