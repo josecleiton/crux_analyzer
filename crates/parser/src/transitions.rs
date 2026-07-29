@@ -35,10 +35,12 @@ pub(crate) const ANY_STATE: &str = "*";
 /// Maximum predicate-method resolution depth (predicates calling predicates).
 const MAX_PREDICATE_DEPTH: usize = 3;
 
-/// A transition attributed to a specific state machine (enum).
+/// A transition attributed to a specific state machine (enum + field —
+/// the same enum can drive more than one machine through different fields).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RawTransition {
     pub machine: String,
+    pub field: String,
     pub from: String,
     pub event: String,
     pub to: String,
@@ -63,8 +65,8 @@ struct Ctx<'a> {
     events: Option<Vec<String>>,
     /// Guard / `if` conditions currently in force.
     conditions: Vec<&'a syn::Expr>,
-    /// Facts from `match`-on-state arms: (machine enum, possible states).
-    facts: Vec<(String, Vec<String>)>,
+    /// Facts from `match`-on-state arms: (machine enum, field, possible states).
+    facts: Vec<(String, String, Vec<String>)>,
     /// The event arm this code belongs to — transitions and effects found
     /// under the same arm are associated with each other.
     arm: usize,
@@ -403,7 +405,9 @@ impl<'w, 'a> Walker<'w, 'a> {
 
             let mut arm_ctx = ctx.clone();
             if !states.is_empty() {
-                arm_ctx.facts.push((machine.enum_name.clone(), states));
+                arm_ctx
+                    .facts
+                    .push((machine.enum_name.clone(), machine.field_name.clone(), states));
             }
             if let Some((_, guard)) = &arm.guard {
                 arm_ctx.conditions.push(guard);
@@ -503,8 +507,8 @@ impl<'w, 'a> Walker<'w, 'a> {
     fn source_states(&self, ctx: &Ctx<'a>, machine: &StateMachine) -> GuardEval {
         let mut result = GuardEval::NoConstraint;
 
-        for (fact_machine, states) in &ctx.facts {
-            if fact_machine == &machine.enum_name {
+        for (fact_machine, fact_field, states) in &ctx.facts {
+            if fact_machine == &machine.enum_name && fact_field == &machine.field_name {
                 result = and(result, GuardEval::Known(states.clone()));
             }
         }
@@ -808,6 +812,7 @@ impl<'w, 'a> Walker<'w, 'a> {
         self.out.push((
             RawTransition {
                 machine: machine.enum_name.clone(),
+                field: machine.field_name.clone(),
                 from,
                 event,
                 to,
