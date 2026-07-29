@@ -24,9 +24,10 @@ Avisos (veja a [referência de avisos](parser.md#referência-de-avisos)) vão pa
 stderr; o JSON vai para `--out`/stdout. O código de saída é diferente de zero
 quando o parsing falha (por exemplo, nenhum `impl App` encontrado).
 
-O **modelo JSON emitido é independente de locale** — ele carrega apenas
-identificadores da fonte analisada, então `generate` produz saída byte a byte
-idêntica em todo locale. Aqui `--locale` afeta somente as mensagens em stderr.
+O **modelo JSON emitido é independente de locale** — tudo nele é lido da fonte
+analisada, tanto identificadores quanto a prosa dos comentários de documentação
+do próprio autor, então `generate` produz saída byte a byte idêntica em todo
+locale. Aqui `--locale` afeta somente as mensagens em stderr.
 
 Alimentar a UI web:
 
@@ -42,20 +43,31 @@ crux-analyzer docs --src <dir> [--name <projeto>] [--format markdown|mermaid] [-
 ```
 
 Aqui `--locale` também traduz a prosa do próprio documento gerado (rótulos de
-seção, cabeçalhos da tabela de transições, o pseudo-estado `qualquer estado`).
-Nomes de estados, eventos e efeitos ficam intocados, e o id do nó Mermaid
-`any_state` permanece estável porque as linhas de transição se referem a ele.
+seção, cabeçalhos de tabela, nomes de marcadores, o pseudo-estado `qualquer
+estado`). Nomes de estados, eventos e efeitos ficam intocados, **e a documentação
+lida da fonte analisada também** — a língua de um comentário de documentação é
+escolha de quem o escreveu. O id do nó Mermaid `any_state` permanece estável
+porque as linhas de transição se referem a ele.
 
 ### Markdown (padrão)
 
-Um documento: por máquina, um bloco ` ```mermaid ` mais uma tabela de transições
-(De / Evento / Para / Efeitos). GitHub, GitLab e a maioria dos visualizadores de
-Markdown renderizam os diagramas embutidos nativamente — faça commit do arquivo e
-a documentação fica legível no repositório:
+Um documento: por máquina, sua descrição, um bloco ` ```mermaid `, uma tabela de
+estados e uma tabela de transições (De / Evento / Para / Efeitos). GitHub, GitLab
+e a maioria dos visualizadores de Markdown renderizam os diagramas embutidos
+nativamente — faça commit do arquivo e a documentação fica legível no
+repositório:
 
 ```sh
 crux-analyzer docs --src caminho/para/app/src --name MeuApp --out MAQUINAS_DE_ESTADO.md
 ```
+
+A descrição e a tabela de estados aparecem apenas quando a fonte analisada
+documenta algo — veja [anotações](parser.md#documentação-e-anotações) para como
+escrevê-las. Duas consequências de copiar a prosa do autor literalmente: uma
+descrição é achatada em uma linha na célula da tabela (um estado cuja descrição
+tem vários parágrafos a recebe de volta por inteiro, sob um título próprio abaixo
+da tabela), e o Markdown que o autor escreveu continua sendo Markdown, então um
+comentário de documentação que começa com `#` renderiza como título.
 
 ### Mermaid (bruto)
 

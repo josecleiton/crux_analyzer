@@ -29,6 +29,24 @@ pub struct Labels {
     pub any_state: &'static str,
     /// Table cell for a transition that requests no effects.
     pub no_effects: &'static str,
+    /// States table heading.
+    pub states: &'static str,
+    /// States table column: the state's name.
+    pub state: &'static str,
+    /// States table column: the description authored in the analyzed source.
+    pub description: &'static str,
+    /// States table column: markers declared in the source.
+    pub markers: &'static str,
+    /// States table column: free-form `@tag` values.
+    pub tags: &'static str,
+    /// Rendered name of the `failure` marker. The marker *value* stays
+    /// `failure` in the model — a stable identifier, like `WarningKind::code()`.
+    pub marker_failure: &'static str,
+    /// Rendered name of the `deprecated` marker.
+    pub marker_deprecated: &'static str,
+    /// States table cell for an absent description, marker or tag. Separate
+    /// from `no_effects`, which would read as a bug in a description column.
+    pub no_value: &'static str,
 }
 
 impl Labels {
@@ -43,6 +61,14 @@ impl Labels {
         any_source: "*any*",
         any_state: "any state",
         no_effects: "—",
+        states: "States",
+        state: "State",
+        description: "Description",
+        markers: "Markers",
+        tags: "Tags",
+        marker_failure: "failure",
+        marker_deprecated: "deprecated",
+        no_value: "—",
     };
 
     /// Brazilian Portuguese.
@@ -58,6 +84,16 @@ impl Labels {
         // An em dash is locale-neutral; kept in the struct so a future locale
         // that needs different filler has somewhere to put it.
         no_effects: "—",
+        states: "Estados",
+        state: "Estado",
+        description: "Descrição",
+        markers: "Marcadores",
+        tags: "Etiquetas",
+        // These match the web UI's `badge.failure` / `badge.deprecated`, so a
+        // generated document and the app read the same way.
+        marker_failure: "falha",
+        marker_deprecated: "descontinuado",
+        no_value: "—",
     };
 
     pub fn for_locale(locale: Locale) -> Labels {

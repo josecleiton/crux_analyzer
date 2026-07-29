@@ -24,9 +24,10 @@ Warnings (see the [warnings reference](parser.md#warnings-reference)) go to
 stderr; the JSON goes to `--out`/stdout. Exit code is non-zero when parsing
 fails (e.g. no `impl App` found).
 
-The emitted **model JSON is locale-independent** — it carries only identifiers
-from the analyzed source, so `generate` produces byte-identical output in every
-locale. `--locale` only affects the messages on stderr here.
+The emitted **model JSON is locale-independent** — everything in it is read out
+of the analyzed source, identifiers and the author's own doc-comment prose
+alike, so `generate` produces byte-identical output in every locale.
+`--locale` only affects the messages on stderr here.
 
 Feed the web UI:
 
@@ -42,20 +43,30 @@ crux-analyzer docs --src <dir> [--name <project>] [--format markdown|mermaid] [-
 ```
 
 Here `--locale` also translates the generated document's own prose (section
-labels, transition-table headers, the `any state` pseudo-state). State, event
-and effect names stay untouched, and the Mermaid node id `any_state` stays
-stable because transition lines refer to it.
+labels, table headers, marker names, the `any state` pseudo-state). State,
+event and effect names stay untouched, **and so does documentation read out of
+the analyzed source** — the language of a doc comment is its author's choice.
+The Mermaid node id `any_state` stays stable because transition lines refer to
+it.
 
 ### Markdown (default)
 
-One document: per machine, a ` ```mermaid ` block plus a transition table
-(From / Event / To / Effects). GitHub, GitLab and most Markdown viewers
-render the embedded diagrams natively — commit the file and the docs are
-readable in the repo:
+One document: per machine, its description, a ` ```mermaid ` block, a states
+table and a transition table (From / Event / To / Effects). GitHub, GitLab and
+most Markdown viewers render the embedded diagrams natively — commit the file
+and the docs are readable in the repo:
 
 ```sh
 crux-analyzer docs --src path/to/app/src --name MyApp --out STATE_MACHINES.md
 ```
+
+The description and states table appear only when the analyzed source
+documents something — see [annotations](parser.md#documentation-and-annotations)
+for how to write them. Two consequences of copying author prose verbatim: a
+description is flattened into one line in its table cell (a state whose
+description runs to several paragraphs gets it back in full, under its own
+heading below the table), and Markdown the author wrote is left as Markdown, so
+a doc comment starting with `#` renders as a heading.
 
 ### Mermaid (raw)
 
