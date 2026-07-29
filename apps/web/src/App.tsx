@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { loadProject } from './data/loadProject';
 import type { DomainProject } from './domain/types';
 import { machineOf } from './domain/fromParserJson';
+import { stateRole } from './domain/stateRole';
 import { toFlowModel } from './flow/toFlowModel';
 import type { LayoutEngine, LayoutResult } from './layout/LayoutEngine';
 import { ElkLayoutEngine } from './layout/ElkLayoutEngine';
@@ -70,11 +71,15 @@ export default function App() {
   const highlight: GraphHighlight | undefined = useMemo(() => {
     if (!simulation) return undefined;
     const last = lastStep(simulation);
+    const current = simulatedMachine?.states.find((s) => s.id === simulation.currentStateId);
     return {
       nodeIds: [simulation.currentStateId],
       edgeIds: last ? [last.transitionId] : [],
+      failure:
+        simulatedMachine && current ? stateRole(simulatedMachine, current).failure : false,
+      step: simulation.trail.length,
     };
-  }, [simulation]);
+  }, [simulation, simulatedMachine]);
 
   function selectCore(coreId: string) {
     setActiveCoreId(coreId);

@@ -13,10 +13,29 @@ Three areas, LangGraph-Studio style:
   renders flat. Every state is a node, every transition an edge labeled with
   its event. Wildcard transitions (`from`/`to` = `"*"`) connect to a dashed
   **any state** pseudo-node. Composite leaves show as `Parent / Child`.
-- **Inspector** (right panel) — selecting a state shows its incoming/outgoing
-  events; selecting a transition shows `event: from ↓ to` plus the
-  **effects** it requests. The owning machine is tagged when the core has
-  more than one.
+- **Inspector** (right panel) — selecting a state shows its role badges and
+  its incoming/outgoing events; selecting a transition shows
+  `event: from ↓ to` plus the **effects** it requests. The owning machine is
+  tagged when the core has more than one.
+
+## State roles
+
+Roles are painted on the canvas at all times, simulation or not
+(`src/domain/stateRole.ts`):
+
+- **initial** (blue, filled dot before the label) — the machine's entry
+  point: a state nothing transitions into. In a fully cyclic machine the
+  first state carries the role, which is where the simulation starts.
+- **final** (amber, double border) — a dead end: no outgoing transition of
+  its own. A machine-wide wildcard (`from: "*"`) may still leave it; that
+  escape stays visible as an edge from the **any state** node.
+- **failure** (red) — a naming heuristic, the only guess of the three: the
+  state's words include a failure word (`Failed`, `Error`, `Denied`,
+  `Rejected`, `Invalid`, `TimedOut`, …). It never reaches the parser, which
+  must not invent semantics; a state that is both failure and final keeps the
+  double border in red.
+
+The Inspector and the simulation panel repeat the roles as badges.
 
 ## Data source
 
@@ -35,9 +54,15 @@ Select a state (optional) and hit **Simulate**:
   runtime-target `to: "*"` transitions are excluded from replay), and the
   trail of what already fired;
 - the canvas highlights the current state and the last transition taken in
-  green;
+  green, and animates the step: the transition's stroke flows as dashes with a
+  pulse traveling along its route, the state that was just entered pops and
+  then breathes, and the new trail entry slides in;
+- landing on a **failure** state turns that whole highlight red (edge, label,
+  arrowhead, ring), so failure paths stand out from healthy ones;
 - **Restart** goes back to the machine's first state; **Stop simulation**
   returns to the inspector.
+
+Every animation is skipped under `prefers-reduced-motion`.
 
 The engine (`src/simulation/engine.ts`) is pure domain logic; it drives the
 Graph exclusively through highlight props.

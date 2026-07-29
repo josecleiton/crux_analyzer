@@ -41,7 +41,21 @@
   --edge-stroke: #8792a2;
   --edge-stroke-selected: #6366f1;
   --edge-stroke-highlighted: #059669;
+  --edge-stroke-failure: #dc2626;
   --edge-label-text: #4b5563;
+
+  --state-failure: #ef4444;
+  --state-failure-text: #b91c1c;
+  --state-failure-bg: #fef2f2;
+  --state-failure-ring: rgba(239, 68, 68, 0.22);
+
+  --state-final: #d97706;
+  --state-final-text: #b45309;
+  --state-final-bg: #fffbeb;
+
+  --state-initial: #0284c7;
+  --state-initial-text: #0369a1;
+  --state-initial-bg: #f0f9ff;
 }
 
 :root[data-theme='dark'] {
@@ -78,7 +92,21 @@
   --edge-stroke: #7c8798;
   --edge-stroke-selected: #818cf8;
   --edge-stroke-highlighted: #34d399;
+  --edge-stroke-failure: #f87171;
   --edge-label-text: #aab3c2;
+
+  --state-failure: #f87171;
+  --state-failure-text: #fca5a5;
+  --state-failure-bg: #2b1719;
+  --state-failure-ring: rgba(248, 113, 113, 0.26);
+
+  --state-final: #fbbf24;
+  --state-final-text: #fcd34d;
+  --state-final-bg: #2a2113;
+
+  --state-initial: #38bdf8;
+  --state-initial-text: #7dd3fc;
+  --state-initial-bg: #10222e;
 }
 
 * {
@@ -341,6 +369,59 @@ body {
   font-size: 11px;
 }
 
+/* the step that just fired slides in, so the trail reads as a movement */
+.trail-list li.trail-new {
+  animation: trail-in 0.35s ease-out;
+}
+
+@keyframes trail-in {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+}
+
+/* --- State role badges (failure / final) -------------------------------- */
+
+.state-badges {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.state-badge {
+  padding: 1px 7px;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.state-badge.initial {
+  color: var(--state-initial-text);
+  background: var(--state-initial-bg);
+}
+
+.state-badge.failure {
+  color: var(--state-failure-text);
+  background: var(--state-failure-bg);
+}
+
+.state-badge.final {
+  color: var(--state-final-text);
+  background: var(--state-final-bg);
+}
+
+.inspector-name.failure {
+  color: var(--state-failure-text);
+}
+
+.inspector-name.final {
+  color: var(--state-final-text);
+}
+
 .restart-button {
   margin-top: 16px;
   padding: 4px 12px;
@@ -389,10 +470,120 @@ body {
   pointer-events: none;
 }
 
+/* The machine's entry point: a filled dot before the label, UML style. */
+.state-node.state-initial {
+  border-color: var(--state-initial);
+  background: var(--state-initial-bg);
+  color: var(--state-initial-text);
+}
+
+.state-initial-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 50%;
+  /* follows the node's role color when a state is initial *and* final */
+  background: currentcolor;
+}
+
+/* Failure states read red; final states (no way out) get the classic double
+   border plus their own hue. A failure that is also final keeps both. */
+.state-node.state-failure {
+  border-color: var(--state-failure);
+  background: var(--state-failure-bg);
+  color: var(--state-failure-text);
+}
+
+.state-node.state-final {
+  border-color: var(--state-final);
+  background: var(--state-final-bg);
+  color: var(--state-final-text);
+  box-shadow:
+    inset 0 0 0 2px var(--state-final-bg),
+    inset 0 0 0 3.5px var(--state-final),
+    var(--node-shadow);
+}
+
+.state-node.state-final.state-failure {
+  border-color: var(--state-failure);
+  background: var(--state-failure-bg);
+  color: var(--state-failure-text);
+  box-shadow:
+    inset 0 0 0 2px var(--state-failure-bg),
+    inset 0 0 0 3.5px var(--state-failure),
+    var(--node-shadow);
+}
+
+/* --- Graph: simulation highlight + animations --------------------------- */
+
 .state-node.highlighted,
 .react-flow__node.highlighted .state-node {
-  border-color: var(--sim);
-  box-shadow: 0 0 0 3px var(--sim-ring);
+  --pulse-color: var(--sim);
+  --pulse-ring: var(--sim-ring);
+  border-color: var(--pulse-color);
+  box-shadow: 0 0 0 3px var(--pulse-ring);
+}
+
+/* the simulation sits in a failure state: the whole highlight turns red */
+.react-flow__node.highlighted.is-failure .state-node {
+  --pulse-color: var(--state-failure);
+  --pulse-ring: var(--state-failure-ring);
+  color: var(--state-failure-text);
+}
+
+/* arrival pop (two names so re-entering the same state replays it) +
+   a breathing ring that keeps saying "you are here" */
+.react-flow__node.highlighted.pulse-a .state-node {
+  animation:
+    state-pop-a 0.4s ease-out,
+    state-breathe 1.9s ease-in-out 0.4s infinite;
+}
+
+.react-flow__node.highlighted.pulse-b .state-node {
+  animation:
+    state-pop-b 0.4s ease-out,
+    state-breathe 1.9s ease-in-out 0.4s infinite;
+}
+
+@keyframes state-pop-a {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 var(--pulse-ring);
+  }
+  45% {
+    transform: scale(1.07);
+    box-shadow: 0 0 0 9px var(--pulse-ring);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 3px var(--pulse-ring);
+  }
+}
+
+@keyframes state-pop-b {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 var(--pulse-ring);
+  }
+  45% {
+    transform: scale(1.07);
+    box-shadow: 0 0 0 9px var(--pulse-ring);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 3px var(--pulse-ring);
+  }
+}
+
+@keyframes state-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px var(--pulse-ring);
+  }
+  50% {
+    box-shadow: 0 0 0 7px var(--pulse-ring);
+  }
 }
 
 .any-state-node {
@@ -473,9 +664,12 @@ body {
   fill: var(--accent-strong);
 }
 
+/* The transition that just fired: thicker, flowing dashes, traveling pulse. */
 .react-flow__edge.highlighted .routed-edge {
   stroke: var(--edge-stroke-highlighted);
   stroke-width: 2.25;
+  stroke-dasharray: 9 7;
+  animation: edge-flow 0.55s linear infinite;
 }
 
 .react-flow__edge.highlighted .edge-label-box {
@@ -485,4 +679,46 @@ body {
 
 .react-flow__edge.highlighted .edge-label-text {
   fill: var(--sim-text);
+}
+
+.react-flow__edge.highlighted.is-failure .routed-edge {
+  stroke: var(--edge-stroke-failure);
+}
+
+.react-flow__edge.highlighted.is-failure .edge-label-box {
+  stroke: var(--state-failure);
+  fill: var(--state-failure-bg);
+}
+
+.react-flow__edge.highlighted.is-failure .edge-label-text {
+  fill: var(--state-failure-text);
+}
+
+@keyframes edge-flow {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+
+.edge-pulse {
+  fill: var(--edge-stroke-highlighted);
+}
+
+.react-flow__edge.is-failure .edge-pulse {
+  fill: var(--edge-stroke-failure);
+}
+
+/* --- Reduced motion ------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__node.highlighted.pulse-a .state-node,
+  .react-flow__node.highlighted.pulse-b .state-node,
+  .react-flow__edge.highlighted .routed-edge,
+  .trail-list li.trail-new {
+    animation: none;
+  }
+
+  .edge-pulse {
+    display: none;
+  }
 }
