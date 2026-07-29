@@ -48,9 +48,12 @@ Two guards came out of it that are worth keeping honest: `just fixture-guard`
 Both were broken on purpose once and watched go red — a guard that cannot fail
 is decoration.
 
-**What is left here:** put a `--min` on the corpus in whatever pipeline analyzes
-a real app. `RecordingState` sits at 13% with no description on the enum itself,
-which is exactly the kind of number a ratchet is for.
+**Closed out:** the corpus now has its own ratchet — `just corpus-coverage`
+(part of `just check`) fails when the corpus total drops below the floor in the
+`justfile`, and skips itself where the source is absent, like the corpus test.
+The floor starts at today's 53%; `RecordingState` still sits at 13% with no
+description on the enum itself, which is exactly the number the ratchet now
+guards while it waits to be raised.
 
 ---
 

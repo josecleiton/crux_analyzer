@@ -50,9 +50,12 @@ fixture precisa extrair com zero avisos e não perder documentação) e
 gerador). As duas foram quebradas de propósito uma vez e observadas ficando
 vermelhas — uma guarda que não pode falhar é decoração.
 
-**O que sobrou aqui:** colocar um `--min` sobre o corpus no pipeline que analisa
-uma aplicação real. O `RecordingState` está em 13% e sem descrição no próprio
-enum, que é exatamente o tipo de número para o qual uma catraca serve.
+**Encerrado:** o corpus agora tem catraca própria — `just corpus-coverage`
+(parte do `just check`) falha quando o total do Corpus cai abaixo do piso no
+`justfile`, e pula a si mesma onde a fonte está ausente, como o teste do
+corpus. O piso começa nos 53% de hoje; o `RecordingState` continua em 13% e sem
+descrição no próprio enum, que é exatamente o número que a catraca agora guarda
+enquanto espera para ser elevada.
 
 ---
 

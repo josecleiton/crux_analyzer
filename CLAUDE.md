@@ -25,6 +25,7 @@ just dev                     # web UI (Vite, apps/web)
 just web-test                # vitest: mapping layers + simulation engine
 just rust-test               # cargo tests (parser unit + fixture + docgen)
 just corpus                  # + real-app corpus test (CORPUS_SRC overrides the path)
+just corpus-coverage [floor]  # corpus documentation ratchet (skips if corpus absent)
 just clippy                  # lint the workspace
 just check                   # full validation: corpus + clippy + web tests + build
 just model <src> <name>      # analyze an app into apps/web/public/model.json

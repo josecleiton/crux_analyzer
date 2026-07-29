@@ -23,6 +23,7 @@ just            # lists every recipe
 | Static doc site | `just site <src> <name> [base]` | `CRUX_BASE=<base> pnpm --filter web build` |
 | Rust tests | `just rust-test` | `cargo test --workspace` |
 | Corpus tests | `just corpus` | `CORPUS_SRC=<path> cargo test --workspace` |
+| Corpus coverage ratchet | `just corpus-coverage [floor]` | `cargo run -p crux-analyzer-cli -- coverage ... --min <floor>` |
 | Clippy | `just clippy` | `cargo clippy --workspace` |
 | Everything | `just check` | — |
 | Model for the UI | `just model <src> <name>` | `cargo run -p crux-analyzer-cli -- generate ...` |
@@ -88,6 +89,12 @@ ways this project can silently rot:
 The corpus test gates itself on `CORPUS_SRC`, and that source is not public — so
 CI proves the fixture path and the corpus stays a local gate. Keep it that way
 when adding guards: anything CI cannot run is not a guard.
+
+The corpus has a coverage ratchet of its own: `just corpus-coverage` (part of
+`just check`) fails when the corpus documentation total drops below the floor
+baked into the recipe. Like the corpus test it skips itself when the source is
+absent, so in CI the fixture-guard floor is the public stand-in. When coverage
+rises, raise the floor in the `justfile` — that is the ratchet clicking.
 
 A guard that cannot fail is decoration. When you add one, break it on purpose
 once and watch it go red before trusting it.

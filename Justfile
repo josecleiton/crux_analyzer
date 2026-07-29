@@ -32,14 +32,26 @@ rust-test:
 corpus:
     CORPUS_SRC={{corpus_src}} cargo test --workspace
 
+# Coverage ratchet on the real-app corpus: documentation goes up, never down.
+# The floor sits at today's total — raise it when coverage rises. Local like
+# `corpus` (the Corpus source is not public), so it skips itself when the
+# directory is absent; in CI the fixture-guard floor is the public stand-in.
+corpus-coverage floor="53":
+    @if [ -d "{{corpus_src}}" ]; then \
+      just coverage "{{corpus_src}}" Corpus {{floor}}; \
+    else \
+      echo "private corpus not found at {{corpus_src}} — coverage ratchet skipped"; \
+    fi
+
 # Clippy across the workspace
 clippy:
     cargo clippy --workspace
 
 # --- Everything ------------------------------------------------------------
 
-# Full validation: Rust + corpus + clippy + web tests + web build + fixture
-check: corpus clippy web-test web-build fixture-guard
+# Full validation: Rust + corpus (tests + coverage ratchet) + clippy + web
+# tests + web build + fixture
+check: corpus corpus-coverage clippy web-test web-build fixture-guard
 
 # The fixture is the public corpus: it must extract with zero warnings, and the
 # documentation it declares must not regress. The floor sits below today's 67%
