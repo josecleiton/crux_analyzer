@@ -22,7 +22,7 @@ fn extracts_all_state_machines() {
         .find(|m| m.name == "RecorderState")
         .expect("RecorderState machine");
     assert_eq!(
-        recorder.states.iter().map(|s| s.0.as_str()).collect::<Vec<_>>(),
+        recorder.states.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
         ["Idle", "Recording", "Paused", "Uploading", "Completed"]
     );
 

@@ -34,7 +34,7 @@ fn extracts_quipu_recording_state_machine() {
         .find(|m| m.name == "RecordingState")
         .expect("RecordingState machine not found");
 
-    let states: Vec<&str> = machine.states.iter().map(|s| s.0.as_str()).collect();
+    let states: Vec<&str> = machine.states.iter().map(|s| s.name.as_str()).collect();
     assert_eq!(
         states,
         [

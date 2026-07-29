@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use crux_analyzer_model::{Core, Effect, Event, Machine, State, Transition};
+use crux_analyzer_model::{Core, Effect, Event, Machine, State, StateDecl, Transition};
 
 use crate::core_finder::CoreInfo;
 use crate::state_enum::StateMachine;
@@ -42,8 +42,9 @@ pub(crate) fn to_core(core: &CoreInfo, machines: &[StateMachine], raw: Vec<RawTr
 
             Some(Machine {
                 name: machine_name(machine, machines),
-                states: machine.variants.iter().map(|v| State(v.clone())).collect(),
+                states: machine.variants.iter().map(StateDecl::bare).collect(),
                 transitions,
+                ..Default::default()
             })
         })
         .collect();
