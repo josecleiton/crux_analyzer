@@ -8,26 +8,36 @@ use std::time::Duration;
 
 use notify::{RecursiveMode, Watcher};
 
+use crate::Messages;
+
 const DEBOUNCE: Duration = Duration::from_millis(300);
 
 /// Runs `run` once, then again after every relevant filesystem change.
 /// Only returns on watcher setup failure (Ctrl-C ends the process).
-pub fn watch(src: &Path, run: impl Fn() -> ExitCode) -> ExitCode {
+pub fn watch(src: &Path, messages: &Messages, run: impl Fn() -> ExitCode) -> ExitCode {
     run();
 
     let (sender, receiver) = mpsc::channel();
     let mut watcher = match notify::recommended_watcher(sender) {
         Ok(watcher) => watcher,
         Err(err) => {
-            eprintln!("error: failed to create file watcher: {err}");
+            eprintln!(
+                "{}: {}: {err}",
+                messages.error_prefix(),
+                messages.failed_to_create_watcher()
+            );
             return ExitCode::FAILURE;
         }
     };
     if let Err(err) = watcher.watch(src, RecursiveMode::Recursive) {
-        eprintln!("error: failed to watch {}: {err}", src.display());
+        eprintln!(
+            "{}: {}: {err}",
+            messages.error_prefix(),
+            messages.failed_to_watch(src)
+        );
         return ExitCode::FAILURE;
     }
-    eprintln!("watching {} — Ctrl-C to stop", src.display());
+    eprintln!("{}", messages.watching(src));
 
     while let Ok(event) = receiver.recv() {
         if !is_relevant(&event) {
@@ -37,7 +47,7 @@ pub fn watch(src: &Path, run: impl Fn() -> ExitCode) -> ExitCode {
         std::thread::sleep(DEBOUNCE);
         while receiver.try_recv().is_ok() {}
 
-        eprintln!("change detected, regenerating…");
+        eprintln!("{}", messages.change_detected());
         run();
     }
 

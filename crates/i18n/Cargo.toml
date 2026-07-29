@@ -1,0 +1,8 @@
+[package]
+name = "crux-analyzer-i18n"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Locale type and detection shared by the crux_analyzer crates. Holds no message catalogs."
+
+[dependencies]

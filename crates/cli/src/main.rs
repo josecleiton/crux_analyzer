@@ -6,14 +6,25 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
+use crux_analyzer_i18n::Locale;
 
+mod i18n;
 mod watch;
+
+use i18n::Messages;
 
 #[derive(Parser)]
 #[command(name = "crux-analyzer", version, about)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
+
+    /// Language of the generated prose and the CLI's own output: `en` or
+    /// `pt-BR`. Defaults to CRUX_ANALYZER_LOCALE, then LC_ALL / LC_MESSAGES /
+    /// LANG, then `en`. Identifiers from the analyzed code are never
+    /// translated.
+    #[arg(long, global = true, value_name = "LOCALE")]
+    locale: Option<Locale>,
 }
 
 #[derive(Subcommand)]
@@ -63,6 +74,7 @@ enum DocsFormat {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    let messages = Messages::new(cli.locale.unwrap_or_else(Locale::from_env));
     let (input, out, watching, render): (InputArgs, Option<PathBuf>, bool, Renderer) =
         match cli.command {
             Command::Generate { input, out, watch } => (input, out, watch, render_json),
@@ -83,29 +95,31 @@ fn main() -> ExitCode {
         };
 
     let project_name = input.name.clone().unwrap_or_else(|| directory_name(&input.src));
-    let run = || run_once(&input.src, &project_name, out.as_deref(), render);
+    let run = || run_once(&input.src, &project_name, out.as_deref(), render, &messages);
 
     if watching {
-        watch::watch(&input.src, run)
+        watch::watch(&input.src, &messages, run)
     } else {
         run()
     }
 }
 
-type Renderer = fn(&crux_analyzer_model::Project) -> String;
+type Renderer = fn(&crux_analyzer_model::Project, Locale) -> String;
 
-fn render_json(project: &crux_analyzer_model::Project) -> String {
+fn render_json(project: &crux_analyzer_model::Project, _locale: Locale) -> String {
+    // The model contract is locale-independent: it carries only identifiers
+    // read out of the analyzed source, so no locale reaches the JSON.
     serde_json::to_string_pretty(project).expect("model serialization cannot fail") + "\n"
 }
 
-fn render_markdown(project: &crux_analyzer_model::Project) -> String {
-    crux_analyzer_docgen::markdown(project)
+fn render_markdown(project: &crux_analyzer_model::Project, locale: Locale) -> String {
+    crux_analyzer_docgen::markdown(project, locale)
 }
 
-fn render_mermaid(project: &crux_analyzer_model::Project) -> String {
+fn render_mermaid(project: &crux_analyzer_model::Project, locale: Locale) -> String {
     // Multiple diagrams are separated by comment headers so the output can
     // be split per machine.
-    crux_analyzer_docgen::mermaid_diagrams(project)
+    crux_analyzer_docgen::mermaid_diagrams(project, locale)
         .into_iter()
         .map(|d| format!("%% {} / {}\n{}\n", d.core, d.machine, d.mermaid))
         .collect::<Vec<_>>()
@@ -117,31 +131,39 @@ fn run_once(
     project_name: &str,
     out: Option<&Path>,
     render: Renderer,
+    messages: &Messages,
 ) -> ExitCode {
+    let locale = messages.locale();
     let outcome = match crux_analyzer_parser::parse_project(src, project_name) {
         Ok(outcome) => outcome,
         Err(err) => {
-            eprintln!("error: {err}");
+            eprintln!("{}: {}", messages.error_prefix(), err.message(locale));
             return ExitCode::FAILURE;
         }
     };
 
     for warning in &outcome.warnings {
-        eprintln!("warning: {warning}");
+        eprintln!("{}: {}", messages.warning_prefix(), warning.render(locale));
     }
 
-    let rendered = render(&outcome.project);
+    let rendered = render(&outcome.project, locale);
     match out {
         Some(path) => {
             if let Err(err) = std::fs::write(path, rendered) {
-                eprintln!("error: failed to write {}: {err}", path.display());
+                eprintln!(
+                    "{}: {}: {err}",
+                    messages.error_prefix(),
+                    messages.failed_to_write(path)
+                );
                 return ExitCode::FAILURE;
             }
             eprintln!(
-                "wrote {} ({} core(s), {} warning(s))",
-                path.display(),
-                outcome.project.cores.len(),
-                outcome.warnings.len()
+                "{}",
+                messages.wrote_summary(
+                    path,
+                    outcome.project.cores.len(),
+                    outcome.warnings.len()
+                )
             );
         }
         None => print!("{rendered}"),

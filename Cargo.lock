@@ -110,6 +110,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "crux-analyzer-docgen",
+ "crux-analyzer-i18n",
  "crux-analyzer-model",
  "crux-analyzer-parser",
  "notify",
@@ -120,8 +121,13 @@ dependencies = [
 name = "crux-analyzer-docgen"
 version = "0.1.0"
 dependencies = [
+ "crux-analyzer-i18n",
  "crux-analyzer-model",
 ]
+
+[[package]]
+name = "crux-analyzer-i18n"
+version = "0.1.0"
 
 [[package]]
 name = "crux-analyzer-model"
@@ -135,6 +141,7 @@ dependencies = [
 name = "crux-analyzer-parser"
 version = "0.1.0"
 dependencies = [
+ "crux-analyzer-i18n",
  "crux-analyzer-model",
  "proc-macro2",
  "syn 2.0.119",

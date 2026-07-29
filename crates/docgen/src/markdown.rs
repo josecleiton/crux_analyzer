@@ -1,31 +1,42 @@
 //! Markdown generator: one document with a Mermaid diagram and a transition
 //! table per machine.
 
+use crux_analyzer_i18n::Locale;
 use crux_analyzer_model::{Project, State};
 
-use crate::{effects_cell, machine_diagram};
+use crate::{effects_cell, machine_diagram, Labels};
 
-pub fn markdown(project: &Project) -> String {
+pub fn markdown(project: &Project, locale: Locale) -> String {
+    let labels = Labels::for_locale(locale);
     let mut out = String::new();
     push_line(&mut out, &format!("# {}", project.project));
 
     for core in &project.cores {
         push_line(&mut out, "");
-        push_line(&mut out, &format!("## Core: {}", core.name));
+        push_line(&mut out, &format!("## {}: {}", labels.core, core.name));
 
         for machine in &core.machines {
             push_line(&mut out, "");
-            push_line(&mut out, &format!("### Machine: {}", machine.name));
+            push_line(
+                &mut out,
+                &format!("### {}: {}", labels.machine, machine.name),
+            );
             push_line(&mut out, "");
             push_line(&mut out, "```mermaid");
-            push_line(&mut out, &machine_diagram(machine));
+            push_line(&mut out, &machine_diagram(machine, &labels));
             push_line(&mut out, "```");
             push_line(&mut out, "");
-            push_line(&mut out, "| From | Event | To | Effects |");
+            push_line(
+                &mut out,
+                &format!(
+                    "| {} | {} | {} | {} |",
+                    labels.from, labels.event, labels.to, labels.effects
+                ),
+            );
             push_line(&mut out, "| --- | --- | --- | --- |");
             for transition in &machine.transitions {
                 let from = if transition.from.0 == State::ANY {
-                    "*any*".to_string()
+                    labels.any_source.to_string()
                 } else {
                     transition.from.0.clone()
                 };
@@ -35,7 +46,7 @@ pub fn markdown(project: &Project) -> String {
                         "| {from} | `{}` | {} | {} |",
                         transition.event.0,
                         transition.to.0,
-                        effects_cell(transition),
+                        effects_cell(transition, &labels),
                     ),
                 );
             }

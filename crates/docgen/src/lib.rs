@@ -2,12 +2,18 @@
 //!
 //! Every generator consumes only [`crux_analyzer_model`] types — never the
 //! parser or its AST — so they work for any client that has a model JSON.
+//!
+//! Generators take a [`Locale`](crux_analyzer_i18n::Locale) and render their
+//! prose through [`Labels`]. Everything else they emit is Markdown/Mermaid
+//! syntax or model data, which is locale-independent by contract.
 
 use crux_analyzer_model::{Machine, State, Transition};
 
+mod labels;
 mod markdown;
 mod mermaid;
 
+pub use labels::Labels;
 pub use markdown::markdown;
 pub use mermaid::{mermaid_diagrams, Diagram};
 
@@ -23,7 +29,7 @@ fn state_id(state: &str) -> String {
 
 /// One `stateDiagram-v2` body for a machine (without code fences).
 /// Composite leaves render nested inside their parent's block.
-fn machine_diagram(machine: &Machine) -> String {
+fn machine_diagram(machine: &Machine, labels: &Labels) -> String {
     let mut lines = vec!["stateDiagram-v2".to_string()];
 
     if machine
@@ -31,7 +37,12 @@ fn machine_diagram(machine: &Machine) -> String {
         .iter()
         .any(|t| t.from.0 == State::ANY || t.to.0 == State::ANY)
     {
-        lines.push("    state \"any state\" as any_state".to_string());
+        // Only the quoted label is localized: `any_state` is the node id the
+        // transition lines refer to, so it must stay stable across locales.
+        lines.push(format!(
+            "    state \"{}\" as any_state",
+            labels.any_state
+        ));
     }
 
     // Composite blocks: `state Parent { state "Child" as Parent_Child }`.
@@ -77,9 +88,9 @@ fn is_referenced(machine: &Machine, state: &str) -> bool {
         .any(|t| t.from.0 == state || t.to.0 == state)
 }
 
-fn effects_cell(transition: &Transition) -> String {
+fn effects_cell(transition: &Transition, labels: &Labels) -> String {
     if transition.effects.is_empty() {
-        "—".to_string()
+        labels.no_effects.to_string()
     } else {
         transition
             .effects
@@ -93,6 +104,7 @@ fn effects_cell(transition: &Transition) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crux_analyzer_i18n::Locale;
     use crux_analyzer_model::{Core, Effect, Event, Project};
 
     fn sample() -> Project {
@@ -148,7 +160,7 @@ mod tests {
                 }],
             }],
         };
-        let body = &mermaid_diagrams(&project)[0].mermaid;
+        let body = &mermaid_diagrams(&project, Locale::En)[0].mermaid;
         assert!(body.contains("state Active {"), "{body}");
         assert!(body.contains("state \"Loading\" as Active_Loading"), "{body}");
         assert!(body.contains("Idle --> Active_Loading: Start"), "{body}");
@@ -156,7 +168,7 @@ mod tests {
 
     #[test]
     fn mermaid_renders_transitions_wildcards_and_orphans() {
-        let diagrams = mermaid_diagrams(&sample());
+        let diagrams = mermaid_diagrams(&sample(), Locale::En);
         assert_eq!(diagrams.len(), 1);
         assert_eq!(diagrams[0].core, "Player");
         assert_eq!(diagrams[0].machine, "PlayerState");
@@ -171,12 +183,37 @@ mod tests {
 
     #[test]
     fn markdown_embeds_diagrams_and_transition_tables() {
-        let doc = markdown(&sample());
+        let doc = markdown(&sample(), Locale::En);
         assert!(doc.contains("# Sample"), "{doc}");
         assert!(doc.contains("## Core: Player"), "{doc}");
         assert!(doc.contains("### Machine: PlayerState"), "{doc}");
         assert!(doc.contains("```mermaid\nstateDiagram-v2"), "{doc}");
         assert!(doc.contains("| Stopped | `Play` | Playing | `Render`, `Audio::Start` |"), "{doc}");
         assert!(doc.contains("| *any* | `Reset` | Stopped | — |"), "{doc}");
+    }
+
+    #[test]
+    fn markdown_localizes_prose_and_leaves_identifiers_alone() {
+        let doc = markdown(&sample(), Locale::PtBr);
+        assert!(doc.contains("## Núcleo: Player"), "{doc}");
+        assert!(doc.contains("### Máquina: PlayerState"), "{doc}");
+        assert!(doc.contains("| De | Evento | Para | Efeitos |"), "{doc}");
+        assert!(doc.contains("| *qualquer* | `Reset` | Stopped | — |"), "{doc}");
+        // The project title and every identifier are data, not prose.
+        assert!(doc.contains("# Sample"), "{doc}");
+        assert!(
+            doc.contains("| Stopped | `Play` | Playing | `Render`, `Audio::Start` |"),
+            "{doc}"
+        );
+        assert!(!doc.contains("## Core:"), "English label leaked: {doc}");
+    }
+
+    #[test]
+    fn mermaid_localizes_the_wildcard_label_but_not_its_node_id() {
+        let body = &mermaid_diagrams(&sample(), Locale::PtBr)[0].mermaid;
+        assert!(body.contains("state \"qualquer estado\" as any_state"), "{body}");
+        // The id is diagram syntax: the transition line must still resolve.
+        assert!(body.contains("any_state --> Stopped: Reset"), "{body}");
+        assert!(body.starts_with("stateDiagram-v2"), "{body}");
     }
 }
