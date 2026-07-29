@@ -4,8 +4,10 @@
  */
 
 import type { DomainMachine } from '../../domain/types';
+import { stateRole } from '../../domain/stateRole';
 import type { Simulation } from '../../simulation/engine';
 import { availableTransitions } from '../../simulation/engine';
+import { StateBadges, StateName } from '../Inspector/StateBadges';
 
 interface SimulationPanelProps {
   machine: DomainMachine;
@@ -17,12 +19,16 @@ interface SimulationPanelProps {
 export function SimulationPanel({ machine, simulation, onFire, onRestart }: SimulationPanelProps) {
   const current = machine.states.find((s) => s.id === simulation.currentStateId);
   const available = availableTransitions(machine, simulation);
+  const role = current
+    ? stateRole(machine, current)
+    : { initial: false, failure: false, final: false };
 
   return (
     <aside className="inspector">
       <h2 className="panel-title">Simulation</h2>
       <p className="inspector-machine">{machine.name}</p>
-      <h3 className="inspector-name">{current?.name ?? '?'}</h3>
+      <StateName name={current?.name ?? '?'} role={role} />
+      <StateBadges role={role} />
 
       <h4>Send event</h4>
       {available.length === 0 ? (
@@ -46,7 +52,10 @@ export function SimulationPanel({ machine, simulation, onFire, onRestart }: Simu
       ) : (
         <ol className="trail-list">
           {simulation.trail.map((step, i) => (
-            <li key={`${step.transitionId}-${i}`}>
+            <li
+              key={`${step.transitionId}-${i}`}
+              className={i === simulation.trail.length - 1 ? 'trail-new' : undefined}
+            >
               <span className="trail-event">{step.event}</span>
               <span className="trail-states">
                 {step.fromName} → {step.toName}

@@ -11,6 +11,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { DomainCore, DomainMachine } from '../domain/types';
 import { wildcardStateId } from '../domain/types';
+import { stateRole } from '../domain/stateRole';
 
 export interface FlowModel {
   nodes: Node[];
@@ -22,6 +23,8 @@ const NODE_MIN_WIDTH = 110;
 const NODE_PADDING_X = 44;
 /** Average glyph width of the node label font (14px system-ui). */
 const NODE_CHAR_WIDTH = 7.6;
+/** Extra room for the initial-state dot rendered before the label. */
+const INITIAL_MARKER_WIDTH = 14;
 
 export function toFlowModel(core: DomainCore): FlowModel {
   const grouped = core.machines.length > 1;
@@ -50,12 +53,14 @@ function machineNodes(machine: DomainMachine, parentId: string | undefined): Nod
   const nodes: Node[] = machine.states.map((state) => {
     // Composite leaves ("Active/Loading") read better with spaced separators.
     const label = state.name.replace(/\//g, ' / ');
+    const role = stateRole(machine, state);
     return {
       ...base,
       id: state.id,
       type: 'state',
-      data: { label },
-      width: nodeWidth(label),
+      data: { label, initial: role.initial, failure: role.failure, final: role.final },
+      // the initial marker (a dot before the label) needs its own room
+      width: nodeWidth(label) + (role.initial ? INITIAL_MARKER_WIDTH : 0),
       height: NODE_HEIGHT,
     };
   });

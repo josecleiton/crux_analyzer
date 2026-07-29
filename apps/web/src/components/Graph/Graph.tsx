@@ -23,6 +23,10 @@ const edgeTypes = { routed: RoutedEdge };
 export interface GraphHighlight {
   nodeIds: string[];
   edgeIds: string[];
+  /** Paints the highlight red — the simulation sits in a failure state. */
+  failure?: boolean;
+  /** Bumped on every step so the arrival animation replays (even on self-loops). */
+  step?: number;
 }
 
 interface GraphProps {
@@ -37,10 +41,17 @@ interface GraphProps {
 export function Graph({ nodes, edges, selection, onSelect, highlight, theme }: GraphProps) {
   const colors = useGraphColors(theme);
 
+  // Alternating pulse class: re-adding the same class would not restart the
+  // arrival animation when a transition loops back to the current state.
+  const pulseClass = (highlight?.step ?? 0) % 2 === 0 ? 'pulse-a' : 'pulse-b';
+  const failureClass = highlight?.failure ? ' is-failure' : '';
+
   const styledNodes = nodes.map((node) => ({
     ...node,
     selected: selection?.kind === 'state' && selection.id === node.id,
-    className: highlight?.nodeIds.includes(node.id) ? 'highlighted' : undefined,
+    className: highlight?.nodeIds.includes(node.id)
+      ? `highlighted ${pulseClass}${failureClass}`
+      : undefined,
   }));
   const styledEdges = edges.map((edge) => {
     const selected = selection?.kind === 'transition' && selection.id === edge.id;
@@ -49,12 +60,16 @@ export function Graph({ nodes, edges, selection, onSelect, highlight, theme }: G
     const stroke = selected
       ? colors.edgeSelected
       : highlighted
-        ? colors.edgeHighlighted
+        ? highlight?.failure
+          ? colors.edgeFailure
+          : colors.edgeHighlighted
         : colors.edge;
     return {
       ...edge,
       selected,
-      className: highlighted ? 'highlighted' : undefined,
+      className: highlighted ? `highlighted${failureClass}` : undefined,
+      // the traveling pulse is drawn by the edge itself, which needs to know
+      data: highlighted ? { ...edge.data, flowing: true } : edge.data,
       markerEnd:
         typeof edge.markerEnd === 'object' ? { ...edge.markerEnd, color: stroke } : edge.markerEnd,
     };

@@ -1,6 +1,8 @@
 import type { DomainCore, DomainMachine } from '../../domain/types';
 import { machineOf } from '../../domain/fromParserJson';
+import { stateRole } from '../../domain/stateRole';
 import type { Selection } from '../../state/selection';
+import { StateBadges, StateName } from './StateBadges';
 
 interface InspectorProps {
   core: DomainCore | null;
@@ -26,10 +28,12 @@ function InspectorBody({ core, selection }: InspectorProps) {
   if (selection.kind === 'state') {
     const state = machine.states.find((s) => s.id === selection.id);
     if (!state) return null;
+    const role = stateRole(machine, state);
     return (
       <div>
-        <h3 className="inspector-name">{state.name}</h3>
+        <StateName name={state.name} role={role} />
         <MachineTag machine={machine} core={core} />
+        <StateBadges role={role} />
         <h4>Incoming</h4>
         <EventList events={state.incoming.map((t) => t.event)} />
         <h4>Outgoing</h4>

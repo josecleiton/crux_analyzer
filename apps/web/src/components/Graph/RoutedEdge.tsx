@@ -5,6 +5,9 @@
  * cross nodes and labels never overlap.
  *
  * The label is SVG inside the edge group, so clicking it selects the edge.
+ *
+ * While the simulation highlights this edge (`data.flowing`), a pulse travels
+ * along the very same route, so the direction of the flow is unmistakable.
  */
 
 import { BaseEdge } from '@xyflow/react';
@@ -28,6 +31,11 @@ export function RoutedEdge({ id, data, label, selected, markerEnd }: EdgeProps) 
         markerEnd={markerEnd}
         className={`routed-edge${selectedClass}`}
       />
+      {data?.flowing ? (
+        <circle className="edge-pulse" r={3.5}>
+          <animateMotion dur="1.1s" repeatCount="indefinite" path={path} />
+        </circle>
+      ) : null}
       {label && route.label ? (
         <g className={`edge-label${selectedClass}`}>
           <rect
