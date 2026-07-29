@@ -16,6 +16,10 @@ The UI and the generated docs speak English and Brazilian Portuguese
 
 ## Demo
 
+**Try it live: [josecleiton.github.io/crux_analyzer](https://josecleiton.github.io/crux_analyzer/)**
+— the fixture below, analyzed by CI's freshly built analyzer and published on
+every push to `main`.
+
 ![The web UI analyzing the mini_recorder fixture: two orthogonal regions, the inspector, a simulation run, tag filtering and dark mode](docs/assets/demo.gif)
 
 Nothing in that recording was authored by hand. It is the web UI on
