@@ -641,6 +641,45 @@ fn effects_attach_to_their_event_arm() {
 }
 
 #[test]
+fn same_enum_in_two_fields_is_two_machines() {
+    let code = r#"
+        pub enum State { Idle, Running }
+        pub struct Model { left: State, right: State }
+        pub struct App1;
+        pub enum Event { StartLeft, StartRight }
+        impl App for App1 {
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {
+                match event {
+                    Event::StartLeft if matches!(model.left, State::Idle) => {
+                        model.left = State::Running;
+                    }
+                    Event::StartRight if matches!(model.right, State::Idle) => {
+                        model.right = State::Running;
+                    }
+                    _ => {}
+                }
+            }
+        }
+    "#;
+    let sources = sources_from_str(&[("lib.rs", code)]);
+    let outcome = parse_sources(&sources, "test").unwrap();
+    let core = &outcome.project.cores[0];
+
+    assert_eq!(core.machines.len(), 2, "each field is its own region");
+    let names: Vec<&str> = core.machines.iter().map(|m| m.name.as_str()).collect();
+    assert!(
+        names.contains(&"State (left)") && names.contains(&"State (right)"),
+        "{names:?}"
+    );
+    for machine in &core.machines {
+        assert_eq!(machine.transitions.len(), 1, "one transition per region: {names:?}");
+        let expected_event = if machine.name.contains("left") { "StartLeft" } else { "StartRight" };
+        assert_eq!(machine.transitions[0].event.0, expected_event);
+    }
+}
+
+#[test]
 fn no_core_is_an_error() {
     let sources = sources_from_str(&[("lib.rs", "pub struct NotACore;")]);
     assert!(matches!(

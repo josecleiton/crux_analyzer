@@ -11,10 +11,12 @@ use crate::transitions::RawTransition;
 /// Builds a [`Core`] from a core's extraction result: one [`Machine`] per
 /// state enum that contributed transitions (orthogonal regions).
 pub(crate) fn to_core(core: &CoreInfo, machines: &[StateMachine], raw: Vec<RawTransition>) -> Core {
-    let mut by_machine: BTreeMap<String, Vec<RawTransition>> = BTreeMap::new();
+    // Keyed by (enum, field): the same enum can drive several machines
+    // through different fields, and each keeps its own transitions.
+    let mut by_machine: BTreeMap<(String, String), Vec<RawTransition>> = BTreeMap::new();
     for transition in raw {
         by_machine
-            .entry(transition.machine.clone())
+            .entry((transition.machine.clone(), transition.field.clone()))
             .or_default()
             .push(transition);
     }
@@ -22,7 +24,8 @@ pub(crate) fn to_core(core: &CoreInfo, machines: &[StateMachine], raw: Vec<RawTr
     let model_machines = machines
         .iter()
         .filter_map(|machine| {
-            let raw_transitions = by_machine.remove(&machine.enum_name)?;
+            let raw_transitions =
+                by_machine.remove(&(machine.enum_name.clone(), machine.field_name.clone()))?;
 
             let mut transitions: Vec<Transition> = Vec::new();
             for raw in raw_transitions {
