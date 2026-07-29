@@ -264,7 +264,122 @@ fn unknown_source_state_warns_instead_of_emitting() {
     let (transitions, warnings) = transitions_of(&code);
     assert!(transitions.is_empty());
     assert_eq!(warnings.len(), 1);
-    assert!(warnings[0].contains("could not infer the source state"), "{warnings:?}");
+    assert!(warnings[0].contains("could not be resolved statically"), "{warnings:?}");
+}
+
+#[test]
+fn predicate_method_guard_resolves_source_states() {
+    let code = format!(
+        r#"{PREAMBLE}
+        pub enum Event {{ Kill, Revive }}
+        impl App for App1 {{
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {{
+                match event {{
+                    Event::Kill if model.state.is_active() => {{
+                        model.state = State::Done;
+                    }}
+                    Event::Revive if !model.state.is_active() => {{
+                        model.state = State::Idle;
+                    }}
+                    _ => {{}}
+                }}
+            }}
+        }}
+        impl State {{
+            pub const fn is_active(&self) -> bool {{
+                matches!(self, Self::Idle | Self::Running)
+            }}
+        }}
+    "#
+    );
+    let (transitions, warnings) = transitions_of(&code);
+    assert_eq!(
+        transitions,
+        vec![
+            triple("Idle", "Kill", "Done"),
+            triple("Running", "Kill", "Done"),
+            // negated predicate resolves to the complement
+            triple("Done", "Revive", "Idle"),
+        ]
+    );
+    assert!(warnings.is_empty(), "{warnings:?}");
+}
+
+#[test]
+fn negated_predicate_with_negated_body_resolves() {
+    // `!state.has_anything()` where the body is itself `!matches!(...)`.
+    let code = format!(
+        r#"{PREAMBLE}
+        pub enum Event {{ Reset }}
+        impl App for App1 {{
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {{
+                match event {{
+                    Event::Reset if !model.state.has_anything() => {{
+                        model.state = State::Running;
+                    }}
+                    _ => {{}}
+                }}
+            }}
+        }}
+        impl State {{
+            pub fn has_anything(&self) -> bool {{
+                !matches!(self, Self::Idle)
+            }}
+        }}
+    "#
+    );
+    let (transitions, _) = transitions_of(&code);
+    assert_eq!(transitions, vec![triple("Idle", "Reset", "Running")]);
+}
+
+#[test]
+fn default_reset_lands_on_default_variant() {
+    let code = r#"
+        pub enum State { #[default] Idle, Running, Done }
+        pub struct Session { state: State, count: u32 }
+        pub struct Model { session: Session }
+        pub struct App1;
+        pub enum Event { Discard }
+        impl App for App1 {
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {
+                match event {
+                    Event::Discard if matches!(model.session.state, State::Done) => {
+                        model.session = Session::default();
+                    }
+                    _ => {}
+                }
+            }
+        }
+    "#;
+    let (transitions, warnings) = transitions_of(code);
+    assert_eq!(transitions, vec![triple("Done", "Discard", "Idle")]);
+    assert!(warnings.is_empty(), "{warnings:?}");
+}
+
+#[test]
+fn unguarded_assignment_fires_from_any_state() {
+    let code = format!(
+        r#"{PREAMBLE}
+        pub enum Event {{ Panic }}
+        impl App for App1 {{
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {{
+                match event {{
+                    Event::Panic => {{
+                        model.state = State::Idle;
+                    }}
+                    _ => {{}}
+                }}
+            }}
+        }}
+    "#
+    );
+    let (transitions, warnings) = transitions_of(&code);
+    assert_eq!(transitions, vec![triple("*", "Panic", "Idle")]);
+    assert!(warnings.is_empty(), "{warnings:?}");
 }
 
 #[test]
