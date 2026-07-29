@@ -1,6 +1,8 @@
-//! Finds Cores: `impl App for X` blocks and their associated event enums.
+//! Finds Cores: `impl App for X` blocks and their associated event and
+//! effect enums.
 
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use crate::index::{CrateIndex, EnumDecl};
 
@@ -12,11 +14,18 @@ pub(crate) struct CoreInfo {
     /// associated type plus enums reachable through variant fields
     /// (`Event::Recording(RecordingEvent)` → both).
     pub event_enums: BTreeMap<String, EnumDecl>,
+    /// Same closure over the `Effect` associated type: the effect enum plus
+    /// the operation enums its variants wrap (`Effect::Audio(AudioOperation)`).
+    pub effect_enums: BTreeMap<String, EnumDecl>,
 }
 
 impl CoreInfo {
     pub fn is_event_enum(&self, name: &str) -> bool {
         self.event_enums.contains_key(name)
+    }
+
+    pub fn is_effect_enum(&self, name: &str) -> bool {
+        self.effect_enums.contains_key(name)
     }
 }
 
@@ -25,17 +34,15 @@ pub(crate) fn find_cores(index: &CrateIndex) -> Vec<CoreInfo> {
         .trait_impls
         .iter()
         .filter(|imp| imp.trait_name == "App")
-        .map(|imp| {
-            let root = associated_type(imp.item, "Event");
-            CoreInfo {
-                name: imp.self_ty.clone(),
-                event_enums: event_enum_closure(index, root.as_deref(), imp.file),
-            }
+        .map(|imp| CoreInfo {
+            name: imp.self_ty.clone(),
+            event_enums: enum_closure(index, associated_type(imp.item, "Event"), imp.file),
+            effect_enums: enum_closure(index, associated_type(imp.item, "Effect"), imp.file),
         })
         .collect()
 }
 
-/// Resolves `type Event = X;` inside the impl block to the ident `X`.
+/// Resolves `type <name> = X;` inside the impl block to the ident `X`.
 fn associated_type(item: &syn::ItemImpl, name: &str) -> Option<String> {
     item.items.iter().find_map(|impl_item| {
         if let syn::ImplItem::Type(assoc) = impl_item {
@@ -49,17 +56,17 @@ fn associated_type(item: &syn::ItemImpl, name: &str) -> Option<String> {
     })
 }
 
-/// Transitive closure of event enums, resolving each name against the file
-/// that references it (so `Event` binds to the Core's own `Event`, not a
-/// same-named enum in another module).
-fn event_enum_closure(
+/// Transitive closure over variant field types, resolving each name against
+/// the file that references it (so `Event` binds to the Core's own `Event`,
+/// not a same-named enum in another module).
+fn enum_closure(
     index: &CrateIndex,
-    root: Option<&str>,
-    core_file: &std::path::Path,
+    root: Option<String>,
+    core_file: &Path,
 ) -> BTreeMap<String, EnumDecl> {
     let mut found: BTreeMap<String, EnumDecl> = BTreeMap::new();
     let mut queue: Vec<(String, std::path::PathBuf)> = root
-        .map(|name| (name.to_string(), core_file.to_path_buf()))
+        .map(|name| (name, core_file.to_path_buf()))
         .into_iter()
         .collect();
 

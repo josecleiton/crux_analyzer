@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use crux_analyzer_model::{Core, Event, Machine, State, Transition};
+use crux_analyzer_model::{Core, Effect, Event, Machine, State, Transition};
 
 use crate::core_finder::CoreInfo;
 use crate::state_enum::StateMachine;
@@ -30,7 +30,7 @@ pub(crate) fn to_core(core: &CoreInfo, machines: &[StateMachine], raw: Vec<RawTr
                     from: State(raw.from),
                     event: Event(raw.event),
                     to: State(raw.to),
-                    effects: Vec::new(),
+                    effects: raw.effects.into_iter().map(Effect).collect(),
                 };
                 if !transitions.contains(&transition) {
                     transitions.push(transition);

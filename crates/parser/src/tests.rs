@@ -511,6 +511,136 @@ fn multiple_state_machines_become_regions() {
 }
 
 #[test]
+fn equality_guard_resolves_source_states() {
+    let code = format!(
+        r#"{PREAMBLE}
+        pub enum Event {{ Start, Abort }}
+        impl App for App1 {{
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {{
+                match event {{
+                    Event::Start if model.state == State::Idle => {{
+                        model.state = State::Running;
+                    }}
+                    Event::Abort if model.state != State::Done => {{
+                        model.state = State::Done;
+                    }}
+                    _ => {{}}
+                }}
+            }}
+        }}
+    "#
+    );
+    let (transitions, _) = transitions_of(&code);
+    assert_eq!(
+        transitions,
+        vec![
+            triple("Idle", "Start", "Running"),
+            triple("Idle", "Abort", "Done"),
+            triple("Running", "Abort", "Done"),
+        ]
+    );
+}
+
+#[test]
+fn let_else_find_closure_narrows_the_rest_of_the_block() {
+    let code = format!(
+        r#"{PREAMBLE}
+        pub struct Item {{ id: u32, state: State }}
+        pub enum Event {{ Pick }}
+        impl App for App1 {{
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {{
+                match event {{
+                    Event::Pick => {{
+                        let Some(item) = model.items.iter_mut().find(|item| {{
+                            item.id == 1 && item.state == State::Idle
+                        }}) else {{
+                            return;
+                        }};
+                        item.state = State::Running;
+                    }}
+                }}
+            }}
+        }}
+    "#
+    );
+    let (transitions, warnings) = transitions_of(&code);
+    assert_eq!(transitions, vec![triple("Idle", "Pick", "Running")]);
+    assert!(warnings.is_empty(), "{warnings:?}");
+}
+
+#[test]
+fn dynamic_target_warns_instead_of_emitting() {
+    let code = format!(
+        r#"{PREAMBLE}
+        pub enum Event {{ Sync(State), Reset }}
+        impl App for App1 {{
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {{
+                match event {{
+                    Event::Sync(status) => {{
+                        model.state = status;
+                    }}
+                    Event::Reset => {{
+                        model.state = State::Idle;
+                    }}
+                }}
+            }}
+        }}
+    "#
+    );
+    let (transitions, warnings) = transitions_of(&code);
+    // the concrete arm still extracts; the dynamic one warns
+    assert_eq!(transitions, vec![triple("*", "Reset", "Idle")]);
+    assert_eq!(warnings.len(), 1);
+    assert!(warnings[0].contains("target state is dynamic"), "{warnings:?}");
+}
+
+#[test]
+fn effects_attach_to_their_event_arm() {
+    let code = format!(
+        r#"{PREAMBLE}
+        pub enum Operation {{ Start, Stop }}
+        pub enum Effect {{ Render(RenderOperation), Op(Operation) }}
+        pub enum Event {{ Go, Halt }}
+        impl App for App1 {{
+            type Event = Event;
+            type Effect = Effect;
+            fn update(&self, event: Event, model: &mut Model) {{
+                match event {{
+                    Event::Go if matches!(model.state, State::Idle) => {{
+                        model.state = State::Running;
+                        render();
+                        Self::op(Operation::Start)
+                    }}
+                    Event::Halt if matches!(model.state, State::Running) => {{
+                        model.state = State::Done;
+                        Self::op(Operation::Stop)
+                    }}
+                    _ => {{}}
+                }}
+            }}
+        }}
+    "#
+    );
+    let sources = sources_from_str(&[("lib.rs", &code)]);
+    let outcome = parse_sources(&sources, "test").unwrap();
+    let machine = &outcome.project.cores[0].machines[0];
+
+    let go = machine.transitions.iter().find(|t| t.event.0 == "Go").unwrap();
+    assert_eq!(
+        go.effects.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(),
+        ["Render", "Operation::Start"]
+    );
+    let halt = machine.transitions.iter().find(|t| t.event.0 == "Halt").unwrap();
+    assert_eq!(
+        halt.effects.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(),
+        ["Operation::Stop"]
+    );
+}
+
+#[test]
 fn no_core_is_an_error() {
     let sources = sources_from_str(&[("lib.rs", "pub struct NotACore;")]);
     assert!(matches!(
