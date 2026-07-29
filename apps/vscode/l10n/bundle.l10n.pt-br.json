@@ -1,0 +1,7 @@
+{
+  "Open a folder to analyze.": "Abra uma pasta para analisar.",
+  "Nothing to analyze: no shared/src or src under {0}. Point cruxAnalyzer.src at the Rust sources.": "Nada para analisar: não há shared/src nem src em {0}. Aponte cruxAnalyzer.src para os fontes Rust.",
+  "Analyzing…": "Analisando…",
+  "crux-analyzer binary not found. Install it (cargo install --path crates/cli) or set cruxAnalyzer.binary.": "Binário crux-analyzer não encontrado. Instale-o (cargo install --path crates/cli) ou defina cruxAnalyzer.binary.",
+  "Analysis failed — see the Crux Analyzer output channel.": "A análise falhou — veja o canal de saída Crux Analyzer."
+}

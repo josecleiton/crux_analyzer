@@ -7,6 +7,9 @@ target/
 
 # Generated artifacts
 apps/web/public/model.json
+apps/vscode/out/
+apps/vscode/media/
+*.vsix
 
 # Misc
 .DS_Store

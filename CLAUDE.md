@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-The original roadmap is fully implemented: syn-based parser (predicate guards, `==`/closure guards, `Default` resets, wildcard sources AND targets, value-flow analysis for runtime-assigned targets, hierarchical/composite states as `Parent/Child` paths, per-transition effects, multiple state machines per core, plus state/machine documentation and `@failure` / `@deprecated` / `@tag` annotations read from `///` doc comments), CLI (`crux-analyzer generate | docs`, both with `--watch`), doc generators (Mermaid with composite blocks and per-state notes, Markdown with a states table), and the web UI (machine sections, inspector with effects and authored documentation, Simulation Engine, tag filter + undocumented-states highlight). The corpus test against a real app is gated on `CORPUS_SRC` and extracts it warning-free. `init.md` is the original project spec (in Portuguese).
+The original roadmap is fully implemented: syn-based parser (predicate guards, `==`/closure guards, `Default` resets, wildcard sources AND targets, value-flow analysis for runtime-assigned targets, hierarchical/composite states as `Parent/Child` paths, per-transition effects, multiple state machines per core, plus state/machine documentation and `@failure` / `@deprecated` / `@tag` annotations read from `///` doc comments), CLI (`crux-analyzer generate | docs`, both with `--watch`), doc generators (Mermaid with composite blocks and per-state notes, Markdown with a states table), and the web UI (machine sections, inspector with effects and authored documentation, Simulation Engine, tag filter + undocumented-states highlight). The VS Code extension (`apps/vscode`) embeds the built web bundle in a webview, spawning the CLI and regenerating on save. The corpus test against a real app is gated on `CORPUS_SRC` and extracts it warning-free. `init.md` is the original project spec (in Portuguese).
 
 ## Documentation
 
@@ -34,6 +34,7 @@ just site <src> <name> [base] # static doc site in apps/web/dist (model baked in
 just docs <src> <name> [markdown|mermaid] [en|pt-BR]
 just corpus-model                   # shortcut: analyze the private corpus into the UI
 just example-docs            # regenerate the example docs in every locale
+just ext-test | ext-build | ext-package   # VS Code extension (tests, build, .vsix)
 ```
 
 Raw `cargo`/`pnpm` equivalents are documented in `docs/development.md`. The full increment validation pipeline (tests + live UI check with screenshots + English commits + push) is described there too.
@@ -42,7 +43,7 @@ Raw `cargo`/`pnpm` equivalents are documented in `docs/development.md`. The full
 
 The project is named **crux_analyzer** (the spec in `init.md` uses the older working name "Crux Studio").
 
-A **semantic analyzer** (not a diagram generator) that turns Rust + Crux applications into living documentation. It parses Rust source via the `syn` AST and builds an intermediate semantic model. The React web app is just one client of that model — the CLI doc generators are another; a VS Code extension and more formats (PlantUML, HTML) are planned future clients.
+A **semantic analyzer** (not a diagram generator) that turns Rust + Crux applications into living documentation. It parses Rust source via the `syn` AST and builds an intermediate semantic model. The React web app is just one client of that model — the CLI doc generators and the VS Code extension are others; more formats (PlantUML, HTML) are possible future clients.
 
 The project must **not** depend on Crux itself — it only analyzes Rust code statically.
 
@@ -54,6 +55,7 @@ Monorepo layout:
 crux_analyzer/
   apps/
     web/          # React + TypeScript + React Flow + ELKJS — visualization + simulation
+    vscode/       # VS Code extension: embeds the built web bundle, spawns the CLI
   crates/
     parser/       # Rust lib: walks syn AST, identifies Core/State/Event/Effect/transitions, emits the model. Never knows about React.
     docgen/       # Rust lib: Mermaid/Markdown generators. Consume only the model.
@@ -77,7 +79,7 @@ Hard rules:
 deliberately *not* being done and why. Keep it updated instead of starting a
 list here; the pt-BR twin is `docs/pt-BR/roadmap.md`.
 
-The short version: the parser is complete against `init.md`, so the open work is
-adoption and keeping the documentation honest — the ratchet (CI,
-`--deny-warnings`, `coverage`) and tag filtering are done; the VS Code
-extension is next.
+The short version: the parser is complete against `init.md`, and the three
+adoption fronts are done too — the ratchet (CI, `--deny-warnings`, `coverage`,
+the corpus floor), tag filtering, and the VS Code extension. What remains are
+the smaller gaps (§4) and the deliberate "not yet" list (§5).

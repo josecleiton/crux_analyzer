@@ -1,0 +1,8 @@
+{
+  "extension.description": "Living state-machine documentation for Rust + Crux applications, beside the code.",
+  "command.show.title": "Show State Machines",
+  "config.binary": "Path to the crux-analyzer binary (default: resolved on PATH).",
+  "config.src": "Directory with the Rust sources to analyze, relative to the workspace root. Empty tries shared/src, then src.",
+  "config.projectName": "Project name shown in the panel. Empty uses the workspace folder name.",
+  "config.watch": "Regenerate the model whenever a .rs file under the analyzed directory is saved."
+}

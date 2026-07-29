@@ -2,8 +2,8 @@
 
 Semantic analyzer for **Rust + Crux** applications: turns the code into living
 documentation. The parser (Rust, via `syn`) produces an **intermediate model**;
-every client — the web UI, the CLI doc generators — consumes only that model
-through the JSON Schema contract.
+every client — the web UI, the CLI doc generators, the VS Code extension —
+consumes only that model through the JSON Schema contract.
 
 **Full documentation: [docs/](docs/README.md)** — architecture, parser
 semantics, schema reference, CLI, web UI, internationalization, development
@@ -18,6 +18,7 @@ The UI and the generated docs speak English and Brazilian Portuguese
 
 ```
 apps/web/        React + TypeScript + React Flow + ELKJS — visualization + simulation
+apps/vscode/     VS Code extension: the web UI in a panel, regenerating on save
 crates/parser/   Rust lib: walks the syn AST and extracts states/transitions/effects
 crates/docgen/   Rust lib: Mermaid + Markdown generators (consume only the model)
 crates/cli/      `crux-analyzer` binary: generate | docs, with --watch

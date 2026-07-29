@@ -1,0 +1,9 @@
+# Ship the compiled extension, the localization files and the built web
+# bundle — nothing else. (media/web is produced by `just ext-build`.)
+**
+!out/**
+!media/web/**
+!l10n/**
+!package.nls*.json
+!LICENSE*
+!README*

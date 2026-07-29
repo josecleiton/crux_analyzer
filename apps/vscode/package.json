@@ -1,0 +1,66 @@
+{
+  "name": "crux-analyzer-vscode",
+  "displayName": "Crux Analyzer",
+  "description": "%extension.description%",
+  "version": "0.1.0",
+  "publisher": "crux-analyzer",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/josecleiton/crux_analyzer"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization"
+  ],
+  "main": "./out/extension.js",
+  "l10n": "./l10n",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cruxAnalyzer.show",
+        "title": "%command.show.title%",
+        "category": "Crux Analyzer"
+      }
+    ],
+    "configuration": {
+      "title": "Crux Analyzer",
+      "properties": {
+        "cruxAnalyzer.binary": {
+          "type": "string",
+          "default": "crux-analyzer",
+          "description": "%config.binary%"
+        },
+        "cruxAnalyzer.src": {
+          "type": "string",
+          "default": "",
+          "description": "%config.src%"
+        },
+        "cruxAnalyzer.projectName": {
+          "type": "string",
+          "default": "",
+          "description": "%config.projectName%"
+        },
+        "cruxAnalyzer.watch": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.watch%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "vitest run",
+    "package": "pnpm dlx @vscode/vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "@types/vscode": "^1.90.0",
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.10"
+  }
+}
