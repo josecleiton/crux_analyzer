@@ -11,7 +11,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { DomainCore, DomainMachine } from '../domain/types';
 import { wildcardStateId } from '../domain/types';
-import { stateRole } from '../domain/stateRole';
+import { entryState, stateRole } from '../domain/stateRole';
 
 export interface FlowModel {
   nodes: Node[];
@@ -36,7 +36,8 @@ export function toFlowModel(core: DomainCore): FlowModel {
       nodes.push({
         id: machine.id,
         type: 'machineGroup',
-        data: { label: machine.name },
+        // clicking the section stands for clicking its entry state
+        data: { label: machine.name, entryStateId: entryState(machine)?.id },
         position: { x: 0, y: 0 },
       });
     }

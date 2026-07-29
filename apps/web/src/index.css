@@ -659,6 +659,13 @@ body {
   background: var(--group-bg);
   border: 1px solid var(--border);
   border-radius: 12px;
+  /* clicking the section selects the machine's entry state */
+  cursor: pointer;
+  transition: border-color 120ms ease;
+}
+
+.machine-group:hover {
+  border-color: var(--border-strong);
 }
 
 .machine-group-title {
@@ -668,6 +675,11 @@ body {
   letter-spacing: 0.04em;
   color: var(--text-muted);
   text-transform: uppercase;
+  transition: color 120ms ease;
+}
+
+.machine-group:hover .machine-group-title {
+  color: var(--text);
 }
 
 .inspector-machine {

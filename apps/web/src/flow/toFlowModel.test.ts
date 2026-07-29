@@ -23,6 +23,15 @@ describe('toFlowModel', () => {
     }
   });
 
+  it('points each section at the entry state of its machine', () => {
+    const { nodes } = toFlowModel(recorderCore);
+    const groups = nodes.filter((n) => n.type === 'machineGroup');
+    const entryNames = groups.map(
+      (group) => nodes.find((n) => n.id === group.data.entryStateId)!.data.label,
+    );
+    expect(entryNames).toEqual(['Idle', 'Ready']);
+  });
+
   it('renders a single-machine core flat (no groups)', () => {
     const { nodes } = toFlowModel(syncCore);
     expect(nodes.every((n) => n.type !== 'machineGroup')).toBe(true);
