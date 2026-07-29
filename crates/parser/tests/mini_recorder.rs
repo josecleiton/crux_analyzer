@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use crux_analyzer_model::{Marker, StateDecl};
 use crux_analyzer_parser::parse_project;
 
 #[test]
@@ -23,7 +24,7 @@ fn extracts_all_state_machines() {
         .expect("RecorderState machine");
     assert_eq!(
         recorder.states.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
-        ["Idle", "Recording", "Paused", "Uploading", "Completed"]
+        ["Idle", "Recording", "Paused", "Uploading", "Completed", "Failed"]
     );
 
     let triples: Vec<(&str, &str, &str)> = recorder
@@ -41,10 +42,12 @@ fn extracts_all_state_machines() {
         ("Recording", "StopPressed", "Uploading"),
         ("Paused", "StopPressed", "Uploading"),
         ("Uploading", "UploadFinished", "Completed"),
+        // guard on a struct-variant state
+        ("Failed", "RetryPressed", "Uploading"),
         // match-on-state helper with wildcard complement
-        ("Recording", "Failed", "Idle"),
-        ("Paused", "Failed", "Idle"),
-        ("Uploading", "Failed", "Idle"),
+        ("Recording", "Failed", "Failed"),
+        ("Paused", "Failed", "Failed"),
+        ("Uploading", "Failed", "Failed"),
     ];
     for triple in &expected {
         assert!(triples.contains(triple), "missing transition {triple:?} in {triples:#?}");
@@ -68,6 +71,45 @@ fn extracts_all_state_machines() {
             ("Empty", "StopPressed", "Uploading"),
             ("Uploading", "UploadFinished", "Synced"),
         ]
+    );
+
+    // Documentation authored in the fixture reaches the model.
+    assert_eq!(
+        recorder.doc.as_deref(),
+        Some(
+            "Where one recording session lives, from arming the microphone to a\nfinished upload."
+        )
+    );
+    let state = |name: &str| {
+        recorder
+            .states
+            .iter()
+            .find(|s| s.name == name)
+            .unwrap_or_else(|| panic!("no state {name}"))
+    };
+    assert_eq!(
+        state("Idle").doc.as_deref(),
+        Some("Nothing is being recorded yet. Every session starts and ends here.")
+    );
+    // A declared marker and tag, with the annotation lines out of the prose.
+    let failed = state("Failed");
+    assert_eq!(
+        failed.doc.as_deref(),
+        Some("The upload gave up. The session is kept so it can be sent again.")
+    );
+    assert_eq!(failed.markers, [Marker::Failure]);
+    assert_eq!(failed.tags, ["retryable"]);
+    // A multi-paragraph description keeps its break.
+    assert!(state("Paused").doc.as_deref().unwrap().contains("\n\n"));
+
+    // The upload region is marked at the machine level and documents no state,
+    // so it also covers the all-bare path in the same run.
+    assert_eq!(upload.markers, [Marker::Deprecated]);
+    assert!(upload.doc.as_deref().unwrap().starts_with("Mirrors"));
+    assert!(
+        upload.states.iter().all(StateDecl::is_bare),
+        "{:#?}",
+        upload.states
     );
 
     assert!(outcome.warnings.is_empty(), "unexpected warnings: {:#?}", outcome.warnings);

@@ -328,6 +328,26 @@ mod tests {
         assert!(!doc.contains("##### Playing"), "{doc}");
     }
 
+    /// A marker on the state enum describes the whole region, so it is stated
+    /// beside the machine's description rather than in the per-state table.
+    #[test]
+    fn markdown_states_markers_declared_on_the_machine() {
+        let mut project = sample();
+        let machine = &mut project.cores[0].machines[0];
+        machine.markers = vec![Marker::Deprecated];
+        machine.tags = vec!["legacy".into()];
+
+        let doc = markdown(&project, Locale::En);
+        assert!(doc.contains("**Markers:** deprecated"), "{doc}");
+        assert!(doc.contains("**Tags:** `legacy`"), "{doc}");
+        // Region-level markers alone must not conjure a states table.
+        assert!(!doc.contains("#### States"), "{doc}");
+
+        let pt = markdown(&project, Locale::PtBr);
+        assert!(pt.contains("**Marcadores:** descontinuado"), "{pt}");
+        assert!(pt.contains("**Etiquetas:** `legacy`"), "{pt}");
+    }
+
     #[test]
     fn markdown_omits_the_states_table_when_nothing_is_documented() {
         let doc = markdown(&sample(), Locale::En);
