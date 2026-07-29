@@ -23,6 +23,14 @@ body {
   height: 100%;
 }
 
+.app-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #9ca3af;
+}
+
 .toolbar {
   display: flex;
   align-items: center;

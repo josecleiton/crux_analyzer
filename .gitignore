@@ -5,6 +5,9 @@ dist/
 # Rust
 target/
 
+# Generated artifacts
+apps/web/public/model.json
+
 # Misc
 .DS_Store
 *.local
