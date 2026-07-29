@@ -44,6 +44,10 @@
   --edge-stroke-failure: #dc2626;
   --edge-label-text: #4b5563;
 
+  --state-deprecated: #b45309;
+  --state-deprecated-text: #92400e;
+  --state-deprecated-bg: #fffbeb;
+
   --state-failure: #ef4444;
   --state-failure-text: #b91c1c;
   --state-failure-bg: #fef2f2;
@@ -94,6 +98,10 @@
   --edge-stroke-highlighted: #34d399;
   --edge-stroke-failure: #f87171;
   --edge-label-text: #aab3c2;
+
+  --state-deprecated: #fbbf24;
+  --state-deprecated-text: #fcd34d;
+  --state-deprecated-bg: #2a2110;
 
   --state-failure: #f87171;
   --state-failure-text: #fca5a5;
@@ -425,6 +433,11 @@ body {
   background: var(--state-failure-bg);
 }
 
+.state-badge.deprecated {
+  color: var(--state-deprecated-text);
+  background: var(--state-deprecated-bg);
+}
+
 .state-badge.final {
   color: var(--state-final-text);
   background: var(--state-final-bg);
@@ -434,8 +447,52 @@ body {
   color: var(--state-failure-text);
 }
 
+.inspector-name.deprecated {
+  color: var(--state-deprecated-text);
+}
+
 .inspector-name.final {
   color: var(--state-final-text);
+}
+
+/* Separate from the color classes, so a deprecated failure is red *and*
+   struck through rather than having to choose. */
+.inspector-name.struck {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+/* --- Documentation from the analyzed source ------------------------------ */
+
+.doc-text {
+  margin-bottom: 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.doc-text p + p {
+  margin-top: 6px;
+}
+
+.state-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+/* Neutral on purpose: a tag carries no semantics this UI knows. Monospace and
+   as-authored, because it is data from the analyzed app — unlike the uppercase,
+   colored role badges, which are this UI's own vocabulary. */
+.state-tag {
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
 }
 
 .restart-button {
@@ -501,6 +558,38 @@ body {
   border-radius: 50%;
   /* follows the node's role color when a state is initial *and* final */
   background: currentcolor;
+}
+
+/* Three short rules standing for "there is prose behind this node". A shape,
+   not a glyph: nothing here is a word, so nothing here is localizable, and the
+   width allowance in toFlowModel stays the same in every locale. */
+.state-doc-mark {
+  flex: none;
+  width: 10px;
+  height: 7px;
+  margin-left: 7px;
+  border-top: 1.5px solid currentcolor;
+  border-bottom: 1.5px solid currentcolor;
+  opacity: 0.5;
+}
+
+.state-doc-mark::after {
+  content: '';
+  display: block;
+  margin-top: 1.25px;
+  border-top: 1.5px solid currentcolor;
+}
+
+/* A declared `@deprecated` state: dashed and amber. Deliberately not dimmed —
+   opacity already means "out of the simulation's reach" — and not struck
+   through, which turns to mush at this size; the panels do that instead.
+   Placed before the failure and final rules so those win the colors while the
+   dash survives every combination. */
+.state-node.state-deprecated {
+  border-style: dashed;
+  border-color: var(--state-deprecated);
+  background: var(--state-deprecated-bg);
+  color: var(--state-deprecated-text);
 }
 
 /* Failure states read red; final states (no way out) get the classic double

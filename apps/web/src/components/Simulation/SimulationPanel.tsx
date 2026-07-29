@@ -9,6 +9,7 @@ import type { Simulation } from '../../simulation/engine';
 import { availableTransitions } from '../../simulation/engine';
 import { useTranslate } from '../../i18n/useI18n';
 import { StateBadges, StateName } from '../Inspector/StateBadges';
+import { DocText, StateTags } from '../Inspector/StateDoc';
 
 interface SimulationPanelProps {
   machine: DomainMachine;
@@ -23,7 +24,7 @@ export function SimulationPanel({ machine, simulation, onFire, onRestart }: Simu
   const available = availableTransitions(machine, simulation);
   const role = current
     ? stateRole(machine, current)
-    : { initial: false, failure: false, final: false };
+    : { initial: false, failure: false, deprecated: false, final: false };
 
   return (
     <aside className="inspector">
@@ -31,6 +32,9 @@ export function SimulationPanel({ machine, simulation, onFire, onRestart }: Simu
       <p className="inspector-machine">{machine.name}</p>
       <StateName name={current?.name ?? t('simulation.unknownState')} role={role} />
       <StateBadges role={role} />
+      {/* Where you are, then what you can do from here. */}
+      {current?.doc ? <DocText doc={current.doc} /> : null}
+      <StateTags tags={current?.tags ?? []} />
 
       <h4>{t('simulation.sendEvent')}</h4>
       {available.length === 0 ? (

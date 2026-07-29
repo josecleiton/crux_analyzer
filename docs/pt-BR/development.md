@@ -80,7 +80,9 @@ testes.
   [i18n.md](i18n.md).
 - **Regra da honestidade** — o parser avisa sobre tudo que não consegue inferir;
   ele nunca adivinha e nunca descarta em silêncio. Novos recursos de inferência
-  devem manter o corpus livre de avisos ou explicar cada aviso restante.
+  devem manter o corpus livre de avisos ou explicar cada aviso restante. Ler o
+  que a fonte *declara* é permitido — anotações são dados que o parser pode
+  reportar — mas inferir continua proibido, e palpites ficam nos clientes.
 - **Evidência acima de forma** — heurísticas de detecção (máquinas, compostos,
   enums de evento aninhados) se baseiam em como o código *usa* um tipo, não em
   como ele se parece. Siga esse princípio ao estender a detecção.

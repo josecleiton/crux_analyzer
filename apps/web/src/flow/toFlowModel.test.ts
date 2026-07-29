@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import rawProject from '../../../../shared/schema/examples/audio-recorder.json';
 import { parseProjectJson } from '../schema/parserJson';
 import { fromParserJson } from '../domain/fromParserJson';
-import { toFlowModel } from './toFlowModel';
+import { DOC_MARK_WIDTH, toFlowModel } from './toFlowModel';
 
 // The mapper receives already-translated chrome; these tests pin the English
 // label so a locale change cannot silently alter node geometry expectations.
@@ -63,6 +63,59 @@ describe('toFlowModel', () => {
     // The longer label must widen the node: the width estimate has to be
     // derived from the translated string, not from a hardcoded English one.
     expect(ptBR.width!).toBeGreaterThan(english.width!);
+  });
+
+  it('carries a state description and the deprecated role into node data', () => {
+    const { nodes } = toFlowModel(syncCore, labels);
+    const conflict = nodes.find((n) => n.data.label === 'Conflict')!;
+    expect(conflict.data.doc).toMatch(/someone has to choose/);
+    expect(nodes.find((n) => n.data.label === 'Done')!.data.deprecated).toBe(true);
+    expect(conflict.data.deprecated).toBe(false);
+    expect(nodes.find((n) => n.data.label === 'Idle')!.data.doc).toBeUndefined();
+  });
+
+  it('keeps tags out of the flow model', () => {
+    // Tags are inspector-only: a node's geometry must not depend on how many
+    // an author wrote.
+    const { nodes } = toFlowModel(project.cores[1], labels);
+    const failed = nodes.find((n) => n.data.label === 'Failed')!;
+    expect(failed.data.tags).toBeUndefined();
+  });
+
+  it('gives a documented state room for its mark', () => {
+    const machine = syncCore.machines[0];
+    const undocumented = {
+      ...syncCore,
+      machines: [{ ...machine, states: machine.states.map((s) => ({ ...s, doc: undefined })) }],
+    };
+    const withDoc = toFlowModel(syncCore, labels).nodes.find((n) => n.data.label === 'Conflict')!;
+    const without = toFlowModel(undocumented, labels).nodes.find(
+      (n) => n.data.label === 'Conflict',
+    )!;
+    expect(withDoc.width! - without.width!).toBe(DOC_MARK_WIDTH);
+  });
+
+  it('sizes a documented node identically in every locale', () => {
+    // The mark is a CSS shape and the description is untranslated data, so
+    // this feature adds no locale-dependent geometry.
+    const english = toFlowModel(syncCore, labels).nodes.find((n) => n.data.label === 'Conflict')!;
+    const ptBR = toFlowModel(syncCore, { anyState: 'qualquer estado' }).nodes.find(
+      (n) => n.data.label === 'Conflict',
+    )!;
+    expect(ptBR.width).toBe(english.width);
+  });
+
+  it('carries the machine description onto its section node', () => {
+    const { nodes } = toFlowModel(recorderCore, labels);
+    const groups = nodes.filter((n) => n.type === 'machineGroup');
+    // Neither Recorder machine is documented in the example.
+    expect(groups.every((g) => g.data.doc === undefined)).toBe(true);
+
+    const documented = toFlowModel(
+      { ...recorderCore, machines: [{ ...recorderCore.machines[0], doc: 'A region.' }, recorderCore.machines[1]] },
+      labels,
+    ).nodes.filter((n) => n.type === 'machineGroup');
+    expect(documented[0].data.doc).toBe('A region.');
   });
 
   it('turns each transition into an edge labeled with its event', () => {

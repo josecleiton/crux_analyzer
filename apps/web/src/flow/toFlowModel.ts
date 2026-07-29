@@ -19,6 +19,23 @@ export interface FlowModel {
 }
 
 /**
+ * What a `state` node needs to render itself.
+ *
+ * `doc` is the analyzed app's own prose — data, not chrome, so it does not go
+ * through `FlowLabels` and the width allowance it earns is the same in every
+ * locale. `tags` deliberately stay out: they belong to the panels, and putting
+ * them in a node would make its geometry depend on how many an author wrote.
+ */
+export interface StateNodeData extends Record<string, unknown> {
+  label: string;
+  initial: boolean;
+  failure: boolean;
+  deprecated: boolean;
+  final: boolean;
+  doc?: string;
+}
+
+/**
  * Chrome this layer has to render but must not author.
  *
  * Localization is a presentation concern: the mapper receives already-
@@ -39,6 +56,12 @@ const NODE_PADDING_X = 44;
 const NODE_CHAR_WIDTH = 7.6;
 /** Extra room for the initial-state dot rendered before the label. */
 const INITIAL_MARKER_WIDTH = 14;
+/**
+ * Extra room for the documentation mark rendered after the label: a 10px
+ * shape plus its 7px gap. A shape and not a glyph, so this is the same in
+ * every locale.
+ */
+export const DOC_MARK_WIDTH = 17;
 
 export function toFlowModel(core: DomainCore, labels: FlowLabels): FlowModel {
   const grouped = core.machines.length > 1;
@@ -51,7 +74,11 @@ export function toFlowModel(core: DomainCore, labels: FlowLabels): FlowModel {
         id: machine.id,
         type: 'machineGroup',
         // clicking the section stands for clicking its entry state
-        data: { label: machine.name, entryStateId: entryState(machine)?.id },
+        data: {
+          label: machine.name,
+          entryStateId: entryState(machine)?.id,
+          doc: machine.doc,
+        },
         position: { x: 0, y: 0 },
       });
     }
@@ -73,13 +100,25 @@ function machineNodes(
     // Composite leaves ("Active/Loading") read better with spaced separators.
     const label = state.name.replace(/\//g, ' / ');
     const role = stateRole(machine, state);
+    const data: StateNodeData = {
+      label,
+      initial: role.initial,
+      failure: role.failure,
+      deprecated: role.deprecated,
+      final: role.final,
+      doc: state.doc,
+    };
     return {
       ...base,
       id: state.id,
       type: 'state',
-      data: { label, initial: role.initial, failure: role.failure, final: role.final },
-      // the initial marker (a dot before the label) needs its own room
-      width: nodeWidth(label) + (role.initial ? INITIAL_MARKER_WIDTH : 0),
+      data,
+      // the initial marker (a dot before the label) and the documentation mark
+      // (a shape after it) each need their own room
+      width:
+        nodeWidth(label) +
+        (role.initial ? INITIAL_MARKER_WIDTH : 0) +
+        (state.doc ? DOC_MARK_WIDTH : 0),
       height: NODE_HEIGHT,
     };
   });

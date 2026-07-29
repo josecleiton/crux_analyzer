@@ -60,15 +60,19 @@ These are the non-negotiable constraints the codebase is built around
    selection, highlights). The Simulation Engine was added without changing
    a line of the Graph component; that is the litmus test for rule 4.
 5. **Honesty rule (parser)** — whatever cannot be inferred statically is
-   surfaced as a `Warning`, never silently dropped and never guessed. See
-   [parser.md](parser.md#warnings-reference).
+   surfaced as a `Warning`, never silently dropped and never guessed. Reading
+   what the source *declares* is not guessing: doc comments and their
+   `@failure` / `@deprecated` / `@tag` annotations are evidence and travel in
+   the model, while name-shaped inferences stay in the clients that want them
+   (`domain/stateRole.ts`). See
+   [parser.md](parser.md#documentation-and-annotations).
 6. **Localization is a presentation concern** — `crates/model`, the parser's
    extraction, and the web app's `domain/` / `flow/` / `layout/` layers hold no
    translated text. Diagnostics travel as data (`WarningKind`) and generators
    take a locale; translated chrome is injected at the boundary (component
-   props, `Labels`, `FlowLabels`). The model JSON stays locale-independent, and
-   identifiers from the analyzed app are never translated.
-   See [i18n.md](i18n.md).
+   props, `Labels`, `FlowLabels`). The model JSON stays locale-independent: it
+   holds no text **of ours**, and identifiers and author prose read out of the
+   analyzed app are never translated. See [i18n.md](i18n.md).
 
 ## Web app layering
 

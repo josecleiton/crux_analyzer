@@ -3,7 +3,7 @@ import rawProject from '../../../../shared/schema/examples/audio-recorder.json';
 import { parseProjectJson } from '../schema/parserJson';
 import { fromParserJson } from './fromParserJson';
 import { entryState, isFailureName, stateRole } from './stateRole';
-import type { DomainMachine } from './types';
+import type { DomainMachine, DomainState } from './types';
 
 const project = fromParserJson(parseProjectJson(rawProject));
 const recorderMachine = project.cores[0].machines[0]; // RecorderState
@@ -44,16 +44,19 @@ describe('stateRole', () => {
     expect(role(recorderMachine, 'Idle')).toEqual({
       initial: true, // nothing transitions into Idle
       failure: false,
+      deprecated: false,
       final: false,
     });
     expect(role(recorderMachine, 'Completed')).toEqual({
       initial: false,
       failure: false,
+      deprecated: false,
       final: true, // no outgoing transition
     });
     expect(role(recorderMachine, 'Recording')).toEqual({
       initial: false,
       failure: false,
+      deprecated: false,
       final: false,
     });
   });
@@ -70,6 +73,7 @@ describe('stateRole', () => {
     expect(role(authMachine, 'Failed')).toEqual({
       initial: false,
       failure: true,
+      deprecated: false,
       final: false,
     });
   });
@@ -81,6 +85,55 @@ describe('stateRole', () => {
     // the first state carries the initial role
     expect(role(inputMachine, 'Ready').initial).toBe(true);
     expect(role(inputMachine, 'Switching').initial).toBe(false);
+  });
+});
+
+/** A bare extra state, for the heuristic-silencing cases. */
+function extraState(name: string, markers: DomainState['markers'] = []): DomainState {
+  return { id: `x/${name}`, name, markers, tags: [], incoming: [], outgoing: [] };
+}
+
+function withState(machine: DomainMachine, state: DomainState): DomainMachine {
+  return { ...machine, states: [...machine.states, state] };
+}
+
+describe('stateRole with declared markers', () => {
+  it('trusts a declared @failure', () => {
+    // AuthState's "Failed" declares one in the bundled example.
+    const failed = authMachine.states.find((s) => s.name === 'Failed')!;
+    expect(failed.markers).toEqual(['failure']);
+    expect(role(authMachine, 'Failed').failure).toBe(true);
+  });
+
+  it('marks a declared @deprecated and never infers one', () => {
+    // SyncState's "Done" declares it; nothing else does.
+    const sync = project.cores[2].machines[0];
+    expect(role(sync, 'Done').deprecated).toBe(true);
+    expect(role(sync, 'Idle').deprecated).toBe(false);
+    // No name ever implies it — that would be a guess, and there is no
+    // heuristic for "on its way out".
+    const machine = withState(recorderMachine, extraState('DeprecatedIdle'));
+    expect(stateRole(machine, machine.states.at(-1)!).deprecated).toBe(false);
+  });
+
+  it('stops guessing failures in a machine that declares one', () => {
+    // AuthState declares @failure, so an unmarked failure-shaped sibling is
+    // unmarked on purpose.
+    const declaring = withState(authMachine, extraState('UploadError'));
+    expect(stateRole(declaring, declaring.states.at(-1)!).failure).toBe(false);
+
+    // RecorderState declares none, so the heuristic still stands in.
+    const guessing = withState(recorderMachine, extraState('UploadError'));
+    expect(stateRole(guessing, guessing.states.at(-1)!).failure).toBe(true);
+  });
+
+  it('does not let @deprecated silence the failure heuristic', () => {
+    // Only a declared *failure* is a statement about failures.
+    const machine = withState(
+      withState(recorderMachine, extraState('LegacyIdle', ['deprecated'])),
+      extraState('UploadError'),
+    );
+    expect(stateRole(machine, machine.states.at(-1)!).failure).toBe(true);
   });
 });
 
