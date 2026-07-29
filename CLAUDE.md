@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-The MVP is scaffolded: pnpm + Cargo workspaces, `shared/schema` contract, stub crates (`model`, `parser`), and the working web UI in `apps/web` reading the fake JSON. `init.md` is the original project spec (in Portuguese).
+Working end-to-end: the real parser (`crates/parser`, syn-based) extracts states/transitions from Crux apps, the CLI (`crates/cli`, binary `crux-analyzer`) emits the model JSON, and the web UI renders it (falling back to the bundled fake example when no `apps/web/public/model.json` exists). Corpus test against a real app is gated on `QUIPU_SRC`. `init.md` is the original project spec (in Portuguese).
 
 ## Conventions
 
@@ -15,7 +15,10 @@ The MVP is scaffolded: pnpm + Cargo workspaces, `shared/schema` contract, stub c
 ```sh
 pnpm install && pnpm dev   # web UI (Vite, apps/web)
 pnpm test                  # vitest on the mapping layers
-cargo check && cargo test  # Rust crates
+cargo check && cargo test  # Rust crates (parser unit + fixture tests)
+QUIPU_SRC=<quipu>/shared/src cargo test          # + real-app corpus test
+cargo run -p crux-analyzer-cli -- generate \
+  --src <app>/src --out apps/web/public/model.json  # feed the UI a real model
 ```
 
 ## What Crux Analyzer Is
