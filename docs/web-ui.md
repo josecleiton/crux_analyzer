@@ -14,16 +14,21 @@ Three areas, LangGraph-Studio style:
   regions) renders each as a **titled section**; a single-machine core
   renders flat. Every state is a node, every transition an edge labeled with
   its event. Wildcard transitions (`from`/`to` = `"*"`) connect to a dashed
-  **any state** pseudo-node. Composite leaves show as `Parent / Child`.
-  Clicking a section (its title or empty area) selects the machine's **entry
-  state** and frames that machine in the viewport, so a machine can be
-  inspected — and simulated — in one click.
+  **any state** pseudo-node. A **composite state** renders as a container
+  holding its leaves — the same nesting the Mermaid output shows; the parent
+  is never a state of its own, so the container selects nothing (and a
+  machine that somehow declares a plain state colliding with a parent's name
+  keeps that family flat). Clicking a section (its title or empty area)
+  selects the machine's **entry state** and frames that machine in the
+  viewport, so a machine can be inspected — and simulated — in one click.
 - **Inspector** (right panel) — selecting a state shows its role badges, the
-  description and tags authored on it in the analyzed source, and its
-  incoming/outgoing events; selecting a transition shows `event: from ↓ to`
-  plus the **effects** it requests. Either way the machine's own description
-  closes the panel. The owning machine is tagged when the core has more than
-  one.
+  description and tags authored on it in the analyzed source, its
+  incoming/outgoing events (documented ones carry a mark and a tooltip), and
+  **Effects on entry**: the union of the effects its incoming transitions
+  request — "some of these fire", never "all". Selecting a transition shows
+  the event's own authored description, `from ↓ to`, plus the **effects** it
+  requests. Either way the machine's own description closes the panel. The
+  owning machine is tagged when the core has more than one.
 
 ## State roles
 
@@ -73,26 +78,31 @@ which are this UI's own vocabulary. A state's description sits directly under
 its name with no heading; the machine's own description comes last, under
 *About this machine*, together with any markers declared on the region.
 
-Markdown syntax inside a doc comment is **not** rendered here (no Markdown
-dependency); hard-wrapped lines are rejoined into paragraphs
-(`docParagraphs`), because `///` wrapping at 80 columns is not a request for
-line breaks in a 260px panel. The generated Markdown document is the client
-that renders Markdown as Markdown.
+Markdown inside a doc comment **renders as Markdown** in the panels
+(react-markdown): code spans, lists, emphasis — the same reading the
+generated document always gave it. Raw HTML in author prose is deliberately
+left inert (shown as text, never executed — react-markdown builds React
+elements and injects no HTML), and hard-wrapped `///` lines rejoin naturally,
+since Markdown treats a single newline as a soft break. Node and section
+tooltips are native `title` attributes, so there the prose stays plain text.
 
 ## Filtering the canvas
 
-Two reading filters live in the toolbar. Both say "these, not the rest" the
-same way the simulation does: the matching states stay at full strength while
-every other state and transition fades back.
+Two reading filters. Both say "these, not the rest" the same way the
+simulation does: the matching states stay at full strength while every other
+state and transition fades back.
 
-- **Filter by tag** — type a fragment of a declared `@tag` name; matching is
-  case-insensitive and the input suggests the active core's own tags. A tag
-  declared on the state enum covers its whole region. The input only renders
-  when the core declares any tag — with nothing to filter by there is no
-  filter.
-- **Undocumented** — an opt-in toggle that keeps only the states with no
-  authored description: the states a reader should not trust yet. Opt-in on
-  purpose, so the default view stays about the machine rather than about
+- **Filter by tag** — the input beside the title (it reads while the toolbar
+  buttons act): type a fragment of a declared `@tag` name, case-insensitive.
+  It carries its own suggestion list — most-used tags first, opened on focus
+  — rather than a native `<datalist>`, whose popup is inconsistent across
+  engines. A tag declared on the state enum covers its whole region. The
+  input only renders when the core declares any tag — with nothing to filter
+  by there is no filter.
+- **Undocumented** — an opt-in toggle (amber warning triangle; amber when
+  active — green belongs to the simulation) that keeps only the states with
+  no authored description: the states a reader should not trust yet. Opt-in
+  on purpose, so the default view stays about the machine rather than about
   documentation coverage (the number itself comes from
   `crux-analyzer coverage`, see [cli.md](cli.md)).
 
@@ -107,6 +117,17 @@ that only escapes the dimming, so a filter match never borrows the
 simulation's colors. While a simulation runs the filters are disabled: the
 emphasis belongs to the replay. Switching cores clears them — each core
 declares its own tags.
+
+## Deep links
+
+The selection lives in the URL hash — `#state=Core/Machine/Name`,
+`#transition=<id>`, `#core=<name>` — so "this state of this machine" is a
+link that can be pasted in a review. Clicking mirrors into the address bar via
+`replaceState` (no history pile-up), the default view keeps a clean URL, a
+pasted hash applies without a reload, and a stale or foreign link falls back
+to the core (or to nothing) instead of a broken UI. Hash-based on purpose:
+the static deployment has no router and no SPA fallback rule, and a hash
+survives any host untouched (`src/state/urlSelection.ts`).
 
 ## Data source
 
@@ -152,9 +173,11 @@ needed — there is a single page and no router.
 Select a state (optional) and hit **Simulate**:
 
 - the right panel switches to the simulation: current state, the events that
-  can fire from it (wildcard-sourced ones are always available;
-  runtime-target `to: "*"` transitions are excluded from replay), and the
-  trail of what already fired;
+  can fire from it (wildcard-sourced ones are always available), and the
+  trail of what already fired. Runtime-target `to: "*"` transitions cannot
+  be replayed — there is nothing static to land on — so they are listed
+  inert under the fireable ones with a note saying exactly that, rather than
+  silently hidden;
 - the canvas reads as a path, in three tiers of emphasis: everything already
   **traveled** is bold green (states and transitions, starting state
   included), what can **fire from here** keeps a green outline, and everything
@@ -225,8 +248,13 @@ rounded corners, and the label box each edge label occupies — ELK computes
 them (`ElkLayoutEngine`, `elk.algorithm: layered` with inline edge labels),
 so edges never cross nodes and labels never overlap. Machine sections use
 ELK's hierarchical layout (React Flow group nodes with relative child
-positions). Nodes are not draggable — routes are engine-owned; use
-**Re-layout** to recompute.
+positions), and grouping is arbitrary-depth: composite containers nest inside
+sections, with each machine laid out as one hierarchical run
+(`INCLUDE_CHILDREN`) so edges may cross a composite's boundary, and every
+edge declared in the lowest common ancestor of its endpoints. Nodes are not
+draggable — routes are engine-owned. **Re-layout** recomputes *and*
+re-frames the viewport: the layout is deterministic, so recomputing alone
+would change nothing visible.
 
 ## Extending
 
