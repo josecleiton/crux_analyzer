@@ -1,0 +1,9 @@
+[package]
+name = "crux-analyzer-docgen"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Documentation generators for the crux_analyzer semantic model (Mermaid, Markdown)."
+
+[dependencies]
+crux-analyzer-model = { path = "../model" }
