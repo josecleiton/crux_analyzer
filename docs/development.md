@@ -94,4 +94,6 @@ source and compare against the CLI output before trusting the tests.
   Portuguese mirror.
 - `CLAUDE.md` — working agreements for AI-assisted development (kept in sync
   with the architecture rules).
+- `docs/roadmap.md` — the single source for planned work. Add to it rather than
+  starting a list elsewhere, and record what you decide *not* to do too.
 - `init.md` — the original project spec (Portuguese, historical).

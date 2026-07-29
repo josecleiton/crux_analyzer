@@ -17,6 +17,7 @@ documentação viva (UI web interativa, documentos Mermaid/Markdown).
 | [UI Web](web-ui.md) | Seções, inspetor, simulação, motor de layout |
 | [Internacionalização](i18n.md) | Locales, catálogos, o que nunca deve ser traduzido |
 | [Desenvolvimento](development.md) | Setup, testes, corpus, convenções, pipeline de validação |
+| [Roadmap](roadmap.md) | Trabalho planejado, em ordem, e o que deliberadamente não será feito |
 | [Exemplo de saída](examples/mini-recorder.md) | Documentação gerada pela CLI a partir do fixture de teste |
 
 O conjunto em inglês é a **fonte**; esta versão o espelha. Veja

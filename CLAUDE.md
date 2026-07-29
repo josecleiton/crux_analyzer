@@ -72,8 +72,10 @@ Hard rules:
 
 ## Known future work
 
-- PlantUML/HTML generators; VS Code extension.
-- Visual nesting of composite states in the web graph (they currently render as flat `Parent / Child` nodes; Mermaid already nests them).
-- Doc comments on events, effects and transitions (only states and machines are covered today).
-- Marker styling in Mermaid (`classDef`) behind an explicit generator option — the default output states markers in words, since a hardcoded fill breaks in a dark-mode reader.
-- Rendering Markdown inside descriptions in the web UI (it currently shows as literal text; the generated document is the client for real Markdown).
+`docs/roadmap.md` is the single source — planned work in order, plus what is
+deliberately *not* being done and why. Keep it updated instead of starting a
+list here; the pt-BR twin is `docs/pt-BR/roadmap.md`.
+
+The short version: the parser is complete against `init.md`, so the open work is
+adoption and keeping the documentation honest — CI, `--deny-warnings` and a
+`coverage` subcommand first, then tag filtering, then the VS Code extension.
