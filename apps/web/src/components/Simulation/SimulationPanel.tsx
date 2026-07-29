@@ -6,7 +6,7 @@
 import type { DomainMachine } from '../../domain/types';
 import { stateRole } from '../../domain/stateRole';
 import type { Simulation } from '../../simulation/engine';
-import { availableTransitions, unreplayableTransitions } from '../../simulation/engine';
+import { availableTransitions, pendingAnswers, unreplayableTransitions } from '../../simulation/engine';
 import { useTranslate } from '../../i18n/useI18n';
 import { StateBadges, StateName } from '../Inspector/StateBadges';
 import { DocText, StateTags } from '../Inspector/StateDoc';
@@ -23,6 +23,9 @@ export function SimulationPanel({ machine, simulation, onFire, onRestart }: Simu
   const current = machine.states.find((s) => s.id === simulation.currentStateId);
   const available = availableTransitions(machine, simulation);
   const unreplayable = unreplayableTransitions(machine, simulation);
+  const answers = pendingAnswers(machine, simulation);
+  const answerOf = (transitionId: string) =>
+    answers.find((answer) => answer.transitionId === transitionId);
   const role = current
     ? stateRole(machine, current)
     : { initial: false, failure: false, deprecated: false, final: false };
@@ -42,14 +45,23 @@ export function SimulationPanel({ machine, simulation, onFire, onRestart }: Simu
         <p className="inspector-empty">{t('simulation.noEvents')}</p>
       ) : (
         <ul className="event-list">
-          {available.map((transition) => (
-            <li key={transition.id}>
-              <button className="event-button" onClick={() => onFire(transition.id)}>
-                {transition.event}
-                <span className="event-target"> → {transition.toName}</span>
-              </button>
-            </li>
-          ))}
+          {available.map((transition) => {
+            const answer = answerOf(transition.id);
+            return (
+              <li key={transition.id}>
+                <button className="event-button" onClick={() => onFire(transition.id)}>
+                  {transition.event}
+                  <span className="event-target"> → {transition.toName}</span>
+                  {/* The shell owes this one: it can arrive with no user input. */}
+                  {answer ? (
+                    <span className="event-answer" title={answer.effect}>
+                      {t('simulation.fromShell')}
+                    </span>
+                  ) : null}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -66,6 +78,37 @@ export function SimulationPanel({ machine, simulation, onFire, onRestart }: Simu
             ))}
           </ul>
           <p className="event-unreplayable-note">{t('simulation.runtimeTargetNote')}</p>
+        </>
+      ) : null}
+
+      {/* What the last events asked the shell to do, and what it can answer
+          with — the half of the loop the graph itself cannot show. */}
+      {simulation.inFlight.length > 0 ? (
+        <>
+          <h4>{t('simulation.inFlight')}</h4>
+          <ul className="event-list">
+            {simulation.inFlight.map((pending) => (
+              <li key={`${pending.step}-${pending.name}`}>
+                {pending.name}
+                <span className="event-target"> → {pending.answers.join(', ')}</span>
+              </li>
+            ))}
+          </ul>
+          {/* Answers with no transition from here: real, and inert. */}
+          {answers.some((answer) => answer.transitionId === null) ? (
+            <>
+              <ul className="event-list">
+                {answers
+                  .filter((answer) => answer.transitionId === null)
+                  .map((answer) => (
+                    <li key={answer.event} className="event-unreplayable">
+                      {answer.event}
+                    </li>
+                  ))}
+              </ul>
+              <p className="event-unreplayable-note">{t('simulation.inertAnswerNote')}</p>
+            </>
+          ) : null}
         </>
       ) : null}
 

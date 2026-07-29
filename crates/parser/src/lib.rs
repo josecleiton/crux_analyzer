@@ -80,6 +80,10 @@ pub enum WarningKind {
     UnknownEvent { to: String },
     /// The guard references the state but defeats static analysis.
     UnresolvableSource { to: String },
+    /// A request declares a callback (`…then_send(…)`) whose event cannot be
+    /// read off the call site — a function or a value computed elsewhere. The
+    /// effect is still recorded; what is lost is which event answers it.
+    UnresolvedEffectCallback,
     /// A doc comment line looked like an annotation but is not one — a typo
     /// (`@failur`), a marker given an argument, or a `@tag` with no usable
     /// name. Reported rather than left inert, so the mistake is visible.
@@ -115,6 +119,7 @@ impl WarningKind {
             WarningKind::DynamicTarget { .. } => "dynamic-target",
             WarningKind::UnknownEvent { .. } => "unknown-event",
             WarningKind::UnresolvableSource { .. } => "unresolvable-source",
+            WarningKind::UnresolvedEffectCallback => "unresolved-effect-callback",
             WarningKind::UnknownAnnotation { .. } => "unknown-annotation",
             WarningKind::AnalysisTruncated { .. } => "analysis-truncated",
             WarningKind::FileTooLarge { .. } => "file-too-large",

@@ -67,7 +67,26 @@ export interface ParserTransitionJson {
   from: string;
   event: string;
   to: string;
-  effects?: string[];
+  effects?: ParserEffectJson[];
+}
+
+/**
+ * An effect after normalization — the only effect shape that leaves this
+ * module. The contract authors it either as a bare operation label or as an
+ * object adding what the source declares around the request, and both collapse
+ * here, exactly as states do.
+ *
+ * `resolvesWith` is always an array and `conditional` always a boolean so no
+ * consumer needs `?? []`; `capability` stays optional because "goes through no
+ * capability" and "unknown" are the same absence to a renderer.
+ */
+export interface ParserEffectJson {
+  name: string;
+  capability?: string;
+  /** Events the shell can answer this request with. */
+  resolvesWith: string[];
+  /** Requested on a branch the transition itself does not imply. */
+  conditional: boolean;
 }
 
 /** Wildcard source state: the transition fires from any state. */
@@ -168,8 +187,33 @@ function parseTransition(machineName: string, raw: unknown): ParserTransitionJso
   const effects =
     raw.effects === undefined
       ? undefined
-      : parseStrings(`machine "${machineName}": effects`, raw.effects);
+      : parseEffects(`machine "${machineName}"`, raw.effects);
   return { from: raw.from, event: raw.event, to: raw.to, effects };
+}
+
+function parseEffects(what: string, raw: unknown): ParserEffectJson[] {
+  if (!Array.isArray(raw)) throw invalid(`${what}: effects must be an array`);
+  return raw.map((entry) => parseEffect(what, entry));
+}
+
+/** Both authored forms of an effect, collapsed into one record. */
+function parseEffect(what: string, raw: unknown): ParserEffectJson {
+  if (typeof raw === 'string') return { name: raw, resolvesWith: [], conditional: false };
+  if (!isRecord(raw)) {
+    throw invalid(`${what}: effect must be a string or an object`);
+  }
+  if (typeof raw.name !== 'string') {
+    throw invalid(`${what}: effect.name must be a string`);
+  }
+  if (raw.conditional !== undefined && typeof raw.conditional !== 'boolean') {
+    throw invalid(`${what}: effect.conditional must be a boolean`);
+  }
+  return {
+    name: raw.name,
+    capability: typeof raw.capability === 'string' ? raw.capability : undefined,
+    resolvesWith: parseStrings(`effect "${raw.name}": resolvesWith`, raw.resolvesWith),
+    conditional: raw.conditional === true,
+  };
 }
 
 function parseDoc(what: string, raw: unknown): string | undefined {

@@ -6,6 +6,7 @@ import {
   availableTransitions,
   fire,
   lastStep,
+  pendingAnswers,
   startSimulation,
   traveledPath,
   unreplayableTransitions,
@@ -14,6 +15,61 @@ import {
 const project = fromParserJson(parseProjectJson(rawProject));
 const recorder = project.cores[0].machines[0]; // RecorderState
 const inputs = project.cores[0].machines[1]; // InputState (has wildcard)
+
+describe('effects in flight', () => {
+  const fireEvent = (machine: typeof recorder, sim: ReturnType<typeof startSimulation>, event: string) =>
+    fire(machine, sim, availableTransitions(machine, sim).find((t) => t.event === event)!.id);
+
+  it('records what each step asked the shell to do', () => {
+    const sim = fireEvent(recorder, startSimulation(recorder), 'RecordPressed');
+    expect(lastStep(sim)!.effects.map((e) => e.name)).toEqual(['AudioOperation::Start']);
+  });
+
+  it('keeps a request waiting until an event answers it', () => {
+    // RecordPressed requests Start, answered by RecordingStarted — an event no
+    // transition of this machine carries, so it stays waiting.
+    let sim = fireEvent(recorder, startSimulation(recorder), 'RecordPressed');
+    expect(sim.inFlight.map((p) => p.name)).toEqual(['AudioOperation::Start']);
+    expect(sim.inFlight[0].step).toBe(1);
+
+    // Pausing and resuming are fire-and-forget: nothing new waits, and Start
+    // still does.
+    sim = fireEvent(recorder, sim, 'PausePressed');
+    sim = fireEvent(recorder, sim, 'ResumePressed');
+    expect(sim.inFlight.map((p) => p.name)).toEqual(['AudioOperation::Start']);
+
+    // Stopping requests the upload, which UploadFinished answers.
+    sim = fireEvent(recorder, sim, 'StopPressed');
+    expect(sim.inFlight.map((p) => p.name)).toEqual([
+      'AudioOperation::Start',
+      'HttpOperation::Upload',
+    ]);
+    sim = fireEvent(recorder, sim, 'UploadFinished');
+    expect(sim.inFlight.map((p) => p.name)).toEqual(['AudioOperation::Start']);
+  });
+
+  it('says which answers a transition handles and which are inert', () => {
+    const sim = fireEvent(recorder, startSimulation(recorder), 'RecordPressed');
+    // The shell can answer with RecordingStarted; no transition from Recording
+    // carries it, so the replay reports it instead of offering it.
+    expect(pendingAnswers(recorder, sim)).toEqual([
+      { event: 'RecordingStarted', effect: 'AudioOperation::Start', transitionId: null },
+    ]);
+
+    // In the input machine the answer *is* a transition from here.
+    const switching = fireEvent(inputs, startSimulation(inputs), 'InputSelected');
+    const answers = pendingAnswers(inputs, switching);
+    const handled = answers.find((a) => a.event === 'InputSwitched')!;
+    expect(handled.transitionId).toBe(
+      availableTransitions(inputs, switching).find((t) => t.event === 'InputSwitched')!.id,
+    );
+    expect(answers.find((a) => a.event === 'InputSwitchFailed')!.transitionId).toBeNull();
+  });
+
+  it('starts and restarts with nothing in flight', () => {
+    expect(startSimulation(recorder).inFlight).toEqual([]);
+  });
+});
 
 describe('simulation engine', () => {
   it('starts at the first state by default, or at a chosen state', () => {

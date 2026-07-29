@@ -106,15 +106,85 @@ documentação.
 
 ## Efeitos
 
-As operações solicitadas por cada braço de evento se anexam às transições que ele
-produz:
+Um efeito é uma **solicitação com volta**, e é assim que ele é lido: a operação,
+a capacidade por onde ela trafega e os eventos com que o shell pode responder.
+
+O que conta como solicitação:
 
 - construções de enums do fechamento de efeitos (`AudioOperation::Start`),
   rotuladas `Enum::Variante`;
 - uma chamada ao `render()` puro do crux → `Render`.
 
-Um braço que produz várias transições compartilha seu conjunto de efeitos entre
-elas (uma sobreaproximação para braços com ramificação interna).
+### A capacidade
+
+O enum `Effect` do núcleo é o que nomeia suas capacidades: a variante que envolve
+o enum de uma operação *é* a capacidade por onde a operação passa.
+`Effect::Audio(AudioOperation)` coloca toda solicitação de `AudioOperation` sob
+`Audio`. Estrutura, não inferência — nada é lido do formato de um nome. `Render`
+não passa por nenhuma.
+
+### A resposta
+
+O laço do Crux é `Evento → Efeito → shell → Evento`, e a volta está escrita no
+local da solicitação, então ela é evidência como qualquer outra. Três formatos
+são lidos, e os eventos que eles nomeiam se tornam o `resolvesWith` da
+solicitação:
+
+```rust
+// o callback ao lado da operação
+Self::request_audio(AudioOperation::Start, Event::CaptureStarted);
+
+// a API Command do crux
+Command::request_from_shell(operation).then_send(Event::Started);
+
+// um callback que mapeia o resultado do shell: todo evento que ele constrói
+Command::request_from_shell(operation).then_send(move |result| match result {
+    AudioResult::Started { id } => RecordingEvent::RecordingStarted { id },
+    AudioResult::Failed(message) => RecordingEvent::RecordingFailed { message },
+})
+```
+
+Um **conjunto**, não um evento: uma solicitação tem rotineiramente uma resposta
+por desfecho. Uma solicitação construída por um helper compartilhado
+(`audio_command(op)`, cujo corpo faz o `then_send`) é seguida uma chamada adiante,
+então a operação que o chamador escreveu mantém as respostas que seu helper
+declara — o que também significa que toda solicitação por aquele helper carrega a
+união do que o callback dele pode construir. Essa é a leitura honesta: pelo que a
+fonte mostra, qualquer uma delas pode voltar.
+
+Uma resposta que nomeia um evento que **nenhuma transição carrega** é mantida. É
+comportamento real — uma confirmação que o núcleo apenas renderiza — e os
+clientes dizem isso em vez de esconder.
+
+Um callback cujo evento não pode ser lido no local da chamada (`then_send(f)`) é
+um aviso `unresolved-effect-callback`: a solicitação continua registrada, apenas
+sua resposta é desconhecida. Uma solicitação que não declara callback nenhum
+*não* é aviso — disparar e esquecer é um formato legítimo.
+
+### A quais transições uma solicitação pertence
+
+Efeitos têm escopo de **ramo**, não de braço: a cadeia de alternativas (ramos de
+`if`/`else`, braços de `match`) percorrida até a solicitação é comparada com a
+cadeia da atribuição que produziu a transição.
+
+- Mesma cadeia → a solicitação pertence àquela transição.
+- Cadeias que se bifurcam → não pertence. Uma solicitação em um ramo nunca cai
+  nas transições do ramo irmão.
+- Mais profunda que a transição → pertence, marcada como **condicional**: chegar
+  ali *pode* solicitá-la. Sobreaproximar é o certo (a solicitação é real), e
+  dizê-lo é melhor do que soar como certeza.
+
+```rust
+RecorderEvent::RetryPressed => {
+    if session.attempts_left() {
+        state = Uploading;                     // ← Upload, certo
+        Self::request(HttpOperation::Upload).then_send(RecorderEvent::UploadFinished);
+    } else {
+        state = Idle;                          // ← apenas Render
+        render();
+    }
+}
+```
 
 ## Documentação e anotações
 
@@ -125,10 +195,11 @@ seu estado.
 Comentários de documentação em **variantes de enums de evento e efeito**
 também chegam ao modelo, como catálogos `events` / `effects` por núcleo
 (`{ name, doc }`). Duas restrições mantêm os catálogos honestos: só entram
-nomes que aparecem nas transições do núcleo (um wrapper delegante documentado
+nomes que aparecem no modelo do núcleo (um wrapper delegante documentado
 como `Event::Recorder(RecorderEvent)` não é um evento que uma transição possa
-carregar), e só entram nomes documentados — as tabelas de transição já
-enumeram o vocabulário. Anotações (linhas `@…`) não são lidas em eventos ou
+carregar) — um evento nomeado como resposta de um efeito conta, já que está no
+modelo e um cliente que o exibe deve poder exibir a prosa dele —, e só entram
+nomes documentados, porque as tabelas de transição já enumeram o vocabulário. Anotações (linhas `@…`) não são lidas em eventos ou
 efeitos; ainda não há nada que um marcador signifique ali.
 
 ```rust
@@ -217,6 +288,7 @@ baseie ferramentas e documentação nele, já que o texto da mensagem é localiz
 | `dynamic-target` | `o estado de destino é dinâmico (atribuído a partir de um valor definido em tempo de execução)` | o valor atribuído não tem tipagem de payload nem restrições resolvíveis |
 | `no-update-method` | `núcleo X: método update não encontrado` | um bloco `impl App` sem função `update` |
 | `unknown-annotation` | `anotação X não reconhecida: não é @failure, @deprecated nem @tag <nome>` | uma linha de documentação parecia uma anotação mas não é: um erro de digitação, um marcador com argumento, ou um `@tag` sem nome utilizável |
+| `unresolved-effect-callback` | `callback de efeito não resolvido: o evento que responde a esta solicitação não é nomeado no local da chamada` | um `then_send` cujo argumento não constrói evento algum (uma função, ou um valor calculado em outro lugar). A solicitação é registrada; a resposta dela, não |
 
 Uma execução limpa contra uma aplicação alvo real extrai com **zero** avisos.
 

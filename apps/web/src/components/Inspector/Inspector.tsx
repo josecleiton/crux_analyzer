@@ -1,4 +1,4 @@
-import type { DomainCore, DomainMachine } from '../../domain/types';
+import type { DomainCore, DomainEffect, DomainMachine } from '../../domain/types';
 import { machineOf } from '../../domain/fromParserJson';
 import { entryEffects } from '../../domain/effects';
 import { stateRole } from '../../domain/stateRole';
@@ -54,7 +54,7 @@ function InspectorBody({ core, selection }: InspectorProps) {
         {onEntry.length > 0 ? (
           <>
             <h4>{t('inspector.entryEffects')}</h4>
-            <EventList events={onEntry} docs={core.effectDocs} />
+            <EffectList effects={onEntry} core={core} />
           </>
         ) : null}
         {/* Context rather than the selection, so it comes last. */}
@@ -88,11 +88,55 @@ function InspectorBody({ core, selection }: InspectorProps) {
       {transition.effects.length > 0 ? (
         <>
           <h4>{t('inspector.effects')}</h4>
-          <EventList events={transition.effects} docs={core.effectDocs} />
+          <EffectList effects={transition.effects} core={core} />
         </>
       ) : null}
       <MachineDoc machine={machine} />
     </div>
+  );
+}
+
+/**
+ * Effect requests: the operation, the capability it travels through, and the
+ * events the shell can answer it with — the return leg of Crux's loop, which
+ * the transition tables cannot show.
+ *
+ * A request the transition's own path does not imply is marked rather than
+ * dropped or stated flatly: "arriving here may request this".
+ */
+function EffectList({ effects, core }: { effects: DomainEffect[]; core: DomainCore }) {
+  const t = useTranslate();
+  return (
+    <ul className="event-list">
+      {effects.map((effect) => {
+        const doc = core.effectDocs[effect.name];
+        return (
+          <li key={effect.name} title={doc}>
+            <span className="effect-name">
+              {effect.name}
+              {doc ? <span className="state-doc-mark" aria-hidden="true" /> : null}
+            </span>
+            {effect.capability ? (
+              <span className="effect-capability">{effect.capability}</span>
+            ) : null}
+            {effect.conditional ? (
+              <span className="effect-conditional">{t('inspector.conditional')}</span>
+            ) : null}
+            {effect.answers.length > 0 ? (
+              <span className="effect-answers">
+                {t('inspector.answersWith')}{' '}
+                {effect.answers.map((event, i) => (
+                  <span key={event} title={core.eventDocs[event]}>
+                    {i > 0 ? ', ' : ''}
+                    {event}
+                  </span>
+                ))}
+              </span>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

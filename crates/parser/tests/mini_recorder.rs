@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crux_analyzer_model::{Marker, StateDecl};
+use crux_analyzer_model::{Effect, Event, Marker, StateDecl};
 use crux_analyzer_parser::parse_project;
 
 #[test]
@@ -42,8 +42,9 @@ fn extracts_all_state_machines() {
         ("Recording", "StopPressed", "Uploading"),
         ("Paused", "StopPressed", "Uploading"),
         ("Uploading", "UploadFinished", "Completed"),
-        // guard on a struct-variant state
+        // guard on a struct-variant state, one target per branch
         ("Failed", "RetryPressed", "Uploading"),
+        ("Failed", "RetryPressed", "Idle"),
         // match-on-state helper with wildcard complement
         ("Recording", "Failed", "Failed"),
         ("Paused", "Failed", "Failed"),
@@ -74,16 +75,54 @@ fn extracts_all_state_machines() {
     );
 
     // Effects requested by the arms reach their transitions.
-    let effect_of = |event: &str| {
+    let effects_of = |event: &str, to: &str| {
         recorder
             .transitions
             .iter()
-            .find(|t| t.event.0 == event)
-            .map(|t| t.effects.iter().map(|e| e.0.as_str()).collect::<Vec<_>>())
+            .find(|t| t.event.0 == event && t.to.0 == to)
+            .map(|t| t.effects.clone())
             .unwrap_or_default()
     };
-    assert_eq!(effect_of("RecordPressed"), ["AudioOperation::Start"]);
-    assert_eq!(effect_of("StopPressed"), ["AudioOperation::Stop"]);
+    fn names(effects: &[Effect]) -> Vec<&str> {
+        effects.iter().map(|e| e.name.as_str()).collect()
+    }
+
+    // A capability-style request: the operation, the capability its enum sits
+    // under in `Effect`, and the event handed to the same call.
+    assert_eq!(
+        effects_of("RecordPressed", "Recording"),
+        [Effect {
+            name: "AudioOperation::Start".into(),
+            capability: Some("Audio".into()),
+            resolves_with: vec![Event("CaptureStarted".into())],
+            conditional: false,
+        }]
+    );
+
+    // Stopping always tells the hardware; sending the take sits on a branch
+    // below the assignment, so it is kept and marked conditional.
+    let stopping = effects_of("StopPressed", "Uploading");
+    assert_eq!(
+        names(&stopping),
+        ["AudioOperation::Stop", "HttpOperation::Upload"]
+    );
+    assert!(!stopping[0].conditional);
+    assert!(stopping[0].resolves_with.is_empty(), "fire-and-forget request");
+    assert!(stopping[1].conditional);
+    assert_eq!(stopping[1].capability.as_deref(), Some("Http"));
+    // The other half of the loop: the event the shell answers with is an event
+    // this very machine handles.
+    assert_eq!(stopping[1].resolves_with, [Event("UploadFinished".into())]);
+
+    // Two branches of one arm, two targets, and neither inherits the other's
+    // request — the retry uploads, giving up only renders.
+    assert_eq!(
+        names(&effects_of("RetryPressed", "Uploading")),
+        ["HttpOperation::Upload"]
+    );
+    assert_eq!(names(&effects_of("RetryPressed", "Idle")), ["Render"]);
+    // `render()` goes through no capability and answers with nothing.
+    assert!(effects_of("RetryPressed", "Idle")[0].is_bare());
 
     // Doc comments on event and effect variants become the core's catalogs —
     // only the documented AND used names.
@@ -92,6 +131,12 @@ fn extracts_all_state_machines() {
     assert_eq!(
         events,
         [
+            // Named only as an effect's callback, and documented — no
+            // transition carries it, and it is still part of the model.
+            (
+                "CaptureStarted",
+                "The shell confirmed the microphone is live. Nothing to decide: the\nsession is already recording."
+            ),
             ("RecordPressed", "The user hit the record button on the main screen."),
             ("RetryPressed", "Retry the failed upload, keeping the recorded take."),
         ]
@@ -100,10 +145,16 @@ fn extracts_all_state_machines() {
         core.effects.iter().map(|e| (e.name.as_str(), e.doc.as_str())).collect();
     assert_eq!(
         effects,
-        [(
-            "AudioOperation::Start",
-            "Arms the microphone and begins capturing into the session buffer."
-        )]
+        [
+            (
+                "AudioOperation::Start",
+                "Arms the microphone and begins capturing into the session buffer."
+            ),
+            (
+                "HttpOperation::Upload",
+                "Sends the finished take, answering with the server's verdict."
+            ),
+        ]
     );
 
     // Documentation authored in the fixture reaches the model.

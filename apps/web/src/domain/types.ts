@@ -74,7 +74,25 @@ export interface DomainTransition {
   fromName: string;
   toName: string;
   /** Effects requested when this transition fires. */
-  effects: string[];
+  effects: DomainEffect[];
+}
+
+/**
+ * An effect request, with what the analyzed source declares around it: the
+ * capability it travels through, the events the shell can answer it with, and
+ * whether the transition's own path actually implies it.
+ *
+ * `answers` is this client's word for the contract's `resolvesWith` — the
+ * mapping layer renames it once, here, so components read the loop the way it
+ * reads in the UI.
+ */
+export interface DomainEffect {
+  name: string;
+  capability?: string;
+  /** Events the shell can answer this request with; empty for fire-and-forget. */
+  answers: string[];
+  /** Requested on a branch the transition does not imply: "may request". */
+  conditional: boolean;
 }
 
 /** Wildcard source name used in the contract. */

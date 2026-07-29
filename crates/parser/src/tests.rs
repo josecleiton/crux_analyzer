@@ -2,7 +2,7 @@
 
 use crate::loader::sources_from_str;
 use crate::parse_sources;
-use crux_analyzer_model::Transition;
+use crux_analyzer_model::{Event, Transition};
 
 fn transitions_of(code: &str) -> (Vec<(String, String, String)>, Vec<String>) {
     let sources = sources_from_str(&[("lib.rs", code)]);
@@ -772,14 +772,123 @@ fn effects_attach_to_their_event_arm() {
 
     let go = machine.transitions.iter().find(|t| t.event.0 == "Go").unwrap();
     assert_eq!(
-        go.effects.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(),
+        go.effects.iter().map(|e| e.name.as_str()).collect::<Vec<_>>(),
         ["Render", "Operation::Start"]
     );
+    // `Effect::Op(Operation)` puts every `Operation` request under `Op`;
+    // crux's bare `render()` goes through no capability at all.
+    assert_eq!(go.effects[0].capability, None);
+    assert_eq!(go.effects[1].capability.as_deref(), Some("Op"));
     let halt = machine.transitions.iter().find(|t| t.event.0 == "Halt").unwrap();
     assert_eq!(
-        halt.effects.iter().map(|e| e.0.as_str()).collect::<Vec<_>>(),
+        halt.effects.iter().map(|e| e.name.as_str()).collect::<Vec<_>>(),
         ["Operation::Stop"]
     );
+}
+
+/// The two shapes a request declares its answer in, and the branch rule that
+/// keeps one arm's alternatives from inheriting each other's requests.
+#[test]
+fn effect_callbacks_and_branches_are_read_from_the_request_site() {
+    let code = format!(
+        r#"{PREAMBLE}
+        pub enum Operation {{ Start, Stop, Cancel }}
+        pub enum Effect {{ Render(RenderOperation), Op(Operation) }}
+        pub enum Event {{ Go, Halt, Started, Stopped }}
+        impl App for App1 {{
+            type Event = Event;
+            type Effect = Effect;
+            fn update(&self, event: Event, model: &mut Model) {{
+                match event {{
+                    Event::Go if matches!(model.state, State::Idle) => {{
+                        model.state = State::Running;
+                        Self::request(Operation::Start).then_send(Event::Started);
+                    }}
+                    Event::Halt if matches!(model.state, State::Running) => {{
+                        if model.graceful {{
+                            model.state = State::Done;
+                            Self::op(Operation::Stop, Event::Stopped)
+                        }} else {{
+                            model.state = State::Idle;
+                            Self::op(Operation::Cancel)
+                        }}
+                    }}
+                    _ => {{}}
+                }}
+            }}
+        }}
+    "#
+    );
+    let sources = sources_from_str(&[("lib.rs", &code)]);
+    let outcome = parse_sources(&sources, "test").unwrap();
+    let machine = &outcome.project.cores[0].machines[0];
+    let effects_to = |to: &str| {
+        machine
+            .transitions
+            .iter()
+            .find(|t| t.to.0 == to)
+            .map(|t| t.effects.clone())
+            .unwrap_or_default()
+    };
+
+    // `…then_send(Event::Started)`: the callback is declared on the chain that
+    // built the request, and reaches the operation through the receiver.
+    let running = effects_to("Running");
+    assert_eq!(running.len(), 1);
+    assert_eq!(running[0].name, "Operation::Start");
+    assert_eq!(running[0].resolves_with, [Event("Started".into())]);
+
+    // An event passed alongside the operation says the same thing, and the
+    // sibling branch's request stays out of this transition.
+    let done = effects_to("Done");
+    assert_eq!(done.len(), 1);
+    assert_eq!(done[0].name, "Operation::Stop");
+    assert_eq!(done[0].resolves_with, [Event("Stopped".into())]);
+    assert!(!done[0].conditional, "the branch's own request is certain");
+
+    let idle = effects_to("Idle");
+    assert_eq!(idle.len(), 1);
+    assert_eq!(idle[0].name, "Operation::Cancel");
+    assert!(idle[0].resolves_with.is_empty(), "no callback was declared");
+
+    assert!(outcome.warnings.is_empty(), "{:?}", outcome.warnings);
+}
+
+/// A callback whose event is not written at the call site is evidence we have
+/// and cannot resolve — reported, never guessed.
+#[test]
+fn an_unreadable_effect_callback_warns() {
+    let code = format!(
+        r#"{PREAMBLE}
+        pub enum Operation {{ Start }}
+        pub enum Effect {{ Render(RenderOperation), Op(Operation) }}
+        pub enum Event {{ Go }}
+        impl App for App1 {{
+            type Event = Event;
+            type Effect = Effect;
+            fn update(&self, event: Event, model: &mut Model) {{
+                match event {{
+                    Event::Go if matches!(model.state, State::Idle) => {{
+                        model.state = State::Running;
+                        Self::request(Operation::Start).then_send(model.callback);
+                    }}
+                    _ => {{}}
+                }}
+            }}
+        }}
+    "#
+    );
+    let sources = sources_from_str(&[("lib.rs", &code)]);
+    let outcome = parse_sources(&sources, "test").unwrap();
+
+    // The request is still recorded — only its answer is unknown.
+    let machine = &outcome.project.cores[0].machines[0];
+    let transition = &machine.transitions[0];
+    assert_eq!(transition.effects[0].name, "Operation::Start");
+    assert!(transition.effects[0].resolves_with.is_empty());
+
+    let codes: Vec<&str> = outcome.warnings.iter().map(|w| w.kind.code()).collect();
+    assert_eq!(codes, ["unresolved-effect-callback"]);
 }
 
 #[test]

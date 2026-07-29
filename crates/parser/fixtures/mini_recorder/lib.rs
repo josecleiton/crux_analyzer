@@ -16,8 +16,15 @@ pub enum AudioOperation {
     Stop,
 }
 
+/// Requests the shell makes of the upload server.
+pub enum HttpOperation {
+    /// Sends the finished take, answering with the server's verdict.
+    Upload,
+}
+
 pub enum Effect {
     Audio(AudioOperation),
+    Http(HttpOperation),
 }
 
 pub struct Model {

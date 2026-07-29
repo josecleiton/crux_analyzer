@@ -31,6 +31,13 @@ Três áreas, no estilo LangGraph Studio:
   **efeitos** que ela solicita. Em ambos os casos a descrição da própria máquina
   encerra o painel. A máquina proprietária é etiquetada quando o core tem mais de
   uma.
+- Cada efeito é uma solicitação com volta, e é renderizado como tal: a operação,
+  um selo para a **capacidade** por onde ela trafega, `responde com` e os eventos
+  que o shell pode devolver (os documentados mantêm seu tooltip), e um selo
+  **pode** quando a solicitação está em um ramo que a transição não implica. Na
+  união dos *Efeitos ao entrar*, as respostas das chegadas são reunidas e o
+  **pode** só sobrevive quando toda chegada que faz a solicitação concorda que ela
+  é condicional.
 
 ## Papéis dos estados
 
@@ -205,6 +212,14 @@ Selecione um estado (opcional) e clique em **Simular**:
   `to: "*"` não podem ser reproduzidas — não há nada estático onde aterrissar —
   então são listadas inertes sob as disparáveis, com uma nota dizendo
   exatamente isso, em vez de escondidas em silêncio;
+- o replay modela a **outra metade do laço do Crux**. Disparar um evento registra
+  o que ele pediu ao shell; uma solicitação que declara resposta fica em
+  **Aguardando o shell** até que um evento a responda, e o evento que responde uma
+  solicitação pendente recebe o selo `do shell` na lista de disparáveis — assim "o
+  que o usuário pode fazer em seguida" e "o que o shell te deve" param de parecer
+  a mesma coisa. Uma resposta que nenhuma transição daqui trata é listada inerte
+  com o mesmo tipo de nota de um destino de tempo de execução: comportamento real
+  que não muda estado;
 - o canvas se lê como um caminho, em três níveis de ênfase: tudo que já foi
   **percorrido** fica verde em negrito (estados e transições, incluindo o estado
   inicial), o que pode **disparar daqui** mantém um contorno verde, e todo o resto

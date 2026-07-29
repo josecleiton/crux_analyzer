@@ -30,6 +30,8 @@ export const ptBR: Catalog = {
   'inspector.outgoing': 'Saídas',
   'inspector.effects': 'Efeitos',
   'inspector.entryEffects': 'Efeitos ao entrar',
+  'inspector.answersWith': 'responde com',
+  'inspector.conditional': 'pode',
   'inspector.none': '—',
   'inspector.tags': 'Etiquetas',
   'inspector.aboutMachine': 'Sobre esta máquina',
@@ -48,6 +50,10 @@ export const ptBR: Catalog = {
   'simulation.noEvents': 'Nenhum evento pode ser disparado a partir daqui.',
   'simulation.runtimeTargetNote':
     'Estes levam a um estado decidido em tempo de execução, então o replay não consegue segui-los.',
+  'simulation.inFlight': 'Aguardando o shell',
+  'simulation.fromShell': 'do shell',
+  'simulation.inertAnswerNote':
+    'O shell pode enviar estes de volta, e nenhuma transição daqui os trata: comportamento real que não muda estado.',
   'simulation.trail': 'Histórico',
   'simulation.nothingFired': 'Nada foi disparado ainda.',
   'simulation.restart': 'Reiniciar',

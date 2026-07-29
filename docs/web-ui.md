@@ -29,6 +29,13 @@ Three areas, LangGraph-Studio style:
   the event's own authored description, `from ↓ to`, plus the **effects** it
   requests. Either way the machine's own description closes the panel. The
   owning machine is tagged when the core has more than one.
+- Each effect is a request with a return leg, so it is rendered as one: the
+  operation, a chip for the **capability** it travels through, `answers with`
+  and the events the shell can send back (documented ones keep their tooltip),
+  and a **may** chip when the request sits on a branch the transition does not
+  imply. In the *Effects on entry* union, the answers of the arrivals are
+  pooled and **may** survives only when every arrival that makes the request
+  agrees it is conditional.
 
 ## State roles
 
@@ -192,6 +199,13 @@ Select a state (optional) and hit **Simulate**:
   be replayed — there is nothing static to land on — so they are listed
   inert under the fireable ones with a note saying exactly that, rather than
   silently hidden;
+- the replay models the **other half of Crux's loop**. Firing an event records
+  what it asked the shell to do; a request that declares an answer stays under
+  **Waiting for the shell** until an event answers it, and an event that answers
+  a waiting request is badged `from the shell` in the fireable list — so "what
+  the user can do next" and "what the shell owes you" stop looking alike. An
+  answer no transition here handles is listed inert with the same kind of note
+  as a runtime target: real behavior that changes no state;
 - the canvas reads as a path, in three tiers of emphasis: everything already
   **traveled** is bold green (states and transitions, starting state
   included), what can **fire from here** keeps a green outline, and everything

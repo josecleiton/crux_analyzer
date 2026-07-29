@@ -6,7 +6,7 @@
  * props, exactly as the architecture promised: no graph changes needed.
  */
 
-import type { DomainMachine, DomainTransition } from '../domain/types';
+import type { DomainEffect, DomainMachine, DomainTransition } from '../domain/types';
 import { wildcardStateId } from '../domain/types';
 
 export interface SimulationStep {
@@ -14,6 +14,24 @@ export interface SimulationStep {
   event: string;
   fromName: string;
   toName: string;
+  /** What firing this asked the shell to do. */
+  effects: DomainEffect[];
+}
+
+/**
+ * A request the replay has made and the shell has not answered yet.
+ *
+ * This is the half of Crux's loop a state graph cannot show: firing an event
+ * requests an effect, and the *shell* decides which event comes back. Only
+ * requests that declare an answer wait here — a fire-and-forget request is done
+ * the moment it is made.
+ */
+export interface InFlightEffect {
+  name: string;
+  /** Step (1-based, as in the trail) that requested it. */
+  step: number;
+  /** Events the shell can answer it with. */
+  answers: string[];
 }
 
 export interface Simulation {
@@ -22,6 +40,8 @@ export interface Simulation {
   initialStateId: string;
   currentStateId: string;
   trail: SimulationStep[];
+  /** Requests still waiting for the shell, oldest first. */
+  inFlight: InFlightEffect[];
 }
 
 /** Starts a simulation at `initialStateId` (or the machine's first state). */
@@ -34,6 +54,7 @@ export function startSimulation(machine: DomainMachine, initialStateId?: string)
     initialStateId: initial.id,
     currentStateId: initial.id,
     trail: [],
+    inFlight: [],
   };
 }
 
@@ -83,6 +104,7 @@ export function fire(
   if (!transition) return simulation; // not fireable from here — ignore
 
   const current = machine.states.find((s) => s.id === simulation.currentStateId);
+  const step = simulation.trail.length + 1;
   return {
     machineId: simulation.machineId,
     initialStateId: simulation.initialStateId,
@@ -94,9 +116,51 @@ export function fire(
         event: transition.event,
         fromName: current?.name ?? transition.fromName,
         toName: transition.toName,
+        effects: transition.effects,
       },
     ],
+    // This event answers whatever was waiting for it, and the requests this
+    // transition makes start waiting in turn.
+    inFlight: [
+      ...simulation.inFlight.filter((pending) => !pending.answers.includes(transition.event)),
+      ...transition.effects
+        .filter((effect) => effect.answers.length > 0)
+        .map((effect) => ({ name: effect.name, step, answers: effect.answers })),
+    ],
   };
+}
+
+/**
+ * The events the shell owes the replay, oldest request first: what can arrive
+ * next without the user doing anything.
+ *
+ * `fireable` is what separates an answer the graph accounts for from one it does
+ * not: a callback event with no transition from the current state is real
+ * behavior that changes no state (a confirmation the core just renders), and
+ * saying so beats hiding it.
+ */
+export interface Answer {
+  event: string;
+  /** The request this answers. */
+  effect: string;
+  /** Transition this answer would fire from the current state, if any. */
+  transitionId: string | null;
+}
+
+export function pendingAnswers(machine: DomainMachine, simulation: Simulation): Answer[] {
+  const available = availableTransitions(machine, simulation);
+  const answers: Answer[] = [];
+  for (const pending of simulation.inFlight) {
+    for (const event of pending.answers) {
+      if (answers.some((answer) => answer.event === event)) continue;
+      answers.push({
+        event,
+        effect: pending.name,
+        transitionId: available.find((t) => t.event === event)?.id ?? null,
+      });
+    }
+  }
+  return answers;
 }
 
 /** The last fired transition, for highlighting. */

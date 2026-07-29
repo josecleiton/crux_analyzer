@@ -249,7 +249,7 @@ fn machine_diagram(machine: &Machine, labels: &Labels) -> String {
             "    {} --> {}: {}",
             ids.id(&transition.from.0),
             ids.id(&transition.to.0),
-            mermaid_label(&transition.event.0),
+            mermaid_label(&transition_label(transition)),
         ));
     }
 
@@ -315,17 +315,84 @@ fn has_documented_states(machine: &Machine) -> bool {
     machine.states.iter().any(StateDecl::is_documented)
 }
 
+/// The transition table's effects cell: each request, the event it is answered
+/// with when the source names one, and a qualifier when the transition's own
+/// path does not imply it.
 fn effects_cell(transition: &Transition, labels: &Labels) -> String {
     if transition.effects.is_empty() {
-        labels.no_effects.to_string()
-    } else {
-        transition
-            .effects
-            .iter()
-            .map(|e| format!("`{}`", e.0))
-            .collect::<Vec<_>>()
-            .join(", ")
+        return labels.no_effects.to_string();
     }
+    transition
+        .effects
+        .iter()
+        .map(|effect| {
+            let mut cell = format!("`{}`", effect.name);
+            if !effect.resolves_with.is_empty() {
+                cell.push_str(&format!(
+                    " → {}",
+                    answers_cell(&effect.resolves_with, labels)
+                ));
+            }
+            if effect.conditional {
+                cell.push_str(&format!(" ({})", labels.conditional));
+            }
+            cell
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Event names as a monospace, comma-separated list.
+fn monospace_events(events: &[crux_analyzer_model::Event]) -> String {
+    events
+        .iter()
+        .map(|event| format!("`{}`", event.0))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// How many answers a transition row lists before counting the rest. A request
+/// built by a shared helper can be answered by every event that helper's
+/// callback maps, which is a dozen in a real app — too many for a table cell,
+/// and never dropped silently: the count says how many were left out and the
+/// capabilities table lists them all.
+const ANSWERS_IN_A_CELL: usize = 3;
+
+fn answers_cell(events: &[crux_analyzer_model::Event], labels: &Labels) -> String {
+    if events.len() <= ANSWERS_IN_A_CELL {
+        return monospace_events(events);
+    }
+    format!(
+        "{}, +{} {}",
+        monospace_events(&events[..ANSWERS_IN_A_CELL]),
+        events.len() - ANSWERS_IN_A_CELL,
+        labels.more
+    )
+}
+
+/// A transition's Mermaid label: `event / effect, effect` — the statechart
+/// convention for "this event, and what firing it asks the shell to do".
+///
+/// Deliberately terser than the table cell: a conditional request is marked with
+/// a `?` and the callback event is left to the table, because a diagram edge has
+/// to stay readable at a glance.
+fn transition_label(transition: &Transition) -> String {
+    if transition.effects.is_empty() {
+        return transition.event.0.clone();
+    }
+    let effects = transition
+        .effects
+        .iter()
+        .map(|effect| {
+            if effect.conditional {
+                format!("{}?", effect.name)
+            } else {
+                effect.name.clone()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("{} / {}", transition.event.0, effects)
 }
 
 #[cfg(test)]
@@ -347,7 +414,7 @@ mod tests {
                             from: State("Stopped".into()),
                             event: Event("Play".into()),
                             to: State("Playing".into()),
-                            effects: vec![Effect("Render".into()), Effect("Audio::Start".into())],
+                            effects: vec![Effect::bare("Render"), Effect::bare("Audio::Start")],
                         },
                         Transition {
                             from: State(State::ANY.into()),
@@ -673,6 +740,95 @@ mod tests {
             "{doc}"
         );
         assert!(!doc.contains("## Core:"), "English label leaked: {doc}");
+    }
+
+    /// `sample()` with what the source declares around its requests.
+    fn requesting_sample() -> Project {
+        let mut project = sample();
+        project.cores[0].machines[0].transitions[0].effects = vec![
+            Effect::bare("Render"),
+            Effect {
+                name: "Audio::Start".into(),
+                capability: Some("Audio".into()),
+                resolves_with: vec![Event("Started".into()), Event("Failed".into())],
+                conditional: false,
+            },
+            Effect {
+                name: "Http::Report".into(),
+                capability: Some("Http".into()),
+                resolves_with: vec![
+                    Event("Reported".into()),
+                    Event("ReportFailed".into()),
+                    Event("Retried".into()),
+                    Event("GaveUp".into()),
+                ],
+                conditional: true,
+            },
+        ];
+        project
+    }
+
+    #[test]
+    fn transition_labels_carry_the_effects_statechart_style() {
+        let body = &mermaid_diagrams(&requesting_sample(), Locale::En)[0].mermaid;
+        // `event / action`, with a conditional request marked as such. The
+        // callback events stay out of the diagram.
+        assert!(
+            body.contains("Stopped --> Playing: Play / Render, Audio::Start, Http::Report?"),
+            "{body}"
+        );
+        assert!(!body.contains("Started"), "callbacks belong in the tables: {body}");
+        // A transition that requests nothing keeps a bare event label.
+        assert!(body.contains("any_state --> Stopped: Reset"), "{body}");
+    }
+
+    #[test]
+    fn markdown_shows_what_each_request_answers_with() {
+        let doc = markdown(&requesting_sample(), Locale::En);
+        assert!(
+            doc.contains(
+                "| Stopped | `Play` | Playing | `Render`, `Audio::Start` → `Started`, `Failed`, \
+                 `Http::Report` → `Reported`, `ReportFailed`, `Retried`, +1 more (conditional) |"
+            ),
+            "{doc}"
+        );
+
+        // One row per capability, with every operation and every answer.
+        assert!(doc.contains("### Capabilities"), "{doc}");
+        assert!(
+            doc.contains("| Capability | Operations | Answers with |"),
+            "{doc}"
+        );
+        assert!(
+            doc.contains("| `Audio` | `Audio::Start` | `Failed`, `Started` |"),
+            "{doc}"
+        );
+        assert!(
+            doc.contains(
+                "| `Http` | `Http::Report` | `GaveUp`, `ReportFailed`, `Reported`, `Retried` |"
+            ),
+            "{doc}"
+        );
+    }
+
+    #[test]
+    fn markdown_localizes_the_capabilities_table() {
+        let doc = markdown(&requesting_sample(), Locale::PtBr);
+        assert!(doc.contains("### Capacidades"), "{doc}");
+        assert!(
+            doc.contains("| Capacidade | Operações | Responde com |"),
+            "{doc}"
+        );
+        assert!(doc.contains("+1 outros (condicional)"), "{doc}");
+        assert!(!doc.contains("conditional"), "English label leaked: {doc}");
+    }
+
+    /// A core whose requests show no capability emits exactly what it emitted
+    /// before capabilities existed.
+    #[test]
+    fn a_core_with_no_capability_gets_no_capabilities_table() {
+        let doc = markdown(&sample(), Locale::En);
+        assert!(!doc.contains("### Capabilities"), "{doc}");
     }
 
     #[test]

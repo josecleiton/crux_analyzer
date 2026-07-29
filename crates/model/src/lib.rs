@@ -256,9 +256,132 @@ pub struct Event(pub String);
 
 /// An effect requested by the Core through a capability
 /// (e.g. `Render`, `AudioOperation::Start`).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct Effect(pub String);
+///
+/// Beyond the operation's own label, an effect carries what the analyzed source
+/// declares *around* the request: which capability it goes through, and — the
+/// other half of Crux's loop — the event the shell sends back when the request
+/// resolves. Both are absent when the source does not show them; neither is
+/// ever inferred from the shape of a name.
+///
+/// # Serialization
+///
+/// Serializes as a **bare string** when it carries nothing but its name, and as
+/// an object otherwise; both forms deserialize. An app whose requests show no
+/// capability and no callback therefore produces exactly the JSON it produced
+/// before those fields existed. Same leniency as [`StateDecl`]: unknown object
+/// fields are ignored rather than rejected.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Effect {
+    /// The operation as transitions label it: `Enum::Variant`, or a bare name
+    /// for crux's builtin `Render`.
+    pub name: String,
+    /// The capability the operation travels through — the variant of the Core's
+    /// root effect enum that wraps this operation's enum
+    /// (`Effect::Audio(AudioOperation)` → `Audio`). Absent when the request
+    /// does not go through one (`Render`) or when it cannot be resolved.
+    pub capability: Option<String>,
+    /// The events the shell can answer this request with, as declared at the
+    /// request site (`…then_send(Event::AudioStarted)`, an event passed
+    /// alongside the operation, or every event the callback that maps the
+    /// shell's result can build). Empty for fire-and-forget requests.
+    ///
+    /// A set, because one request routinely has several answers: a callback that
+    /// matches on the shell's result maps success and failure to different
+    /// events, and all of them are real.
+    pub resolves_with: Vec<Event>,
+    /// Whether the request sits on a branch the transition itself does not
+    /// imply — "arriving here *may* request this", as opposed to "does". The
+    /// honesty rule applied to effect attribution: an over-approximation says
+    /// so instead of reading as certainty.
+    pub conditional: bool,
+}
+
+impl Effect {
+    /// An effect with nothing but its label — the form that serializes as a
+    /// bare string.
+    pub fn bare(name: impl Into<String>) -> Self {
+        Effect {
+            name: name.into(),
+            ..Default::default()
+        }
+    }
+
+    /// Whether this effect is nothing but its label.
+    pub fn is_bare(&self) -> bool {
+        self.capability.is_none() && self.resolves_with.is_empty() && !self.conditional
+    }
+}
+
+impl From<&str> for Effect {
+    fn from(name: &str) -> Self {
+        Effect::bare(name)
+    }
+}
+
+impl From<String> for Effect {
+    fn from(name: String) -> Self {
+        Effect::bare(name)
+    }
+}
+
+impl Serialize for Effect {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        if self.is_bare() {
+            return serializer.serialize_str(&self.name);
+        }
+        let fields = 1
+            + usize::from(self.capability.is_some())
+            + usize::from(!self.resolves_with.is_empty())
+            + usize::from(self.conditional);
+        let mut state = serializer.serialize_struct("Effect", fields)?;
+        state.serialize_field("name", &self.name)?;
+        if let Some(capability) = &self.capability {
+            state.serialize_field("capability", capability)?;
+        }
+        if !self.resolves_with.is_empty() {
+            state.serialize_field("resolvesWith", &self.resolves_with)?;
+        }
+        if self.conditional {
+            state.serialize_field("conditional", &self.conditional)?;
+        }
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for Effect {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        /// Both authored forms of an effect, collapsed on the way in.
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Repr {
+            Name(String),
+            Full {
+                name: String,
+                #[serde(default)]
+                capability: Option<String>,
+                #[serde(default, rename = "resolvesWith")]
+                resolves_with: Vec<Event>,
+                #[serde(default)]
+                conditional: bool,
+            },
+        }
+
+        Ok(match Repr::deserialize(deserializer)? {
+            Repr::Name(name) => Effect::bare(name),
+            Repr::Full {
+                name,
+                capability,
+                resolves_with,
+                conditional,
+            } => Effect {
+                name,
+                capability,
+                resolves_with,
+                conditional,
+            },
+        })
+    }
+}
 
 /// A capability used by the Core (Http, KeyValue, ...).
 /// Not part of the MVP serialized contract yet.
@@ -305,15 +428,25 @@ mod tests {
                 from: State("Idle".into()),
                 event: Event("RecordPressed".into()),
                 to: State("Recording".into()),
-                effects: vec![Effect("AudioOperation::Start".into())],
+                effects: vec![Effect {
+                    name: "AudioOperation::Start".into(),
+                    capability: Some("Audio".into()),
+                    resolves_with: vec![Event("RecordingStarted".into())],
+                    conditional: false,
+                }],
             }
         );
+
+        // A fire-and-forget request stays the bare form.
+        assert_eq!(machine.transitions[1].effects, [Effect::bare("AudioOperation::Pause")]);
 
         // Wildcard source state round-trips untouched.
         let inputs = &recorder.machines[1];
         assert_eq!(inputs.transitions[2].from.0, State::ANY);
         // Absent `effects` deserializes as empty and is skipped when empty.
         assert!(inputs.transitions[2].effects.is_empty());
+        // A request on a branch the transition does not imply says so.
+        assert!(inputs.transitions[0].effects[0].conditional);
 
         // The documented-events/effects catalogs round-trip; cores without
         // them (Authentication, Sync) deserialize as empty and stay skipped.
@@ -382,6 +515,33 @@ mod tests {
             serde_json::to_string(&documented).unwrap(),
             r#"{"name":"Failed","doc":"It broke.","markers":["failure"],"tags":["retryable"]}"#
         );
+    }
+
+    /// The same two forms, for effects: a plain operation label stays a string,
+    /// and everything the source declares around a request travels as an object.
+    #[test]
+    fn plain_effects_serialize_as_bare_strings() {
+        assert_eq!(
+            serde_json::to_string(&Effect::bare("Render")).unwrap(),
+            r#""Render""#
+        );
+
+        let requested = Effect {
+            name: "HttpOperation::Upload".into(),
+            capability: Some("Http".into()),
+            resolves_with: vec![Event("UploadFinished".into())],
+            conditional: true,
+        };
+        assert_eq!(
+            serde_json::to_string(&requested).unwrap(),
+            r#"{"name":"HttpOperation::Upload","capability":"Http","resolvesWith":["UploadFinished"],"conditional":true}"#
+        );
+
+        // Name-only object in, bare form out: a hand-written model and a
+        // generated one compare equal.
+        let parsed: Effect = serde_json::from_str(r#"{"name":"Render"}"#).unwrap();
+        assert_eq!(parsed, Effect::bare("Render"));
+        assert_eq!(serde_json::to_string(&parsed).unwrap(), r#""Render""#);
     }
 
     /// An object carrying nothing but a name canonicalizes back to the bare

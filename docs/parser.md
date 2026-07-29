@@ -104,14 +104,84 @@ right bias for documentation.
 
 ## Effects
 
-Each event arm's requested operations attach to the transitions it produces:
+An effect is a **request with a return leg**, and that is how it is read: the
+operation, the capability it travels through, and the events the shell can
+answer it with.
+
+What counts as a request:
 
 - constructions of effect-closure enums (`AudioOperation::Start`), labeled
   `Enum::Variant`;
 - a call to crux's bare `render()` → `Render`.
 
-An arm that produces several transitions shares its effect set among them
-(an over-approximation for arms with internal branching).
+### The capability
+
+The Core's `Effect` enum is what names its capabilities: the variant that wraps
+an operation's enum *is* the capability the operation goes through.
+`Effect::Audio(AudioOperation)` puts every `AudioOperation` request under
+`Audio`. Structure, not inference — nothing is read off the shape of a name.
+`Render` goes through none.
+
+### The answer
+
+Crux's loop is `Event → Effect → shell → Event`, and the return leg is written
+at the request site, so it is evidence like any other. Three shapes are read,
+and the events they name become the request's `resolvesWith`:
+
+```rust
+// the callback alongside the operation
+Self::request_audio(AudioOperation::Start, Event::CaptureStarted);
+
+// crux's Command API
+Command::request_from_shell(operation).then_send(Event::Started);
+
+// a callback that maps the shell's result: every event it can build
+Command::request_from_shell(operation).then_send(move |result| match result {
+    AudioResult::Started { id } => RecordingEvent::RecordingStarted { id },
+    AudioResult::Failed(message) => RecordingEvent::RecordingFailed { message },
+})
+```
+
+A **set**, not one event: a request routinely has one answer per outcome. A
+request built by a shared helper (`audio_command(op)` whose body does the
+`then_send`) is followed one call deep, so the operation the caller wrote keeps
+the answers its helper declares — which also means every request through that
+helper carries the union of what its callback can build. That is the honest
+reading: as far as the source shows, any of them can come back.
+
+An answer that names an event **no transition carries** is kept. It is real
+behavior — a confirmation the core only renders — and the clients say so rather
+than hiding it.
+
+A callback whose event cannot be read off the call site (`then_send(f)`) is an
+`unresolved-effect-callback` warning: the request is still recorded, only its
+answer is unknown. A request that declares no callback at all is *not* a
+warning — fire-and-forget is a legitimate shape.
+
+### Which transitions a request belongs to
+
+Effects are scoped by **branch**, not by arm: the chain of alternatives
+(`if`/`else` branches, `match` arms) entered to reach a request is compared with
+the chain of the assignment that made the transition.
+
+- Same chain → the request belongs to that transition.
+- Forked apart → it does not. A request in one branch never lands on the
+  transitions of its sibling.
+- Deeper than the transition → it belongs, marked **conditional**: arriving
+  there *may* request it. Over-approximating is right (the request is real), and
+  saying so beats reading as certainty.
+
+```rust
+RecorderEvent::RetryPressed => {
+    if session.attempts_left() {
+        state = Uploading;                     // ← Upload, certain
+        Self::request(HttpOperation::Upload).then_send(RecorderEvent::UploadFinished);
+    } else {
+        state = Idle;                          // ← Render only
+        render();
+    }
+}
+```
 
 ## Documentation and annotations
 
@@ -120,12 +190,13 @@ machine's description, and each variant's becomes its state's.
 
 Doc comments on **event and effect enum variants** reach the model too, as
 per-core `events` / `effects` catalogs (`{ name, doc }`). Two restrictions
-keep the catalogs honest: only names that appear in the core's transitions
-enter (a documented delegating wrapper like `Event::Recorder(RecorderEvent)`
-is not an event a transition can carry), and only documented names enter —
-the transition tables already enumerate the vocabulary. Annotations (`@…`
-lines) are not read on events or effects; there is nothing for a marker to
-mean there yet.
+keep the catalogs honest: only names that appear in the core's model enter (a
+documented delegating wrapper like `Event::Recorder(RecorderEvent)` is not an
+event a transition can carry) — an event named as an effect's answer counts,
+since it is in the model and a client showing it should be able to show its
+prose — and only documented names enter, because the transition tables already
+enumerate the vocabulary. Annotations (`@…` lines) are not read on events or
+effects; there is nothing for a marker to mean there yet.
 
 ```rust
 /// Where a recording session lives.
@@ -212,6 +283,7 @@ localized ([i18n.md](i18n.md)). The English rendering is shown below.
 | `dynamic-target` | `target state is dynamic (assigned from a runtime value)` | the assigned value has no payload typing and no resolvable constraints |
 | `no-update-method` | `core X: no update method found` | an `impl App` block without an `update` fn |
 | `unknown-annotation` | `unrecognized annotation X: not one of @failure, @deprecated, @tag <name>` | a doc line looked like an annotation but is not one: a typo, a marker given an argument, or a `@tag` with no usable name |
+| `unresolved-effect-callback` | `effect callback not resolved: the event this request is answered with is not named at the call site` | a `then_send` whose argument builds no event (a function, or a value computed elsewhere). The request is recorded; its answer is not |
 
 A clean run against a real target app extracts with **zero** warnings.
 

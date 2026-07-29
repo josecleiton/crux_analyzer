@@ -50,7 +50,12 @@ function mapMachine(coreId: string, machine: ParserMachineJson): DomainMachine {
     to: stateId(t.to),
     fromName: t.from,
     toName: t.to,
-    effects: t.effects ?? [],
+    effects: (t.effects ?? []).map((effect) => ({
+      name: effect.name,
+      capability: effect.capability,
+      answers: effect.resolvesWith,
+      conditional: effect.conditional,
+    })),
   }));
 
   // `doc`, `markers` and `tags` pass through verbatim: normalizing prose or

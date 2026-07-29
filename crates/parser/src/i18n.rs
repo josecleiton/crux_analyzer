@@ -56,6 +56,11 @@ impl WarningKind {
                 "transition to `{to}` dropped: source-state condition could not \
                  be resolved statically"
             ),
+            WarningKind::UnresolvedEffectCallback => {
+                "effect callback not resolved: the event this request is answered \
+                 with is not named at the call site"
+                    .to_string()
+            }
             WarningKind::UnknownAnnotation { annotation } => format!(
                 "unrecognized annotation `{annotation}`: not one of @failure, \
                  @deprecated, @tag <name>"
@@ -100,6 +105,11 @@ impl WarningKind {
                 "transição para `{to}` descartada: a condição do estado de origem não \
                  pôde ser resolvida estaticamente"
             ),
+            WarningKind::UnresolvedEffectCallback => {
+                "callback de efeito não resolvido: o evento que responde a esta \
+                 solicitação não é nomeado no local da chamada"
+                    .to_string()
+            }
             WarningKind::UnknownAnnotation { annotation } => format!(
                 "anotação `{annotation}` não reconhecida: não é @failure, \
                  @deprecated nem @tag <nome>"

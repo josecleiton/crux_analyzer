@@ -1,6 +1,8 @@
 //! Markdown generator: one document with a Mermaid diagram, a states table
 //! and a transition table per machine.
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use crux_analyzer_i18n::Locale;
 use crux_analyzer_model::{DocumentedName, Machine, Project, State, StateDecl};
 
@@ -71,6 +73,9 @@ pub fn markdown(project: &Project, locale: Locale) -> String {
             }
         }
 
+        // What this core asks of the shell, gathered from its requests.
+        push_capabilities(&mut out, core, &labels);
+
         // The core's documented events and effects close its section: the
         // vocabulary already appears in the transition tables above, so these
         // catalogs only exist where an author explained something.
@@ -79,6 +84,73 @@ pub fn markdown(project: &Project, locale: Locale) -> String {
     }
 
     out
+}
+
+/// What the core needs from the shell: one row per capability, the operations
+/// requested through it, and the events those requests come back as.
+///
+/// Read off the requests themselves, so it says nothing the transition tables
+/// do not already contain — it just answers a question they answer badly
+/// ("what does this core talk to?"). Omitted entirely when no request resolved
+/// to a capability, which is also the pre-capability output.
+fn push_capabilities(out: &mut String, core: &crux_analyzer_model::Core, labels: &Labels) {
+    // BTreeMap/BTreeSet: deterministic rows and columns, and one entry per name
+    // however many transitions requested it.
+    let mut by_capability: BTreeMap<&str, (BTreeSet<&str>, BTreeSet<&str>)> = BTreeMap::new();
+    for effect in core
+        .machines
+        .iter()
+        .flat_map(|machine| &machine.transitions)
+        .flat_map(|transition| &transition.effects)
+    {
+        let Some(capability) = &effect.capability else {
+            continue;
+        };
+        let entry = by_capability.entry(capability.as_str()).or_default();
+        entry.0.insert(effect.name.as_str());
+        for event in &effect.resolves_with {
+            entry.1.insert(event.0.as_str());
+        }
+    }
+    if by_capability.is_empty() {
+        return;
+    }
+
+    push_line(out, "");
+    push_line(out, &format!("### {}", labels.capabilities));
+    push_line(out, "");
+    push_line(
+        out,
+        &format!(
+            "| {} | {} | {} |",
+            labels.capability, labels.operations, labels.answers
+        ),
+    );
+    push_line(out, "| --- | --- | --- |");
+    for (capability, (operations, answers)) in by_capability {
+        let answers = if answers.is_empty() {
+            labels.no_value.to_string()
+        } else {
+            monospace_list(answers.into_iter())
+        };
+        push_line(
+            out,
+            &format!(
+                "| `{}` | {} | {} |",
+                capability,
+                monospace_list(operations.into_iter()),
+                answers
+            ),
+        );
+    }
+}
+
+/// Identifiers as a monospace, comma-separated cell.
+fn monospace_list<'a>(names: impl Iterator<Item = &'a str>) -> String {
+    names
+        .map(|name| format!("`{name}`"))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// A name/description table for documented events or effects. Names are

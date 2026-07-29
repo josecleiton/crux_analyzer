@@ -39,6 +39,10 @@ export const en = {
   'inspector.effects': 'Effects',
   // A union over the incoming transitions: "some of these", never "all".
   'inspector.entryEffects': 'Effects on entry',
+  // The return leg of the loop: which events the shell can send back.
+  'inspector.answersWith': 'answers with',
+  // The request sits on a branch the transition does not imply.
+  'inspector.conditional': 'may',
   'inspector.none': '—',
   'inspector.tags': 'Tags',
   'inspector.aboutMachine': 'About this machine',
@@ -58,6 +62,10 @@ export const en = {
   'simulation.noEvents': 'No events can fire from here.',
   'simulation.runtimeTargetNote':
     'These land on a state decided at runtime, so the replay cannot follow them.',
+  'simulation.inFlight': 'Waiting for the shell',
+  'simulation.fromShell': 'from the shell',
+  'simulation.inertAnswerNote':
+    'The shell can send these back, and no transition here handles them: real behavior that changes no state.',
   'simulation.trail': 'Trail',
   'simulation.nothingFired': 'Nothing fired yet.',
   'simulation.restart': 'Restart',

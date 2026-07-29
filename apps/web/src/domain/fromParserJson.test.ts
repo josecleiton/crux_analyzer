@@ -49,7 +49,24 @@ describe('fromParserJson', () => {
 
   it('maps effects and wildcard sources', () => {
     const recorder = project.cores[0].machines[0];
-    expect(recorder.transitions[0].effects).toEqual(['AudioOperation::Start']);
+    // The contract's `resolvesWith` becomes this client's `answers`, and both
+    // authored forms of an effect arrive as one record.
+    expect(recorder.transitions[0].effects).toEqual([
+      {
+        name: 'AudioOperation::Start',
+        capability: 'Audio',
+        answers: ['RecordingStarted'],
+        conditional: false,
+      },
+    ]);
+    expect(recorder.transitions[1].effects).toEqual([
+      {
+        name: 'AudioOperation::Pause',
+        capability: undefined,
+        answers: [],
+        conditional: false,
+      },
+    ]);
     expect(recorder.hasWildcard).toBe(false);
 
     const inputs = project.cores[0].machines[1];

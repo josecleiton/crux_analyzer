@@ -448,6 +448,57 @@ body {
   font-size: 12px;
 }
 
+/* --- Effect requests ----------------------------------------------------
+   An effect is a request with a return leg: the operation, the capability it
+   travels through, and the events the shell can answer with. Each part reads
+   at a different weight so the operation stays the headline. */
+
+.event-list li .effect-name {
+  display: block;
+}
+
+.effect-capability,
+.effect-conditional {
+  display: inline-block;
+  margin-top: 3px;
+  margin-right: 4px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.effect-capability {
+  background: var(--sim-soft);
+  color: var(--sim-text);
+  border: 1px solid var(--sim-border);
+}
+
+/* "may": the request sits on a branch this transition does not imply. */
+.effect-conditional {
+  background: var(--state-deprecated-bg);
+  color: var(--state-deprecated-text);
+  border: 1px solid var(--state-deprecated);
+}
+
+.effect-answers {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.event-button .event-answer {
+  float: right;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
 .transition-flow {
   display: flex;
   flex-direction: column;

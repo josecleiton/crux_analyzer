@@ -61,7 +61,9 @@ publicado. Eles nunca podem se tornar marcação.
   dentro dele.
 - **No Mermaid gerado**: rótulos e notas passam por `mermaid_label`, que achata
   para uma linha (um comando termina na linha), remove caracteres de controle e
-  troca `"`, `<`, `>` e `%%` por códigos de entidade.
+  troca `"`, `<`, `>` e `%%` por códigos de entidade. O rótulo de uma transição é
+  `evento / efeito, efeito`, então **nomes de efeito** também estão nesse caminho —
+  o rótulo composto inteiro é escapado, não suas partes.
 - **Em células de tabela**: a barra invertida é escapada *antes* do pipe, ou
   prosa contendo `\|` reabre uma coluna. Backticks também são escapados.
 
@@ -98,6 +100,7 @@ e são ajustáveis com `--max-file-size`, `--max-total-size` e `--max-steps`:
 | Aninhamento de delimitadores | `syn::parse_file` recursa sobre aninhamento; um stack overflow **aborta o processo** e não pode ser capturado, então este é verificado no texto bruto *antes* do parsing | `nesting-too-deep` |
 | Passos da caminhada | O walker que segue chamadas re-percorre um helper por caminho distinto, então um grafo de chamadas em diamante é exponencial — quarenta funções pequenas descrevem 2⁴⁰ caminhadas | `analysis-truncated` |
 | Profundidade de expressão / padrão / chamada | Os walkers recursam sobre o aninhamento da própria entrada | `analysis-truncated` |
+| Profundidade de expressão de callback | A varredura que lê quais eventos respondem uma solicitação segue closures, blocos e braços de match, todos aninháveis sem limite | passado o limite o callback simplesmente é lido como não resolvido (`unresolved-effect-callback` quando um `then_send` não nomeia nada legível) |
 
 Memoizar o walker *não* é a alternativa: um helper é legitimamente re-percorrido
 sob um contexto diferente e produz transições diferentes a cada vez. O que é

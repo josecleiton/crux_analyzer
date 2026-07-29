@@ -9,7 +9,7 @@ use crux_analyzer_model::{
 use crate::annotations::DocBlock;
 use crate::core_finder::CoreInfo;
 use crate::state_enum::StateMachine;
-use crate::transitions::RawTransition;
+use crate::transitions::{RawEffect, RawTransition};
 
 /// Builds a [`Core`] from a core's extraction result: one [`Machine`] per
 /// state enum that contributed transitions (orthogonal regions).
@@ -34,7 +34,7 @@ pub(crate) fn to_core(core: &CoreInfo, machines: &[StateMachine], raw: Vec<RawTr
             // fan one assignment out to variants × events, and comparing every
             // new transition against every kept one is quadratic in that.
             let mut transitions: Vec<Transition> = Vec::new();
-            let mut seen: std::collections::HashSet<(String, String, String, Vec<String>)> =
+            let mut seen: std::collections::HashSet<(String, String, String, Vec<RawEffect>)> =
                 std::collections::HashSet::new();
             for raw in raw_transitions {
                 if !seen.insert((
@@ -49,7 +49,7 @@ pub(crate) fn to_core(core: &CoreInfo, machines: &[StateMachine], raw: Vec<RawTr
                     from: State(raw.from),
                     event: Event(raw.event),
                     to: State(raw.to),
-                    effects: raw.effects.into_iter().map(Effect).collect(),
+                    effects: raw.effects.into_iter().map(effect).collect(),
                 });
             }
 
@@ -79,16 +79,40 @@ pub(crate) fn to_core(core: &CoreInfo, machines: &[StateMachine], raw: Vec<RawTr
     }
 }
 
+/// The model's view of one effect request. The extraction keeps the callback
+/// event as a bare label; the model types it as an [`Event`], because that is
+/// what it is — the other half of the loop, comparable with the events the
+/// transitions carry.
+fn effect(raw: RawEffect) -> Effect {
+    Effect {
+        name: raw.label,
+        capability: raw.capability,
+        resolves_with: raw.resolves_with.into_iter().map(Event).collect(),
+        conditional: raw.conditional,
+    }
+}
+
 /// Documentation authored on event enum variants, for the events this core's
 /// transitions actually use. Reading what the source *declares* — the honesty
 /// rule's fair game. Restricted to used events so the catalog joins cleanly
 /// with the transition tables: a documented wrapper variant (a delegating
 /// `Event::Recording(RecordingEvent)`) never appears as a phantom event.
 fn documented_events(core: &CoreInfo, machines: &[Machine]) -> Vec<DocumentedName> {
+    // An event named as an effect's callback counts as used even when no
+    // transition carries it: it is in the model, so a client showing it should
+    // be able to show what its author wrote about it.
     let used: BTreeSet<&str> = machines
         .iter()
         .flat_map(|machine| &machine.transitions)
-        .map(|transition| transition.event.0.as_str())
+        .flat_map(|transition| {
+            std::iter::once(transition.event.0.as_str()).chain(
+                transition
+                    .effects
+                    .iter()
+                    .flat_map(|effect| &effect.resolves_with)
+                    .map(|event| event.0.as_str()),
+            )
+        })
         .collect();
 
     // BTreeMap: deterministic output and one entry per name — the same enum
@@ -114,7 +138,7 @@ fn documented_effects(core: &CoreInfo, machines: &[Machine]) -> Vec<DocumentedNa
         .iter()
         .flat_map(|machine| &machine.transitions)
         .flat_map(|transition| &transition.effects)
-        .map(|effect| effect.0.as_str())
+        .map(|effect| effect.name.as_str())
         .collect();
 
     let mut documented: BTreeMap<&str, &str> = BTreeMap::new();

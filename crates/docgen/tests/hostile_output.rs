@@ -30,7 +30,7 @@ fn hostile(doc: &str) -> Project {
                     from: State("Idle".into()),
                     event: Event("Go".into()),
                     to: State("Idle".into()),
-                    effects: vec![Effect("Render".into())],
+                    effects: vec![Effect::bare("Render")],
                 }],
                 ..Default::default()
             }],
@@ -178,6 +178,34 @@ fn keyword_state_names_get_a_generated_id() {
     );
     // The real name still shows, via a quoted label.
     assert!(body.contains("\"end\""), "{body}");
+}
+
+/// Effect names reach the diagram now that a transition label is
+/// `event / action`, so they are one more identifier that must not be able to
+/// inject a diagram statement or close a label.
+#[test]
+fn hostile_effect_names_cannot_escape_a_transition_label() {
+    let body = diagram_with_states(
+        vec!["Idle".into(), "Busy".into()],
+        vec![Transition {
+            from: State("Idle".into()),
+            event: Event("Go".into()),
+            to: State("Busy".into()),
+            effects: vec![
+                Effect::bare("Op::\"quoted\""),
+                Effect::bare("Op::A\n    Idle --> Busy: Injected"),
+                Effect::bare("Op::%% commented"),
+            ],
+        }],
+    );
+
+    let transitions: Vec<&str> = body.lines().filter(|l| l.contains("-->")).collect();
+    assert_eq!(transitions.len(), 1, "a statement was injected:\n{body}");
+    let label = transitions[0];
+    assert!(!label.contains('"'), "unescaped quote in {label:?}");
+    assert!(!label.contains("%%"), "live comment in {label:?}");
+    // The names still read, through Mermaid's entity codes.
+    assert!(label.contains("#quot;quoted#quot;"), "{label}");
 }
 
 /// A composite leaf flattens to `Parent_Child`; a sibling variant literally

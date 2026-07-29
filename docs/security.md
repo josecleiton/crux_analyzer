@@ -57,7 +57,9 @@ document. They may never become markup.
   any backtick run inside it.
 - **In generated Mermaid**: labels and notes go through `mermaid_label`, which
   flattens to one line (a statement is line-terminated), drops control
-  characters, and replaces `"`, `<`, `>` and `%%` with entity codes.
+  characters, and replaces `"`, `<`, `>` and `%%` with entity codes. A
+  transition label is `event / effect, effect`, so **effect names** are on that
+  path too — the whole composed label is escaped, not its parts.
 - **In table cells**: the backslash is escaped *before* the pipe, or prose
   containing `\|` re-opens a column. Backticks are escaped too.
 
@@ -91,6 +93,7 @@ and are overridable with `--max-file-size`, `--max-total-size` and `--max-steps`
 | Bracket nesting | `syn::parse_file` recurses over nesting; a stack overflow **aborts the process** and cannot be caught, so this one is checked on the raw text *before* parsing | `nesting-too-deep` |
 | Walk steps | The call-following walker re-walks a helper per distinct path, so a diamond call graph is exponential — forty small functions describe 2⁴⁰ walks | `analysis-truncated` |
 | Expression / pattern / call depth | The walkers recurse over the input's own nesting | `analysis-truncated` |
+| Callback expression depth | The scan that reads which events answer a request follows closures, blocks and match arms, all of which nest without limit | past the cap the callback simply reads as unresolved (`unresolved-effect-callback` when a `then_send` names nothing readable) |
 
 Memoizing the walker is *not* the alternative: a helper is legitimately
 re-walked under a different context and yields different transitions each time.

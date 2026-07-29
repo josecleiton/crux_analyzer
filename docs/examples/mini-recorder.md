@@ -9,13 +9,14 @@ finished upload.
 
 ```mermaid
 stateDiagram-v2
-    Idle --> Recording: RecordPressed
+    Idle --> Recording: RecordPressed / AudioOperation::Start
     Recording --> Paused: PausePressed
     Paused --> Recording: ResumePressed
-    Recording --> Uploading: StopPressed
-    Paused --> Uploading: StopPressed
+    Recording --> Uploading: StopPressed / AudioOperation::Stop, HttpOperation::Upload?
+    Paused --> Uploading: StopPressed / AudioOperation::Stop, HttpOperation::Upload?
     Uploading --> Completed: UploadFinished
-    Failed --> Uploading: RetryPressed
+    Failed --> Uploading: RetryPressed / HttpOperation::Upload
+    Failed --> Idle: RetryPressed / Render
     Recording --> Failed: Failed
     Paused --> Failed: Failed
     Uploading --> Failed: Failed
@@ -47,13 +48,14 @@ interruption forced.
 
 | From | Event | To | Effects |
 | --- | --- | --- | --- |
-| Idle | `RecordPressed` | Recording | `AudioOperation::Start` |
+| Idle | `RecordPressed` | Recording | `AudioOperation::Start` → `CaptureStarted` |
 | Recording | `PausePressed` | Paused | — |
 | Paused | `ResumePressed` | Recording | — |
-| Recording | `StopPressed` | Uploading | `AudioOperation::Stop` |
-| Paused | `StopPressed` | Uploading | `AudioOperation::Stop` |
+| Recording | `StopPressed` | Uploading | `AudioOperation::Stop`, `HttpOperation::Upload` → `UploadFinished` (conditional) |
+| Paused | `StopPressed` | Uploading | `AudioOperation::Stop`, `HttpOperation::Upload` → `UploadFinished` (conditional) |
 | Uploading | `UploadFinished` | Completed | — |
-| Failed | `RetryPressed` | Uploading | — |
+| Failed | `RetryPressed` | Uploading | `HttpOperation::Upload` → `UploadFinished` |
+| Failed | `RetryPressed` | Idle | `Render` |
 | Recording | `Failed` | Failed | — |
 | Paused | `Failed` | Failed | — |
 | Uploading | `Failed` | Failed | — |
@@ -77,10 +79,18 @@ stateDiagram-v2
 | Empty | `StopPressed` | Uploading | — |
 | Uploading | `UploadFinished` | Synced | — |
 
+### Capabilities
+
+| Capability | Operations | Answers with |
+| --- | --- | --- |
+| `Audio` | `AudioOperation::Start`, `AudioOperation::Stop` | `CaptureStarted` |
+| `Http` | `HttpOperation::Upload` | `UploadFinished` |
+
 ### Events
 
 | Event | Description |
 | --- | --- |
+| `CaptureStarted` | The shell confirmed the microphone is live. Nothing to decide: the session is already recording. |
 | `RecordPressed` | The user hit the record button on the main screen. |
 | `RetryPressed` | Retry the failed upload, keeping the recorded take. |
 
@@ -89,3 +99,4 @@ stateDiagram-v2
 | Effect | Description |
 | --- | --- |
 | `AudioOperation::Start` | Arms the microphone and begins capturing into the session buffer. |
+| `HttpOperation::Upload` | Sends the finished take, answering with the server's verdict. |

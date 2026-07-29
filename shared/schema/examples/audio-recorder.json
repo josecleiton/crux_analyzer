@@ -8,10 +8,10 @@
           "name": "RecorderState",
           "states": ["Idle", "Recording", "Paused", "Uploading", "Completed"],
           "transitions": [
-            { "from": "Idle", "event": "RecordPressed", "to": "Recording", "effects": ["AudioOperation::Start"] },
+            { "from": "Idle", "event": "RecordPressed", "to": "Recording", "effects": [{ "name": "AudioOperation::Start", "capability": "Audio", "resolvesWith": ["RecordingStarted"] }] },
             { "from": "Recording", "event": "PausePressed", "to": "Paused", "effects": ["AudioOperation::Pause"] },
             { "from": "Paused", "event": "ResumePressed", "to": "Recording", "effects": ["AudioOperation::Resume"] },
-            { "from": "Recording", "event": "StopPressed", "to": "Uploading", "effects": ["AudioOperation::Stop", "HttpOperation::Upload"] },
+            { "from": "Recording", "event": "StopPressed", "to": "Uploading", "effects": [{ "name": "AudioOperation::Stop", "capability": "Audio" }, { "name": "HttpOperation::Upload", "capability": "Http", "resolvesWith": ["UploadFinished"] }] },
             { "from": "Uploading", "event": "UploadFinished", "to": "Completed", "effects": ["Render"] }
           ]
         },
@@ -19,7 +19,7 @@
           "name": "InputState",
           "states": ["Ready", "Switching"],
           "transitions": [
-            { "from": "Ready", "event": "InputSelected", "to": "Switching", "effects": ["AudioOperation::SwitchInput"] },
+            { "from": "Ready", "event": "InputSelected", "to": "Switching", "effects": [{ "name": "AudioOperation::SwitchInput", "capability": "Audio", "resolvesWith": ["InputSwitched", "InputSwitchFailed"], "conditional": true }] },
             { "from": "Switching", "event": "InputSwitched", "to": "Ready", "effects": ["Render"] },
             { "from": "*", "event": "InputsInvalidated", "to": "Ready" }
           ]

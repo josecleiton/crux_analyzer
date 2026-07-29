@@ -122,6 +122,36 @@
         }
       ]
     },
+    "effect": {
+      "description": "An effect requested when a transition fires. A bare string is the operation's label; the object form adds what the analyzed source declares around the request — the capability it travels through and the event that resolves it. A producer emits the bare form whenever there is nothing to add, so a model of an app whose requests show neither is identical to a pre-capability one.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "required": ["name"],
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The operation as transitions label it: \"Enum::Variant\", or a bare name for crux's builtin \"Render\". Data from the analyzed application — never translated."
+            },
+            "capability": {
+              "type": "string",
+              "description": "Variant of the Core's root effect enum that wraps this operation (`Effect::Audio(AudioOperation)` → \"Audio\"). Absent when the request goes through none (\"Render\") or when it could not be resolved."
+            },
+            "resolvesWith": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Events the shell can answer this request with, as declared at the request site — several when the callback maps the shell's result to one event per outcome. Absent for fire-and-forget requests, and never guessed from the operation's name."
+            },
+            "conditional": {
+              "type": "boolean",
+              "description": "True when the request sits on a branch the transition itself does not imply: arriving here *may* request it. Absent (false) means the transition's own path requests it."
+            }
+          }
+        }
+      ]
+    },
     "marker": {
       "description": "A semantic marker declared in the analyzed source, as an `@` line inside a `///` doc comment. Declared evidence, not inference — which is why `initial` and `final` are deliberately absent: those are derived from graph shape and `#[default]`. A stable identifier, never prose: clients render their own localized label for it, and a client that meets an unknown value should ignore it rather than reject the model.",
       "enum": ["failure", "deprecated"]
@@ -142,7 +172,7 @@
         },
         "effects": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": { "$ref": "#/$defs/effect" },
           "description": "Effects requested when this transition fires (e.g. \"Render\", \"AudioOperation::Start\")."
         }
       }

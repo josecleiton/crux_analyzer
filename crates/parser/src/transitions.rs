@@ -36,6 +36,11 @@ pub(crate) const ANY_STATE: &str = "*";
 /// Maximum predicate-method resolution depth (predicates calling predicates).
 const MAX_PREDICATE_DEPTH: usize = 3;
 
+/// How deep a callback expression is followed looking for the event it builds.
+/// Far above `|out| Event::Recorder(RecorderEvent::Loaded(out))`; past it the
+/// callback simply reads as unresolved. See `docs/security.md`.
+const MAX_EVENT_VALUE_DEPTH: usize = 32;
+
 /// The walk's remaining allowance, and which limit stopped it.
 ///
 /// Interior mutability because the evaluators that recurse (`eval_condition`,
@@ -103,8 +108,33 @@ pub(crate) struct RawTransition {
     pub from: String,
     pub event: String,
     pub to: String,
-    /// Effects requested by the event arm this transition came from.
-    pub effects: Vec<String>,
+    /// Effects requested on a code path this transition is on.
+    pub effects: Vec<RawEffect>,
+}
+
+/// An effect request as the source shows it: the operation, the capability it
+/// travels through, and the event the shell answers with.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct RawEffect {
+    pub label: String,
+    pub capability: Option<String>,
+    pub resolves_with: Vec<String>,
+    /// Set when the request sits on a branch the transition does not imply.
+    pub conditional: bool,
+}
+
+/// Where in the branch tree of an event arm something was found: the chain of
+/// alternatives (`if`/`else` branches, `match` arms) entered to reach it.
+///
+/// Two paths on the same chain — one a prefix of the other — describe code that
+/// runs together; paths that fork apart describe alternatives that never do.
+/// That is what keeps an effect requested in one branch off the transitions of
+/// its sibling.
+type BranchPath = Vec<usize>;
+
+/// Whether `path` runs on the same chain of alternatives as `other`.
+fn same_chain(path: &[usize], other: &[usize]) -> bool {
+    path.starts_with(other) || other.starts_with(path)
 }
 
 /// What a condition says about a machine's current state.
@@ -133,6 +163,13 @@ struct Ctx<'a> {
     /// The event arm this code belongs to — transitions and effects found
     /// under the same arm are associated with each other.
     arm: usize,
+    /// Which alternatives were entered to reach this code, innermost last.
+    branch: BranchPath,
+    /// The events a request made here can be answered with, when the request
+    /// site declares them (`…then_send(Event::X)`, an event passed alongside the
+    /// operation, or every event the result-mapping callback builds). Empty =
+    /// nothing said so.
+    resolution: Vec<String>,
 }
 
 pub(crate) fn extract(
@@ -161,6 +198,7 @@ pub(crate) fn extract(
         out: Vec::new(),
         effects_by_arm: HashMap::new(),
         arm_counter: 0,
+        branch_counter: 0,
         call_stack: vec![(Some(core.name.clone()), "update".to_string())],
         budget: Budget::new(limits),
     };
@@ -172,6 +210,8 @@ pub(crate) fn extract(
             facts: Vec::new(),
             payload_bindings: HashMap::new(),
             arm: 0,
+            branch: BranchPath::new(),
+            resolution: Vec::new(),
         },
         update.self_ty.clone(),
         update.file,
@@ -181,9 +221,9 @@ pub(crate) fn extract(
     let truncated = walker.budget.hit.get();
     let effects_by_arm = walker.effects_by_arm;
     let mut out = walker.out;
-    for (transition, arm) in &mut out {
+    for (transition, arm, branch) in &mut out {
         if let Some(effects) = effects_by_arm.get(arm) {
-            transition.effects = effects.clone();
+            transition.effects = attach(effects, branch);
         }
     }
 
@@ -201,7 +241,39 @@ pub(crate) fn extract(
         });
     }
 
-    out.into_iter().map(|(transition, _)| transition).collect()
+    out.into_iter().map(|(transition, _, _)| transition).collect()
+}
+
+/// The effects of one event arm that belong to a transition found at `branch`.
+///
+/// An effect on the transition's own chain of alternatives fires with it; one
+/// found *deeper* — on a branch the transition itself does not imply — is kept
+/// but marked conditional, because dropping it would hide a real request and
+/// stating it plainly would claim more than the source does. Effects on a
+/// forked-off branch belong to that branch's transitions, not to this one.
+fn attach(effects: &[(RawEffect, BranchPath)], branch: &BranchPath) -> Vec<RawEffect> {
+    let mut out: Vec<RawEffect> = Vec::new();
+    for (effect, effect_branch) in effects {
+        if !same_chain(effect_branch, branch) {
+            continue;
+        }
+        let conditional = effect_branch.len() > branch.len();
+        // The same request can be reached both on the transition's own path and
+        // on a branch below it; certainty wins over the conditional sighting.
+        if let Some(kept) = out.iter_mut().find(|kept| {
+            kept.label == effect.label
+                && kept.capability == effect.capability
+                && kept.resolves_with == effect.resolves_with
+        }) {
+            kept.conditional &= conditional;
+            continue;
+        }
+        out.push(RawEffect {
+            conditional,
+            ..effect.clone()
+        });
+    }
+    out
 }
 
 struct Walker<'w, 'a> {
@@ -209,10 +281,13 @@ struct Walker<'w, 'a> {
     core: &'w CoreInfo,
     machines: &'w [StateMachine],
     warnings: &'w mut Vec<Warning>,
-    out: Vec<(RawTransition, usize)>,
-    /// Effect labels observed under each event arm.
-    effects_by_arm: HashMap<usize, Vec<String>>,
+    out: Vec<(RawTransition, usize, BranchPath)>,
+    /// Effect requests observed under each event arm, with the branch each was
+    /// found on — [`attach`] decides which transitions they belong to.
+    effects_by_arm: HashMap<usize, Vec<(RawEffect, BranchPath)>>,
     arm_counter: usize,
+    /// Hands out branch ids; each alternative entered gets a fresh one.
+    branch_counter: usize,
     /// Functions currently being walked — breaks recursion cycles while still
     /// allowing the same helper to be re-walked under a different context.
     call_stack: Vec<(Option<String>, String)>,
@@ -308,13 +383,15 @@ impl<'w, 'a> Walker<'w, 'a> {
             }
             syn::Expr::Match(expr_match) => self.walk_match(expr_match, ctx, self_ty, file),
             syn::Expr::If(expr_if) => {
-                // The condition holds inside the then-branch.
-                let mut then_ctx = ctx.clone();
+                // Then and else are alternatives: a request in one is not a
+                // request in the other.
+                let mut then_ctx = self.enter_branch(ctx);
                 then_ctx.conditions.push(&expr_if.cond);
                 self.walk_expr(&expr_if.cond, ctx, self_ty, file);
                 self.walk_block(&expr_if.then_branch, &then_ctx, self_ty.clone(), file);
                 if let Some((_, else_expr)) = &expr_if.else_branch {
-                    self.walk_expr(else_expr, ctx, self_ty, file);
+                    let else_ctx = self.enter_branch(ctx);
+                    self.walk_expr(else_expr, &else_ctx, self_ty, file);
                 }
             }
             syn::Expr::Call(call) => {
@@ -322,15 +399,32 @@ impl<'w, 'a> Walker<'w, 'a> {
                 if let syn::Expr::Path(path) = &*call.func {
                     self.record_effect_path(&path.path, ctx);
                 }
+                // An event handed to the same call is the callback the shell
+                // answers with: `request(AudioOperation::Start, Event::Started)`.
+                // A request built by a helper declares it one call away instead
+                // (`audio_command(op)` whose body does the `then_send`), so the
+                // callee is consulted when the call site itself says nothing.
+                let resolved = self
+                    .with_resolution(ctx, &call.args)
+                    .or_else(|| self.with_callee_resolution(ctx, &call.func, self_ty));
+                let call_ctx = resolved.as_ref().unwrap_or(ctx);
                 for arg in &call.args {
-                    self.walk_expr(arg, ctx, self_ty, file);
+                    self.walk_expr(arg, call_ctx, self_ty, file);
                 }
                 self.follow_call(&call.func, ctx, self_ty);
             }
             syn::Expr::MethodCall(method_call) => {
-                self.walk_expr(&method_call.receiver, ctx, self_ty, file);
+                // `…request_from_shell(op).then_send(Event::Started)`: the
+                // callback is declared on the chain that built the request, so
+                // it reaches the operation through the receiver.
+                let resolved = self.with_resolution(ctx, &method_call.args);
+                if resolved.is_none() {
+                    self.check_resolution_sink(method_call, file);
+                }
+                let call_ctx = resolved.as_ref().unwrap_or(ctx);
+                self.walk_expr(&method_call.receiver, call_ctx, self_ty, file);
                 for arg in &method_call.args {
-                    self.walk_expr(arg, ctx, self_ty, file);
+                    self.walk_expr(arg, call_ctx, self_ty, file);
                 }
             }
             syn::Expr::Block(block) => self.walk_block(&block.block, ctx, self_ty.clone(), file),
@@ -385,10 +479,15 @@ impl<'w, 'a> Walker<'w, 'a> {
         }
     }
 
-    /// Follows `Self::helper(...)`, `Type::helper(...)` or `helper(...)` into
-    /// the callee's body, keeping the current context.
-    fn follow_call(&mut self, func: &'a syn::Expr, ctx: &Ctx<'a>, self_ty: &Option<String>) {
-        let syn::Expr::Path(path) = func else { return };
+    /// `Self::helper`, `Type::helper` or `helper` → the callee this call names.
+    fn callee_key(
+        &self,
+        func: &syn::Expr,
+        self_ty: &Option<String>,
+    ) -> Option<(Option<String>, String)> {
+        let syn::Expr::Path(path) = func else {
+            return None;
+        };
         let segments: Vec<String> = path
             .path
             .segments
@@ -396,11 +495,19 @@ impl<'w, 'a> Walker<'w, 'a> {
             .map(|s| s.ident.to_string())
             .collect();
 
-        let (callee_self, callee_name) = match segments.as_slice() {
-            [name] => (None, name.clone()),
-            [ty, name] if ty == "Self" => (self_ty.clone(), name.clone()),
-            [ty, name] => (Some(ty.clone()), name.clone()),
-            _ => return,
+        match segments.as_slice() {
+            [name] => Some((None, name.clone())),
+            [ty, name] if ty == "Self" => Some((self_ty.clone(), name.clone())),
+            [ty, name] => Some((Some(ty.clone()), name.clone())),
+            _ => None,
+        }
+    }
+
+    /// Follows `Self::helper(...)`, `Type::helper(...)` or `helper(...)` into
+    /// the callee's body, keeping the current context.
+    fn follow_call(&mut self, func: &'a syn::Expr, ctx: &Ctx<'a>, self_ty: &Option<String>) {
+        let Some((callee_self, callee_name)) = self.callee_key(func, self_ty) else {
+            return;
         };
 
         let key = (callee_self.clone(), callee_name.clone());
@@ -451,14 +558,15 @@ impl<'w, 'a> Walker<'w, 'a> {
             return;
         }
 
-        // Anything else: walk generically.
+        // Anything else: walk generically. The arms are still alternatives.
         self.walk_expr(&expr_match.expr, ctx, self_ty, file);
         for arm in &expr_match.arms {
             let (_, guard) = arm_pattern_and_guard(arm);
             if let Some(guard) = guard {
                 self.walk_expr(guard, ctx, self_ty, file);
             }
-            self.walk_expr(&arm.body, ctx, self_ty, file);
+            let arm_ctx = self.enter_branch(ctx);
+            self.walk_expr(&arm.body, &arm_ctx, self_ty, file);
         }
     }
 
@@ -508,7 +616,7 @@ impl<'w, 'a> Walker<'w, 'a> {
 
             seen.extend(states.iter().cloned());
 
-            let mut arm_ctx = ctx.clone();
+            let mut arm_ctx = self.enter_branch(ctx);
             if !states.is_empty() {
                 arm_ctx
                     .facts
@@ -540,7 +648,7 @@ impl<'w, 'a> Walker<'w, 'a> {
                 EventLabels::None => None,
             };
 
-            let mut arm_ctx = ctx.clone();
+            let mut arm_ctx = self.enter_branch(ctx);
             arm_ctx.events = events;
             // Each event arm gets its own effect scope and payload bindings.
             self.arm_counter += 1;
@@ -631,20 +739,305 @@ impl<'w, 'a> Walker<'w, 'a> {
     // ---- effect collection ----------------------------------------------
 
     /// Records `Enum::Variant` as an effect when `Enum` belongs to the core's
-    /// effect closure.
+    /// effect closure, with the capability its declaration puts it under.
     fn record_effect_path(&mut self, path: &syn::Path, ctx: &Ctx<'a>) {
         let Some((enum_name, variant)) = enum_variant_path(path) else {
             return;
         };
         if self.core.is_effect_enum(&enum_name) {
-            self.record_effect(ctx, format!("{enum_name}::{variant}"));
+            let capability = self.core.capability_of(&enum_name);
+            self.record(ctx, format!("{enum_name}::{variant}"), capability);
         }
     }
 
+    /// Crux's bare `render()` — an effect with no operation enum, so no
+    /// capability and nothing to send back.
     fn record_effect(&mut self, ctx: &Ctx<'a>, label: String) {
+        self.record(ctx, label, None);
+    }
+
+    fn record(&mut self, ctx: &Ctx<'a>, label: String, capability: Option<String>) {
+        let effect = RawEffect {
+            label,
+            capability,
+            resolves_with: ctx.resolution.clone(),
+            // Decided per transition in `attach`: the same request is certain
+            // for the transitions on its own branch and conditional for those
+            // above it.
+            conditional: false,
+        };
         let effects = self.effects_by_arm.entry(ctx.arm).or_default();
-        if !effects.contains(&label) {
-            effects.push(label);
+        // Keyed by branch as well as by request: the same operation in two
+        // sibling branches is two sightings, and collapsing them would hand
+        // one branch's transitions the other's effect.
+        if !effects
+            .iter()
+            .any(|(kept, branch)| kept == &effect && branch == &ctx.branch)
+        {
+            effects.push((effect, ctx.branch.clone()));
+        }
+    }
+
+    /// A fresh alternative: everything walked under the returned context is on
+    /// a branch of its own.
+    fn enter_branch(&mut self, ctx: &Ctx<'a>) -> Ctx<'a> {
+        self.branch_counter += 1;
+        let mut branch_ctx = ctx.clone();
+        branch_ctx.branch.push(self.branch_counter);
+        branch_ctx
+    }
+
+    /// The context to walk a call's arguments and receiver in, when the call
+    /// declares which events answer the request made inside it.
+    ///
+    /// `None` when it declares none — the caller then keeps its own context,
+    /// which also keeps an enclosing callback in force for a nested call.
+    fn with_resolution(
+        &self,
+        ctx: &Ctx<'a>,
+        args: &syn::punctuated::Punctuated<syn::Expr, syn::Token![,]>,
+    ) -> Option<Ctx<'a>> {
+        let events = self.declared_events(args);
+        if events.is_empty() {
+            return None;
+        }
+        let mut resolved = ctx.clone();
+        resolved.resolution = events;
+        Some(resolved)
+    }
+
+    /// The same, for a request whose callback is declared inside the helper it
+    /// delegates to:
+    ///
+    /// ```ignore
+    /// Self::audio_command(AudioOperation::Start)   // <- the operation
+    /// // fn audio_command(op) { Command::request_from_shell(op).then_send(…) }
+    /// ```
+    ///
+    /// Only the callee's own body is read — no further calls are followed — so
+    /// the callback belongs to the request the caller wrote, and the scan cannot
+    /// wander off into the call graph.
+    fn with_callee_resolution(
+        &self,
+        ctx: &Ctx<'a>,
+        func: &syn::Expr,
+        self_ty: &Option<String>,
+    ) -> Option<Ctx<'a>> {
+        let (callee_self, callee_name) = self.callee_key(func, self_ty)?;
+        let callee = self.index.find_fn(callee_self.as_deref(), &callee_name)?;
+        let mut events = Vec::new();
+        self.collect_callback_events_in_block(callee.block, 0, &mut events);
+        if events.is_empty() {
+            return None;
+        }
+        let mut resolved = ctx.clone();
+        resolved.resolution = events;
+        Some(resolved)
+    }
+
+    /// Every event declared by a `then_send` inside a block.
+    fn collect_callback_events_in_block(
+        &self,
+        block: &syn::Block,
+        depth: usize,
+        out: &mut Vec<String>,
+    ) {
+        if depth >= MAX_EVENT_VALUE_DEPTH || !self.budget.enter() {
+            return;
+        }
+        for statement in &block.stmts {
+            match statement {
+                syn::Stmt::Expr(expr, _) => {
+                    self.collect_callback_events(expr, depth + 1, out);
+                }
+                syn::Stmt::Local(local) => {
+                    if let Some(init) = &local.init {
+                        self.collect_callback_events(&init.expr, depth + 1, out);
+                    }
+                }
+                _ => {}
+            }
+        }
+        self.budget.leave();
+    }
+
+    /// Finds the `then_send` calls in an expression and collects what they
+    /// declare. Structural recursion only — the callback's own body is read by
+    /// [`Self::collect_event_values`].
+    fn collect_callback_events(&self, expr: &syn::Expr, depth: usize, out: &mut Vec<String>) {
+        if depth >= MAX_EVENT_VALUE_DEPTH {
+            return;
+        }
+        let deeper = depth + 1;
+        match expr {
+            syn::Expr::MethodCall(call) => {
+                if call.method == "then_send" {
+                    for arg in &call.args {
+                        self.collect_event_values(arg, deeper, out);
+                    }
+                }
+                self.collect_callback_events(&call.receiver, deeper, out);
+                for arg in &call.args {
+                    self.collect_callback_events(arg, deeper, out);
+                }
+            }
+            syn::Expr::Call(call) => {
+                for arg in &call.args {
+                    self.collect_callback_events(arg, deeper, out);
+                }
+            }
+            syn::Expr::Match(expr_match) => {
+                for arm in &expr_match.arms {
+                    self.collect_callback_events(&arm.body, deeper, out);
+                }
+            }
+            syn::Expr::If(expr_if) => {
+                self.collect_callback_events_in_block(&expr_if.then_branch, deeper, out);
+                if let Some((_, else_expr)) = &expr_if.else_branch {
+                    self.collect_callback_events(else_expr, deeper, out);
+                }
+            }
+            syn::Expr::Block(block) => {
+                self.collect_callback_events_in_block(&block.block, deeper, out)
+            }
+            syn::Expr::Return(ret) => {
+                if let Some(inner) = &ret.expr {
+                    self.collect_callback_events(inner, deeper, out);
+                }
+            }
+            syn::Expr::Paren(paren) => self.collect_callback_events(&paren.expr, deeper, out),
+            syn::Expr::Group(group) => self.collect_callback_events(&group.expr, deeper, out),
+            _ => {}
+        }
+    }
+
+    /// Every event the arguments of one call build, in first-seen order.
+    fn declared_events(
+        &self,
+        args: &syn::punctuated::Punctuated<syn::Expr, syn::Token![,]>,
+    ) -> Vec<String> {
+        let mut events = Vec::new();
+        for arg in args {
+            self.collect_event_values(arg, 0, &mut events);
+        }
+        events
+    }
+
+    /// Warns when a callback sink declares an answer this analysis cannot read:
+    /// `then_send` is crux's own "answer with this", so an argument that builds
+    /// no event is evidence we have and cannot resolve.
+    fn check_resolution_sink(&mut self, call: &syn::ExprMethodCall, file: &Path) {
+        if call.method != "then_send" || call.args.is_empty() {
+            return;
+        }
+        self.warnings.push(Warning {
+            file: file.to_path_buf(),
+            line: call.span().start().line,
+            kind: WarningKind::UnresolvedEffectCallback,
+        });
+    }
+
+    /// Every event label an expression *constructs*, as opposed to matches.
+    ///
+    /// `Event::Started` yields `Started`; a wrapper delegates to what it wraps
+    /// (`Event::Recorder(RecorderEvent::Started)` → `Started`); a callback
+    /// yields everything its body can build, because a closure that matches on
+    /// the shell's result answers with a different event per outcome and all of
+    /// them are real:
+    ///
+    /// ```ignore
+    /// Command::request_from_shell(op).then_send(move |result| match result {
+    ///     AudioResult::Started { id } => RecordingEvent::RecordingStarted { id },
+    ///     AudioResult::Failed(message) => RecordingEvent::RecordingFailed { message },
+    /// })
+    /// ```
+    ///
+    /// Depth-guarded like the pattern walker: expressions nest without limit in
+    /// hostile input.
+    fn collect_event_values(&self, expr: &syn::Expr, depth: usize, out: &mut Vec<String>) {
+        if depth >= MAX_EVENT_VALUE_DEPTH {
+            return;
+        }
+        let deeper = depth + 1;
+        // A constructed variant ends the descent: what it carries is a payload,
+        // not another answer — except for a wrapper, which *is* the delegation.
+        if let Some((enum_name, variant)) = enum_variant_of_expr(expr) {
+            if self.is_event_enum(&enum_name) {
+                if self.is_wrapper_variant(&enum_name, &variant) {
+                    if let syn::Expr::Call(call) = expr {
+                        for arg in &call.args {
+                            self.collect_event_values(arg, deeper, out);
+                        }
+                    }
+                    if let syn::Expr::Struct(strct) = expr {
+                        for field in &strct.fields {
+                            self.collect_event_values(&field.expr, deeper, out);
+                        }
+                    }
+                    return;
+                }
+                if !out.contains(&variant) {
+                    out.push(variant);
+                }
+                return;
+            }
+        }
+
+        match expr {
+            syn::Expr::Closure(closure) => self.collect_event_values(&closure.body, deeper, out),
+            syn::Expr::Paren(paren) => self.collect_event_values(&paren.expr, deeper, out),
+            syn::Expr::Group(group) => self.collect_event_values(&group.expr, deeper, out),
+            syn::Expr::Reference(reference) => {
+                self.collect_event_values(&reference.expr, deeper, out)
+            }
+            syn::Expr::Match(expr_match) => {
+                for arm in &expr_match.arms {
+                    self.collect_event_values(&arm.body, deeper, out);
+                }
+            }
+            syn::Expr::If(expr_if) => {
+                for statement in &expr_if.then_branch.stmts {
+                    self.collect_event_statement(statement, deeper, out);
+                }
+                if let Some((_, else_expr)) = &expr_if.else_branch {
+                    self.collect_event_values(else_expr, deeper, out);
+                }
+            }
+            syn::Expr::Block(block) => {
+                for statement in &block.block.stmts {
+                    self.collect_event_statement(statement, deeper, out);
+                }
+            }
+            syn::Expr::Call(call) => {
+                for arg in &call.args {
+                    self.collect_event_values(arg, deeper, out);
+                }
+            }
+            syn::Expr::MethodCall(call) => {
+                for arg in &call.args {
+                    self.collect_event_values(arg, deeper, out);
+                }
+            }
+            syn::Expr::Return(ret) => {
+                if let Some(inner) = &ret.expr {
+                    self.collect_event_values(inner, deeper, out);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// A callback's body is usually `let event = match … ;` followed by the
+    /// event it built, so statements count as much as trailing expressions.
+    fn collect_event_statement(&self, statement: &syn::Stmt, depth: usize, out: &mut Vec<String>) {
+        match statement {
+            syn::Stmt::Expr(expr, _) => self.collect_event_values(expr, depth, out),
+            syn::Stmt::Local(local) => {
+                if let Some(init) = &local.init {
+                    self.collect_event_values(&init.expr, depth, out);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -1247,13 +1640,13 @@ impl<'w, 'a> Walker<'w, 'a> {
             GuardEval::NoConstraint => {
                 // No state evidence: the transition fires from any state.
                 for event in events {
-                    self.push(machine, ANY_STATE.to_string(), event.clone(), to.clone(), ctx.arm);
+                    self.push(machine, ANY_STATE.to_string(), event.clone(), to.clone(), ctx);
                 }
             }
             GuardEval::Known(from_states) => {
                 for event in events {
                     for from in &from_states {
-                        self.push(machine, from.clone(), event.clone(), to.clone(), ctx.arm);
+                        self.push(machine, from.clone(), event.clone(), to.clone(), ctx);
                     }
                 }
             }
@@ -1267,7 +1660,16 @@ impl<'w, 'a> Walker<'w, 'a> {
         }
     }
 
-    fn push(&mut self, machine: &StateMachine, from: String, event: String, to: String, arm: usize) {
+    /// The assignment's branch travels with the transition: it is what tells
+    /// [`attach`] which of the arm's requests this transition is on the path of.
+    fn push(
+        &mut self,
+        machine: &StateMachine,
+        from: String,
+        event: String,
+        to: String,
+        ctx: &Ctx<'a>,
+    ) {
         self.out.push((
             RawTransition {
                 machine: machine.enum_name.clone(),
@@ -1277,7 +1679,8 @@ impl<'w, 'a> Walker<'w, 'a> {
                 to,
                 effects: Vec::new(),
             },
-            arm,
+            ctx.arm,
+            ctx.branch.clone(),
         ));
     }
 }

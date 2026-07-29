@@ -37,7 +37,13 @@ and a round-trip test in `crates/model` keeps the Rust structs aligned with it.
               "from": "Idle",
               "event": "RecordPressed",
               "to": "Recording",
-              "effects": ["AudioOperation::Start"]
+              "effects": [
+                {
+                  "name": "AudioOperation::Start",
+                  "capability": "Audio",
+                  "resolvesWith": ["RecordingStarted", "RecordingFailed"]
+                }
+              ]
             }
           ]
         }
@@ -71,9 +77,36 @@ and a round-trip test in `crates/model` keeps the Rust structs aligned with it.
 | `transitions[].from` | Source state, or `"*"` — the transition fires from **any** state (statically unguarded). |
 | `transitions[].event` | Leaf event variant name that triggers the transition. |
 | `transitions[].to` | Target state, or `"*"` — the target is decided at **runtime** (e.g. carried by the event payload). |
-| `transitions[].effects[]` | Optional. Effects requested when the transition fires: `"Render"`, `"AudioOperation::Start"`, ... Omitted when empty. |
+| `transitions[].effects[]` | Optional. Effects requested when the transition fires — **a bare string or an object** (see below). Omitted when empty. |
+| `effects[].name` | The operation as transitions label it: `"AudioOperation::Start"`, or `"Render"` for crux's builtin. The bare-string form is exactly this field. |
+| `effects[].capability` | Optional. The variant of the core's root `Effect` enum that wraps this operation (`Effect::Audio(AudioOperation)` → `"Audio"`). Absent when the request goes through none, or when it could not be resolved. |
+| `effects[].resolvesWith[]` | Optional. Events the shell can answer this request with, as declared at the request site — several when the callback maps one event per outcome. Absent for fire-and-forget requests. An event here need not appear in any transition: a confirmation the core only renders is real behavior. |
+| `effects[].conditional` | Optional (`false`). The request sits on a branch the transition itself does not imply: arriving there *may* request it. |
 | `cores[].events[]` | Optional. `{ name, doc }` pairs: documentation authored on event enum variants, **only** for events that appear in this core's transitions and **only** when documented — the transition tables already enumerate the vocabulary. Omitted when empty, so an undocumented app emits exactly the JSON it emitted before this field existed. |
 | `cores[].effects[]` | Optional. Same for effects, keyed by the label transitions carry (`AudioOperation::Start`, `Render`). |
+
+## Effects, and the loop they close
+
+A transition's `effects[]` entry is written **either** as a bare operation label
+**or** as an object adding what the analyzed source declares around the request.
+Same widening as `states[]`, same reason: an app whose requests show neither a
+capability nor a callback emits exactly the JSON it emitted before those fields
+existed.
+
+```json
+"effects": ["Render", { "name": "HttpOperation::Upload", "capability": "Http", "resolvesWith": ["UploadFinished"] }]
+```
+
+`resolvesWith` is the return leg of Crux's `Event → Effect → shell → Event`
+loop, and the reason it is in the contract: a state graph shows the events going
+in, and without this nothing says which of them the *shell* sends back. It is a
+set because one request has one answer per outcome, and it is only ever what the
+source names at the request site — never inferred from an operation's name. See
+[parser.md](parser.md#effects) for what counts as evidence.
+
+`conditional` is the honesty rule applied to attribution. An effect requested on
+a branch below the assignment is neither dropped nor stated flatly: it travels
+with the transition and says that arriving there *may* request it.
 
 ## Documented states
 
@@ -130,7 +163,7 @@ here. See [i18n.md](i18n.md).
   clients keep working.
 - A value that was a bare string can be **widened** to "string or object" by
   making the object form optional and emitting the bare form whenever the extra
-  data is empty (how `states[]` gained documentation). Existing artifacts stay
+  data is empty (how `states[]` gained documentation, and then `effects[]`). Existing artifacts stay
   valid and unannotated output stays byte-identical, so the change is additive
   in practice — but the clients still move in the same commit, because the
   producer starts emitting objects the moment a source is annotated.

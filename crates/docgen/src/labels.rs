@@ -29,6 +29,20 @@ pub struct Labels {
     pub any_state: &'static str,
     /// Table cell for a transition that requests no effects.
     pub no_effects: &'static str,
+    /// Qualifier on an effect the transition's own path does not imply —
+    /// requested on a branch below it.
+    pub conditional: &'static str,
+    /// Heading of the per-core capabilities table.
+    pub capabilities: &'static str,
+    /// Capabilities table column: the capability itself.
+    pub capability: &'static str,
+    /// Capabilities table column: the operations requested through it.
+    pub operations: &'static str,
+    /// Capabilities table column: the events those requests are answered with.
+    pub answers: &'static str,
+    /// Suffix for the answers a transition cell did not list, as `+3 {more}`.
+    /// The whole set stays in the capabilities table.
+    pub more: &'static str,
     /// States table heading.
     pub states: &'static str,
     /// Heading of the per-core documented-events table. The `effects` label
@@ -66,6 +80,12 @@ impl Labels {
         any_source: "*any*",
         any_state: "any state",
         no_effects: "—",
+        conditional: "conditional",
+        capabilities: "Capabilities",
+        capability: "Capability",
+        operations: "Operations",
+        answers: "Answers with",
+        more: "more",
         states: "States",
         events: "Events",
         effect: "Effect",
@@ -91,6 +111,12 @@ impl Labels {
         // An em dash is locale-neutral; kept in the struct so a future locale
         // that needs different filler has somewhere to put it.
         no_effects: "—",
+        conditional: "condicional",
+        capabilities: "Capacidades",
+        capability: "Capacidade",
+        operations: "Operações",
+        answers: "Responde com",
+        more: "outros",
         states: "Estados",
         events: "Eventos",
         effect: "Efeito",

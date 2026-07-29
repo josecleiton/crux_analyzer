@@ -38,7 +38,13 @@ ele.
               "from": "Idle",
               "event": "RecordPressed",
               "to": "Recording",
-              "effects": ["AudioOperation::Start"]
+              "effects": [
+                {
+                  "name": "AudioOperation::Start",
+                  "capability": "Audio",
+                  "resolvesWith": ["RecordingStarted", "RecordingFailed"]
+                }
+              ]
             }
           ]
         }
@@ -72,9 +78,36 @@ ele.
 | `transitions[].from` | Estado de origem, ou `"*"` — a transição dispara a partir de **qualquer** estado (estaticamente sem guarda). |
 | `transitions[].event` | Nome da variante de evento folha que dispara a transição. |
 | `transitions[].to` | Estado de destino, ou `"*"` — o destino é decidido em **tempo de execução** (por exemplo, carregado pelo payload do evento). |
-| `transitions[].effects[]` | Opcional. Efeitos solicitados quando a transição dispara: `"Render"`, `"AudioOperation::Start"`, ... Omitido quando vazio. |
+| `transitions[].effects[]` | Opcional. Efeitos solicitados quando a transição dispara — **uma string simples ou um objeto** (veja abaixo). Omitido quando vazio. |
+| `effects[].name` | A operação como as transições a rotulam: `"AudioOperation::Start"`, ou `"Render"` para o builtin do crux. A forma de string simples é exatamente este campo. |
+| `effects[].capability` | Opcional. A variante do enum `Effect` raiz do núcleo que envolve esta operação (`Effect::Audio(AudioOperation)` → `"Audio"`). Ausente quando a solicitação não passa por nenhuma, ou quando não pôde ser resolvida. |
+| `effects[].resolvesWith[]` | Opcional. Eventos com que o shell pode responder a esta solicitação, conforme declarado no local da solicitação — vários quando o callback mapeia um evento por desfecho. Ausente para solicitações do tipo disparar e esquecer. Um evento aqui não precisa aparecer em nenhuma transição: uma confirmação que o núcleo apenas renderiza é comportamento real. |
+| `effects[].conditional` | Opcional (`false`). A solicitação está em um ramo que a própria transição não implica: chegar ali *pode* solicitá-la. |
 | `cores[].events[]` | Opcional. Pares `{ name, doc }`: documentação autoral nas variantes do enum de eventos, **apenas** para eventos que aparecem nas transições deste núcleo e **apenas** quando documentados — as tabelas de transição já enumeram o vocabulário. Omitido quando vazio, então uma aplicação sem documentação emite exatamente o JSON que emitia antes deste campo existir. |
 | `cores[].effects[]` | Opcional. O mesmo para efeitos, indexados pelo rótulo que as transições carregam (`AudioOperation::Start`, `Render`). |
+
+## Efeitos, e o laço que eles fecham
+
+Uma entrada de `effects[]` de uma transição é escrita **ou** como o rótulo simples
+da operação **ou** como um objeto que acrescenta o que a fonte analisada declara
+em torno da solicitação. O mesmo alargamento de `states[]`, pelo mesmo motivo: um
+app cujas solicitações não mostram capacidade nem callback emite exatamente o JSON
+que emitia antes desses campos existirem.
+
+```json
+"effects": ["Render", { "name": "HttpOperation::Upload", "capability": "Http", "resolvesWith": ["UploadFinished"] }]
+```
+
+`resolvesWith` é a volta do laço `Evento → Efeito → shell → Evento` do Crux, e a
+razão de estar no contrato: um grafo de estados mostra os eventos que entram, e
+sem isso nada diz quais deles o *shell* devolve. É um conjunto porque uma
+solicitação tem uma resposta por desfecho, e é só o que a fonte nomeia no local da
+solicitação — nunca inferido do nome de uma operação. Veja
+[parser.md](parser.md#efeitos) para o que conta como evidência.
+
+`conditional` é a regra de honestidade aplicada à atribuição. Um efeito solicitado
+em um ramo abaixo da atribuição não é descartado nem afirmado sem ressalva: ele
+viaja com a transição e diz que chegar ali *pode* solicitá-lo.
 
 ## Estados documentados
 

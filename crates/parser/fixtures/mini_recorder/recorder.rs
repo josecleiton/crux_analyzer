@@ -8,6 +8,9 @@ pub enum RecorderEvent {
     /// Retry the failed upload, keeping the recorded take.
     RetryPressed,
     Failed,
+    /// The shell confirmed the microphone is live. Nothing to decide: the
+    /// session is already recording.
+    CaptureStarted,
 }
 
 /// Where one recording session lives, from arming the microphone to a
@@ -48,7 +51,12 @@ impl super::MiniRecorder {
                 if matches!(model.recorder.session.state, RecorderState::Idle) =>
             {
                 model.recorder.session.state = RecorderState::Recording;
-                Self::request_audio(super::AudioOperation::Start);
+                // Capability-style request: the event the shell answers with
+                // travels alongside the operation.
+                Self::request_audio_then(
+                    super::AudioOperation::Start,
+                    RecorderEvent::CaptureStarted,
+                );
             }
             RecorderEvent::PausePressed
                 if matches!(model.recorder.session.state, RecorderState::Recording) =>
@@ -66,7 +74,16 @@ impl super::MiniRecorder {
             RecorderEvent::RetryPressed
                 if matches!(model.recorder.session.state, RecorderState::Failed { .. }) =>
             {
-                model.recorder.session.state = RecorderState::Uploading;
+                // Two branches, two different requests: neither belongs to the
+                // other's transition.
+                if model.recorder.session.attempts_left() {
+                    model.recorder.session.state = RecorderState::Uploading;
+                    Self::request(super::HttpOperation::Upload)
+                        .then_send(RecorderEvent::UploadFinished);
+                } else {
+                    model.recorder.session.state = RecorderState::Idle;
+                    render();
+                }
             }
             RecorderEvent::Failed => Self::park(&mut model.recorder.session),
             _ => {}
@@ -83,6 +100,12 @@ impl super::MiniRecorder {
             {
                 model.recorder.session.state = RecorderState::Uploading;
                 Self::request_audio(super::AudioOperation::Stop);
+                // Requested on a branch below the assignment: arriving in
+                // `Uploading` *may* send the take, it does not always.
+                if model.recorder.session.is_last_take() {
+                    Self::request(super::HttpOperation::Upload)
+                        .then_send(RecorderEvent::UploadFinished);
+                }
             }
             RecorderEvent::UploadFinished
                 if matches!(model.recorder.session.state, RecorderState::Uploading) =>
