@@ -23,42 +23,34 @@ guarantees, not before.
 
 ---
 
-## 1. The ratchet — make the documentation have teeth
+## 1. The ratchet — make the documentation have teeth ✅ **done**
 
-The highest-leverage work, and the cheapest. There is no CI in the repository at
-all today.
+The highest-leverage work, and the cheapest. Shipped as three independent
+increments; see [cli.md](cli.md) and
+[development.md](development.md#what-ci-enforces).
 
-### 1.1 CI running `just check`
+- **CI running `just check`** — `.github/workflows/ci.yml`. `just check` already
+  did the right thing; it just never ran unless a human typed it. The corpus
+  test gates itself on `QUIPU_SRC` and that source is not public, so CI proves
+  the fixture path and the corpus stays a local gate.
+- **`--deny-warnings`** — a global flag that exits non-zero when the parser
+  reported anything. Turns "the corpus extracts cleanly" from a note in
+  `parser.md` into something a pipeline enforces. Output is still written: the
+  exit code is the signal.
+- **`crux-analyzer coverage`** — the share of states carrying a *description*,
+  per machine and in total, failing below `--min`. State documentation made this
+  measurable for the first time. Documentation you can add is nice;
+  documentation you can *measure* is what actually gets written.
 
-`just check` already does the right thing (corpus + clippy + web tests + web
-build). It just never runs unless a human types it. One workflow closes the
-biggest gap in the project.
+Two guards came out of it that are worth keeping honest: `just fixture-guard`
+(the fixture must extract with zero warnings and not lose documentation) and
+`just docs-current` (a committed generated example must match the generator).
+Both were broken on purpose once and watched go red — a guard that cannot fail
+is decoration.
 
-Needs: Rust toolchain + pnpm + `just`, and a decision about the corpus — the
-Quipu test is gated on `QUIPU_SRC` and that source is not public, so CI runs the
-fixture tests and skips the corpus (the gate already handles this by design).
-
-### 1.2 `--deny-warnings`
-
-`crux-analyzer` already counts warnings and prints them to stderr; nothing acts
-on them. A `--deny-warnings` flag that exits non-zero when the count is above
-zero turns "the corpus extracts cleanly" from a note in `parser.md` into
-something a pipeline enforces.
-
-Small, self-contained, and the natural companion to 1.1.
-
-### 1.3 `crux-analyzer coverage`
-
-The state-documentation work made this measurable for the first time: `doc` is
-in the model, so the model can be asked *how much of it is documented*.
-
-A `coverage` subcommand that reports, per core and machine, the share of states
-carrying a description — and fails below a `--min` threshold. That is what turns
-the tool from a viewer into a ratchet: a team adopts it, the number goes up, and
-CI stops it going down.
-
-It is also the honest counterpart to the feature just shipped. Documentation you
-can add is nice; documentation you can *measure* is what actually gets written.
+**What is left here:** put a `--min` on the corpus in whatever pipeline analyzes
+a real app. `RecordingState` sits at 13% with no description on the enum itself,
+which is exactly the kind of number a ratchet is for.
 
 ---
 

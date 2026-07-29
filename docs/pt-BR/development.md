@@ -27,7 +27,10 @@ just            # lista todas as receitas
 | Tudo | `just check` | — |
 | Modelo para a UI | `just model <src> <nome>` | `cargo run -p crux-analyzer-cli -- generate ...` |
 | Documentação | `just docs <src> <nome> [formato] [locale]` | `cargo run -p crux-analyzer-cli -- docs ...` |
+| Cobertura de documentação | `just coverage <src> <nome> [min]` | `cargo run -p crux-analyzer-cli -- coverage ...` |
 | Atualizar docs de exemplo (todos os locales) | `just example-docs` | — |
+| Exemplos versionados estão atuais | `just docs-current` | — |
+| Fixture extrai limpo | `just fixture-guard` | — |
 
 ## Camadas de teste
 
@@ -71,6 +74,26 @@ Para mudanças no parser que alteram a semântica de extração, adicione uma
 verificação cruzada adversarial: derive independentemente as transições esperadas
 a partir da fonte do corpus e compare com a saída da CLI antes de confiar nos
 testes.
+
+### O que o CI garante
+
+O `.github/workflows/ci.yml` roda `just check` (que agora inclui o
+`fixture-guard`) mais `just docs-current`. Juntos eles cobrem as três formas pelas
+quais este projeto pode apodrecer em silêncio:
+
+| Guarda | Pega |
+| --- | --- |
+| `just check` | testes quebrados, clippy, uma chave faltando no catálogo de mensagens (`tsc`) |
+| `fixture-guard` | o fixture começando a emitir avisos, ou sua documentação regredindo abaixo do piso |
+| `docs-current` | um exemplo gerado versionado que não corresponde mais ao gerador |
+
+O teste do corpus se auto-restringe por `QUIPU_SRC`, e essa fonte não é pública —
+então o CI comprova o caminho do fixture e o corpus continua sendo uma guarda
+local. Mantenha assim ao adicionar guardas: o que o CI não consegue rodar não é
+uma guarda.
+
+Uma guarda que não pode falhar é decoração. Quando adicionar uma, quebre-a de
+propósito uma vez e veja-a ficar vermelha antes de confiar nela.
 
 ## Convenções
 

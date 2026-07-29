@@ -1,4 +1,5 @@
-//! Documentation generators for the crux_analyzer semantic model.
+//! Documentation generators for the crux_analyzer semantic model, and the
+//! measure of how much of it is documented ([`coverage`]).
 //!
 //! Every generator consumes only [`crux_analyzer_model`] types — never the
 //! parser or its AST — so they work for any client that has a model JSON.
@@ -9,10 +10,12 @@
 
 use crux_analyzer_model::{Machine, Marker, State, StateDecl, Transition};
 
+mod coverage;
 mod labels;
 mod markdown;
 mod mermaid;
 
+pub use coverage::{coverage, Coverage, MachineCoverage, ProjectCoverage};
 pub use labels::Labels;
 pub use markdown::markdown;
 pub use mermaid::{mermaid_diagrams, Diagram};

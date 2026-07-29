@@ -1,0 +1,54 @@
+# The guard that makes the documentation defensible: `just check` on every
+# change, plus the two things `check` cannot know about — that the committed
+# generated examples are current, and that the fixture extracts without a
+# single warning.
+#
+# The Quipu corpus test is gated on QUIPU_SRC and that source is not public, so
+# it skips itself here by design (see docs/development.md). CI therefore proves
+# the fixture path; the corpus stays a local gate.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: extractions/setup-just@v2
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Rust tests + clippy + web tests + web build + the fixture guard (tsc is
+      # the i18n catalog parity check).
+      - run: just check
+
+      # The generated examples are committed, so they can drift. Regenerating
+      # must be a no-op.
+      - name: Generated examples are current
+        run: just docs-current
