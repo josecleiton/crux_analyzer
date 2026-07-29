@@ -289,23 +289,39 @@ fn collect_renames(tree: &syn::UseTree, prefix: &mut Vec<String>, out: &mut Vec<
 
 /// A variant's fields with names (if any) and last-segment type names
 /// (`Recording(RecordingEvent)` and `Recording(recorder::RecordingEvent)`
-/// both yield the type `RecordingEvent`); generic types are skipped.
+/// both yield the type `RecordingEvent`). Single-argument smart pointers
+/// (`Box<T>`, `Rc<T>`, `Arc<T>`) are looked through; other generic types
+/// are skipped.
 fn variant_fields(fields: &syn::Fields) -> Vec<VariantField> {
     fields
         .iter()
         .filter_map(|field| {
-            if let syn::Type::Path(type_path) = &field.ty {
-                let segment = type_path.path.segments.last()?;
-                if segment.arguments.is_none() {
-                    return Some(VariantField {
-                        name: field.ident.as_ref().map(|i| i.to_string()),
-                        type_name: segment.ident.to_string(),
-                    });
-                }
-            }
-            None
+            let type_name = unwrapped_type_name(&field.ty)?;
+            Some(VariantField {
+                name: field.ident.as_ref().map(|i| i.to_string()),
+                type_name,
+            })
         })
         .collect()
+}
+
+fn unwrapped_type_name(ty: &syn::Type) -> Option<String> {
+    let syn::Type::Path(type_path) = ty else { return None };
+    let segment = type_path.path.segments.last()?;
+    match &segment.arguments {
+        syn::PathArguments::None => Some(segment.ident.to_string()),
+        syn::PathArguments::AngleBracketed(args)
+            if matches!(segment.ident.to_string().as_str(), "Box" | "Rc" | "Arc") =>
+        {
+            let [syn::GenericArgument::Type(inner)] =
+                args.args.iter().collect::<Vec<_>>()[..]
+            else {
+                return None;
+            };
+            unwrapped_type_name(inner)
+        }
+        _ => None,
+    }
 }
 
 /// Parameter binding names of a function signature.

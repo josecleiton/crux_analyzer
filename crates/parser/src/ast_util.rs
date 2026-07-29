@@ -68,12 +68,23 @@ pub(crate) fn expr_path_string(expr: &syn::Expr) -> Option<String> {
         }
         syn::Expr::Reference(reference) => expr_path_string(&reference.expr),
         syn::Expr::Paren(paren) => expr_path_string(&paren.expr),
-        syn::Expr::MethodCall(call) if call.args.is_empty() => {
-            // `.clone()`, `.to_owned()`, ... — the value is still the receiver's.
+        syn::Expr::MethodCall(call)
+            if call.args.is_empty() && is_identity_method(&call.method.to_string()) =>
+        {
+            // Only genuinely identity-preserving calls are looked through —
+            // `.take()`/`.unwrap()`/business accessors yield different values
+            // and must NOT alias to their receiver's path.
             expr_path_string(&call.receiver)
         }
         _ => None,
     }
+}
+
+fn is_identity_method(name: &str) -> bool {
+    matches!(
+        name,
+        "clone" | "to_owned" | "as_ref" | "as_mut" | "as_deref" | "borrow" | "borrow_mut"
+    )
 }
 
 /// The `expr, pat` arguments of a `matches!` invocation.

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-The original roadmap is fully implemented: syn-based parser (predicate guards, `==`/closure guards, `Default` resets, wildcard sources, per-transition effects, multiple state machines per core), CLI (`crux-analyzer generate | docs`, both with `--watch`), doc generators (Mermaid, Markdown), and the web UI (machine sections, inspector with effects, Simulation Engine). The corpus test against a real app is gated on `CORPUS_SRC`. `init.md` is the original project spec (in Portuguese).
+The original roadmap is fully implemented: syn-based parser (predicate guards, `==`/closure guards, `Default` resets, wildcard sources AND targets, value-flow analysis for runtime-assigned targets, hierarchical/composite states as `Parent/Child` paths, per-transition effects, multiple state machines per core), CLI (`crux-analyzer generate | docs`, both with `--watch`), doc generators (Mermaid with composite blocks, Markdown), and the web UI (machine sections, inspector with effects, Simulation Engine). The corpus test against a real app is gated on `CORPUS_SRC` and extracts it warning-free. `init.md` is the original project spec (in Portuguese).
 
 ## Conventions
 
@@ -56,5 +56,5 @@ Hard rules:
 
 ## Known future work
 
-- Value-flow analysis for dynamic transition targets (`draft.status = event_payload`) — currently a warning.
-- Hierarchical (composite) states; PlantUML/HTML generators; VS Code extension.
+- PlantUML/HTML generators; VS Code extension.
+- Visual nesting of composite states in the web graph (they currently render as flat `Parent / Child` nodes; Mermaid already nests them).

@@ -799,6 +799,84 @@ fn same_enum_in_two_fields_is_two_machines() {
 }
 
 #[test]
+fn payload_data_enum_is_not_a_composite_state() {
+    // `Failed(ErrorCode)` carries data — no nested variant pattern exists,
+    // so Failed stays a plain leaf and the runtime payload does not warn.
+    let code = r#"
+        pub enum ErrorCode { NotFound, Timeout }
+        pub enum State { Idle, Failed(ErrorCode) }
+        pub struct Model { state: State }
+        pub struct App1;
+        pub enum Event { Boom(ErrorCode) }
+        impl App for App1 {
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {
+                match event {
+                    Event::Boom(code) if matches!(model.state, State::Idle) => {
+                        model.state = State::Failed(code);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    "#;
+    let sources = sources_from_str(&[("lib.rs", code)]);
+    let outcome = parse_sources(&sources, "test").unwrap();
+    let machine = &outcome.project.cores[0].machines[0];
+
+    assert_eq!(
+        machine.states.iter().map(|s| s.0.as_str()).collect::<Vec<_>>(),
+        ["Idle", "Failed"],
+        "ErrorCode must not expand into fake sub-states"
+    );
+    assert_eq!(machine.transitions.len(), 1);
+    assert_eq!(machine.transitions[0].to.0, "Failed");
+    assert!(outcome.warnings.is_empty(), "{:?}", outcome.warnings);
+}
+
+#[test]
+fn boxed_nested_event_enum_still_delegates() {
+    let code = r#"
+        pub enum State { Idle, Running }
+        pub struct Model { state: State }
+        pub struct App1;
+        pub enum Inner { Go }
+        pub enum Event { Wrapped(Box<Inner>) }
+        impl App for App1 {
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {
+                match event {
+                    Event::Wrapped(inner) => Self::update_inner(*inner, model),
+                }
+            }
+        }
+        impl App1 {
+            fn update_inner(event: Inner, model: &mut Model) {
+                match event {
+                    Inner::Go if matches!(model.state, State::Idle) => {
+                        model.state = State::Running;
+                    }
+                    _ => {}
+                }
+            }
+        }
+    "#;
+    let (transitions, _) = {
+        let sources = sources_from_str(&[("lib.rs", code)]);
+        let outcome = parse_sources(&sources, "test").unwrap();
+        let t = outcome.project.cores[0].machines[0]
+            .transitions
+            .iter()
+            .map(|t| (t.from.0.clone(), t.event.0.clone(), t.to.0.clone()))
+            .collect::<Vec<_>>();
+        (t, outcome.warnings)
+    };
+    // the Box around Inner must not break wrapper detection: the leaf label
+    // is Go, not Wrapped
+    assert_eq!(transitions, vec![triple("Idle", "Go", "Running")]);
+}
+
+#[test]
 fn no_core_is_an_error() {
     let sources = sources_from_str(&[("lib.rs", "pub struct NotACore;")]);
     assert!(matches!(
