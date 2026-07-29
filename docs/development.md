@@ -97,6 +97,11 @@ The corpus test gates itself on `QUIPU_SRC`, and that source is not public — s
 CI proves the fixture path and the corpus stays a local gate. Keep it that way
 when adding guards: anything CI cannot run is not a guard.
 
+On every push to `main`, CI also publishes a **living preview**: the
+mini-recorder fixture analyzed by the freshly built analyzer and deployed to
+GitHub Pages via `just site` — the same recipe users run, pointed at the
+public corpus. If the preview looks wrong, the release would too.
+
 The corpus has a coverage ratchet of its own: `just quipu-coverage` (part of
 `just check`) fails when the Quipu documentation total drops below the floor
 baked into the recipe. Like the corpus test it skips itself when the source is

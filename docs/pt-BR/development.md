@@ -100,6 +100,11 @@ então o CI comprova o caminho do fixture e o corpus continua sendo uma guarda
 local. Mantenha assim ao adicionar guardas: o que o CI não consegue rodar não é
 uma guarda.
 
+A cada push na `main`, o CI também publica um **preview vivo**: o fixture
+mini-recorder analisado pelo analisador recém-compilado e publicado no GitHub
+Pages via `just site` — a mesma receita que os usuários rodam, apontada para o
+corpus público. Se o preview estiver errado, o release também estaria.
+
 O corpus tem uma catraca de cobertura própria: `just quipu-coverage` (parte do
 `just check`) falha quando o total de documentação do Quipu cai abaixo do piso
 embutido na receita. Como o teste do corpus, ela pula a si mesma quando a fonte

@@ -52,3 +52,51 @@ jobs:
       # must be a no-op.
       - name: Generated examples are current
         run: just docs-current
+
+  # A living preview of the tool on GitHub Pages: the bundled fixture
+  # analyzed by the freshly built analyzer and published as a static site —
+  # the same `just site` recipe users run, pointed at the public corpus.
+  preview:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: extractions/setup-just@v2
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # First run enables Pages on the repo (build_type: workflow).
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      # Project Pages serve from /<repo>/, so the base must match.
+      - name: Build the mini-recorder site
+        run: just site crates/parser/fixtures/mini_recorder "Mini Recorder" "/${{ github.event.repository.name }}/"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
