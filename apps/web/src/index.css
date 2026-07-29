@@ -543,6 +543,32 @@ body {
   counter-reset: trail;
 }
 
+/* A step of the run that is recorded but not taken: the replay was rewound past
+   it. Same inert vocabulary the unreplayable transitions use. */
+.trail-list li.trail-ahead {
+  opacity: 0.55;
+  font-style: italic;
+}
+
+/* Standing at another point of the run. Quiet until hovered — the trail is a
+   record first and a control second. */
+.trail-goto {
+  float: right;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 10px;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.trail-goto:hover {
+  border-color: var(--sim-border);
+  color: var(--sim-text);
+}
+
 /* The requests a step made, under its states: a quieter third line, so the
    event and the states it moved between stay the headline. */
 .trail-effects {

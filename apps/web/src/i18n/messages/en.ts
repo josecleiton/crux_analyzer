@@ -71,6 +71,11 @@ export const en = {
   'simulation.requested': 'requested',
   // A request on a branch the replay does not evaluate: it cannot claim it ran.
   'simulation.mayHave': 'may have',
+  // Standing at another point of the recorded run.
+  'simulation.stepBack': 'back to here',
+  'simulation.stepForward': 'forward to here',
+  'simulation.aheadNote':
+    'Steps the replay was rewound past. They are kept, not taken: firing the same event again walks into them, and a different move replaces them.',
   'simulation.nothingFired': 'Nothing fired yet.',
   'simulation.restart': 'Restart',
 

@@ -222,8 +222,15 @@ Select a state (optional) and hit **Simulate**:
 - the viewport follows the replay: when the state just entered is not fully in
   view, the canvas pans to center it, keeping the zoom untouched — a step that
   lands on screen never moves the canvas;
-- **Restart** goes back to the machine's first state; **Stop simulation**
-  returns to the inspector.
+- **the trail is where you stand**, not just what happened: every step but the
+  current one offers `back to here` / `forward to here`, and going back does
+  *not* throw away what you had done — the later steps stay listed and inert
+  (`ahead`), with a note saying so. Firing the same event again walks into them;
+  a different move is what replaces them. Any position is rebuilt by *replaying*
+  the recorded run, never from stored snapshots, so the current state, the
+  traveled path and the requests in flight come back consistent by construction;
+- **Restart** goes back to the machine's first state (and drops the recorded
+  run); **Stop simulation** returns to the inspector.
 
 Every animation is skipped under `prefers-reduced-motion`, viewport moves
 included (`src/components/Graph/ViewportFocus.tsx` reads the preference in JS,

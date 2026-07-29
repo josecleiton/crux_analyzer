@@ -6,7 +6,12 @@
 import type { DomainMachine } from '../../domain/types';
 import { stateRole } from '../../domain/stateRole';
 import type { Simulation } from '../../simulation/engine';
-import { availableTransitions, pendingAnswers, unreplayableTransitions } from '../../simulation/engine';
+import {
+  availableTransitions,
+  pendingAnswers,
+  recordedRun,
+  unreplayableTransitions,
+} from '../../simulation/engine';
 import { useTranslate } from '../../i18n/useI18n';
 import { StateBadges, StateName } from '../Inspector/StateBadges';
 import { DocText, StateTags } from '../Inspector/StateDoc';
@@ -15,10 +20,17 @@ interface SimulationPanelProps {
   machine: DomainMachine;
   simulation: Simulation;
   onFire: (transitionId: string) => void;
+  onGoToStep: (steps: number) => void;
   onRestart: () => void;
 }
 
-export function SimulationPanel({ machine, simulation, onFire, onRestart }: SimulationPanelProps) {
+export function SimulationPanel({
+  machine,
+  simulation,
+  onFire,
+  onGoToStep,
+  onRestart,
+}: SimulationPanelProps) {
   const t = useTranslate();
   const current = machine.states.find((s) => s.id === simulation.currentStateId);
   const available = availableTransitions(machine, simulation);
@@ -26,6 +38,7 @@ export function SimulationPanel({ machine, simulation, onFire, onRestart }: Simu
   const answers = pendingAnswers(machine, simulation);
   const answerOf = (transitionId: string) =>
     answers.find((answer) => answer.transitionId === transitionId);
+  const run = recordedRun(simulation);
   const role = current
     ? stateRole(machine, current)
     : { initial: false, failure: false, deprecated: false, final: false };
@@ -113,15 +126,32 @@ export function SimulationPanel({ machine, simulation, onFire, onRestart }: Simu
       ) : null}
 
       <h4>{t('simulation.trail')}</h4>
-      {simulation.trail.length === 0 ? (
+      {run.length === 0 ? (
         <p className="inspector-empty">{t('simulation.nothingFired')}</p>
       ) : (
         <ol className="trail-list">
-          {simulation.trail.map((step, i) => (
+          {run.map((step, i) => {
+            // One numbered history: what was taken, then what the replay was
+            // rewound past. `here` is where it stands; `ahead` is recorded and
+            // not taken.
+            const here = i === simulation.trail.length - 1;
+            const ahead = i >= simulation.trail.length;
+            return (
             <li
               key={`${step.transitionId}-${i}`}
-              className={i === simulation.trail.length - 1 ? 'trail-new' : undefined}
+              className={
+                [here ? 'trail-new' : '', ahead ? 'trail-ahead' : '']
+                  .filter(Boolean)
+                  .join(' ') || undefined
+              }
             >
+              {/* Every step but the current one is a place to stand: earlier ones
+                  go back, rewound ones go forward again. */}
+              {here ? null : (
+                <button className="trail-goto" onClick={() => onGoToStep(i + 1)}>
+                  {ahead ? t('simulation.stepForward') : t('simulation.stepBack')}
+                </button>
+              )}
               <span className="trail-event">{step.event}</span>
               <span className="trail-states">
                 {step.fromName} → {step.toName}
@@ -145,9 +175,14 @@ export function SimulationPanel({ machine, simulation, onFire, onRestart }: Simu
                 </span>
               ) : null}
             </li>
-          ))}
+            );
+          })}
         </ol>
       )}
+      {/* Why steps are sitting there greyed out, and what makes them go. */}
+      {simulation.ahead.length > 0 ? (
+        <p className="event-unreplayable-note">{t('simulation.aheadNote')}</p>
+      ) : null}
 
       <button className="restart-button" onClick={onRestart}>
         {t('simulation.restart')}

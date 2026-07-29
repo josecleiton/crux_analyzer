@@ -14,6 +14,7 @@ import {
   availableTransitions,
   fire,
   lastStep,
+  goToStep,
   startSimulation,
   traveledPath,
 } from './simulation/engine';
@@ -196,6 +197,12 @@ export default function App() {
     setSimulation(fire(simulatedMachine, simulation, transitionId));
   }
 
+  /** Stand at step `steps` of the recorded run — the trail is navigable. */
+  function goTo(steps: number) {
+    if (!simulation || !simulatedMachine) return;
+    setSimulation(goToStep(simulatedMachine, simulation, steps));
+  }
+
   if (!project) {
     return <div className="app-loading">{t('app.loading')}</div>;
   }
@@ -238,6 +245,7 @@ export default function App() {
             machine={simulatedMachine}
             simulation={simulation}
             onFire={fireTransition}
+            onGoToStep={goTo}
             onRestart={() => setSimulation(startSimulation(simulatedMachine))}
           />
         ) : (

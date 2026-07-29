@@ -40,6 +40,15 @@ export interface Simulation {
   initialStateId: string;
   currentStateId: string;
   trail: SimulationStep[];
+  /**
+   * Steps the replay was rewound past: recorded, shown, and **not** taken.
+   *
+   * Going back does not throw away what you had done — you may only want to look
+   * at an earlier point. They stay inert until either you walk into them again
+   * (firing the same event advances into the first one, so going back is
+   * reversible) or you make a different move, which is what discards them.
+   */
+  ahead: SimulationStep[];
   /** Requests still waiting for the shell, oldest first. */
   inFlight: InFlightEffect[];
 }
@@ -54,6 +63,7 @@ export function startSimulation(machine: DomainMachine, initialStateId?: string)
     initialStateId: initial.id,
     currentStateId: initial.id,
     trail: [],
+    ahead: [],
     inFlight: [],
   };
 }
@@ -105,10 +115,14 @@ export function fire(
 
   const current = machine.states.find((s) => s.id === simulation.currentStateId);
   const step = simulation.trail.length + 1;
+  // Firing what was already recorded next walks back into it; anything else is
+  // a different run from here, and the recorded remainder goes.
+  const resumes = simulation.ahead[0]?.transitionId === transition.id;
   return {
     machineId: simulation.machineId,
     initialStateId: simulation.initialStateId,
     currentStateId: transition.to,
+    ahead: resumes ? simulation.ahead.slice(1) : [],
     trail: [
       ...simulation.trail,
       {
@@ -161,6 +175,43 @@ export function pendingAnswers(machine: DomainMachine, simulation: Simulation): 
     }
   }
   return answers;
+}
+
+/**
+ * The recorded run: what was taken, then what the replay was rewound past.
+ *
+ * The two together are one history — which is why [`goToStep`] moves through
+ * both, and the panel numbers them in one list.
+ */
+export function recordedRun(simulation: Simulation): SimulationStep[] {
+  return [...simulation.trail, ...simulation.ahead];
+}
+
+/**
+ * The replay at step `steps` of its recorded run — how you go back one, or
+ * forward to where you were.
+ *
+ * Rebuilt by replaying, not by keeping snapshots: [`fire`] is pure and each step
+ * records the transition it fired, so any point of a run is derivable from its
+ * history. One source of truth, and everything that hangs off the position — the
+ * current state, the traveled path, the requests in flight — comes back
+ * consistent by construction rather than by having been stored correctly.
+ *
+ * `steps` is clamped: 0 is the starting state, and past the run's length is the
+ * run in full.
+ */
+export function goToStep(
+  machine: DomainMachine,
+  simulation: Simulation,
+  steps: number,
+): Simulation {
+  const run = recordedRun(simulation);
+  const target = Math.min(Math.max(0, steps), run.length);
+  let moved = startSimulation(machine, simulation.initialStateId);
+  for (const step of run.slice(0, target)) {
+    moved = fire(machine, moved, step.transitionId);
+  }
+  return { ...moved, ahead: run.slice(target) };
 }
 
 /** The last fired transition, for highlighting. */

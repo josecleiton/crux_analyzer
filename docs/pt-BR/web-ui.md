@@ -236,8 +236,16 @@ Selecione um estado (opcional) e clique em **Simular**:
 - a view acompanha o replay: quando o estado recém-alcançado não está
   inteiramente visível, o canvas pana para centralizá-lo, sem mexer no zoom — um
   passo que cai na tela nunca move o canvas;
-- **Reiniciar** volta ao primeiro estado da máquina; **Parar simulação** retorna
-  ao inspetor.
+- **o histórico é onde você está**, não só o que aconteceu: todo passo além do
+  atual oferece `voltar até aqui` / `avançar até aqui`, e voltar *não* joga fora
+  o que você já tinha feito — os passos seguintes continuam listados e inertes
+  (`ahead`), com uma nota dizendo isso. Disparar o mesmo evento de novo entra
+  neles; um movimento diferente é o que os substitui. Qualquer posição é
+  reconstruída *reexecutando* a corrida registrada, nunca a partir de snapshots
+  guardados, então o estado atual, o caminho percorrido e as solicitações em voo
+  voltam consistentes por construção;
+- **Reiniciar** volta ao primeiro estado da máquina (e descarta a corrida
+  registrada); **Parar simulação** retorna ao inspetor.
 
 Toda animação é suprimida sob `prefers-reduced-motion`, movimentos de view
 incluídos (`src/components/Graph/ViewportFocus.tsx` lê a preferência em JS, já

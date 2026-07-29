@@ -5,8 +5,10 @@ import { fromParserJson } from '../domain/fromParserJson';
 import {
   availableTransitions,
   fire,
+  goToStep,
   lastStep,
   pendingAnswers,
+  recordedRun,
   startSimulation,
   traveledPath,
   unreplayableTransitions,
@@ -15,6 +17,80 @@ import {
 const project = fromParserJson(parseProjectJson(rawProject));
 const recorder = project.cores[0].machines[0]; // RecorderState
 const inputs = project.cores[0].machines[1]; // InputState (has wildcard)
+
+describe('standing at another point of the run', () => {
+  const fireEvent = (
+    machine: typeof recorder,
+    sim: ReturnType<typeof startSimulation>,
+    event: string,
+  ) => fire(machine, sim, availableTransitions(machine, sim).find((t) => t.event === event)!.id);
+
+  /** Idle → Recording → Paused → Recording. */
+  const threeSteps = () => {
+    let sim = startSimulation(recorder);
+    for (const event of ['RecordPressed', 'PausePressed', 'ResumePressed']) {
+      sim = fireEvent(recorder, sim, event);
+    }
+    return sim;
+  };
+
+  it('goes back without throwing away what was done', () => {
+    const back = goToStep(recorder, threeSteps(), 1);
+
+    // Standing after step 1, with the rest recorded and not taken.
+    expect(back.trail.map((s) => s.event)).toEqual(['RecordPressed']);
+    expect(back.ahead.map((s) => s.event)).toEqual(['PausePressed', 'ResumePressed']);
+    expect(recordedRun(back).map((s) => s.event)).toEqual([
+      'RecordPressed',
+      'PausePressed',
+      'ResumePressed',
+    ]);
+    expect(back.currentStateId).toBe(recorder.states.find((s) => s.name === 'Recording')!.id);
+  });
+
+  it('rebuilds everything that hangs off the position', () => {
+    // Rewinding past the request that was waiting un-waits it, and the traveled
+    // path shrinks with it — both derived, neither stored.
+    const back = goToStep(recorder, threeSteps(), 0);
+    expect(back.inFlight).toEqual([]);
+    expect(back.trail).toEqual([]);
+    expect(traveledPath(recorder, back).transitionIds).toEqual([]);
+    expect(lastStep(back)).toBeNull();
+
+    const one = goToStep(recorder, threeSteps(), 1);
+    expect(one.inFlight.map((p) => p.name)).toEqual(['AudioOperation::Start']);
+    expect(traveledPath(recorder, one).transitionIds).toHaveLength(1);
+  });
+
+  it('walks back into the recorded steps when the same event fires', () => {
+    const back = goToStep(recorder, threeSteps(), 1);
+    const forward = fireEvent(recorder, back, 'PausePressed');
+
+    expect(forward.trail.map((s) => s.event)).toEqual(['RecordPressed', 'PausePressed']);
+    expect(forward.ahead.map((s) => s.event)).toEqual(['ResumePressed']);
+  });
+
+  it('replaces the recorded steps when a different move is made', () => {
+    // From Recording, stopping instead of pausing is a different run.
+    const back = goToStep(recorder, threeSteps(), 1);
+    const diverged = fireEvent(recorder, back, 'StopPressed');
+
+    expect(diverged.trail.map((s) => s.event)).toEqual(['RecordPressed', 'StopPressed']);
+    expect(diverged.ahead).toEqual([]);
+  });
+
+  it('goes forward again through the trail it kept', () => {
+    const run = threeSteps();
+    const back = goToStep(recorder, run, 1);
+    expect(goToStep(recorder, back, 3)).toEqual(run);
+  });
+
+  it('clamps out-of-range positions instead of breaking', () => {
+    const run = threeSteps();
+    expect(goToStep(recorder, run, -5).trail).toEqual([]);
+    expect(goToStep(recorder, run, 99)).toEqual(run);
+  });
+});
 
 describe('effects in flight', () => {
   const fireEvent = (machine: typeof recorder, sim: ReturnType<typeof startSimulation>, event: string) =>
