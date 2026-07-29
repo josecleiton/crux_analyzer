@@ -599,6 +599,62 @@ body {
   margin-top: 6px;
 }
 
+/* Author prose renders as Markdown; keep its elements panel-sized. */
+.doc-text ul,
+.doc-text ol {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+
+.doc-text li + li {
+  margin-top: 2px;
+}
+
+.doc-text code {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  background: var(--bg-hover);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+.doc-text pre {
+  margin: 6px 0;
+  padding: 8px;
+  background: var(--bg-hover);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.doc-text pre code {
+  background: none;
+  padding: 0;
+}
+
+/* A heading in a 260px panel is emphasis, not typography. */
+.doc-text h1,
+.doc-text h2,
+.doc-text h3,
+.doc-text h4,
+.doc-text h5,
+.doc-text h6 {
+  margin: 8px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.doc-text a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.doc-text blockquote {
+  margin: 6px 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--border-strong);
+}
+
 .state-tags {
   display: flex;
   flex-wrap: wrap;

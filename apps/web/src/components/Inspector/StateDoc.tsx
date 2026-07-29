@@ -2,23 +2,25 @@
  * Documentation read out of the analyzed application, shared by the Inspector
  * and the simulation panel.
  *
- * The text is the analyzed app's own prose, so it is rendered verbatim and is
- * never translated — only the headings around it are. Tag names are the
- * author's identifiers, hence monospace: in this UI, monospace is data.
+ * The text is the analyzed app's own prose, so it is never translated — only
+ * the headings around it are. It *is* rendered as Markdown now, like the
+ * generated document always did: `///` prose full of `backticks` and lists
+ * was showing its raw syntax here. react-markdown renders to React elements
+ * (no HTML injection), leaves raw HTML in prose unrendered, and treats
+ * single newlines as soft breaks — which is exactly the hard-wrap rejoining
+ * `docParagraphs` used to do by hand. Tag names are the author's
+ * identifiers, hence monospace: in this UI, monospace is data.
  */
 
+import Markdown from 'react-markdown';
 import type { DomainMachine } from '../../domain/types';
 import { useTranslate } from '../../i18n/useI18n';
-import { docParagraphs } from './docParagraphs';
 
 export function DocText({ doc }: { doc: string }) {
-  const paragraphs = docParagraphs(doc);
-  if (paragraphs.length === 0) return null;
+  if (doc.trim() === '') return null;
   return (
     <div className="doc-text">
-      {paragraphs.map((text, index) => (
-        <p key={index}>{text}</p>
-      ))}
+      <Markdown>{doc}</Markdown>
     </div>
   );
 }
