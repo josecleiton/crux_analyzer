@@ -8,7 +8,13 @@ import type { LayoutEngine, LayoutResult } from './layout/LayoutEngine';
 import { ElkLayoutEngine } from './layout/ElkLayoutEngine';
 import type { Selection } from './state/selection';
 import type { Simulation } from './simulation/engine';
-import { fire, lastStep, startSimulation } from './simulation/engine';
+import {
+  availableTransitions,
+  fire,
+  lastStep,
+  startSimulation,
+  traveledPath,
+} from './simulation/engine';
 import { Graph } from './components/Graph/Graph';
 import type { GraphHighlight } from './components/Graph/Graph';
 import { Sidebar } from './components/Sidebar/Sidebar';
@@ -69,14 +75,23 @@ export default function App() {
   );
 
   const highlight: GraphHighlight | undefined = useMemo(() => {
-    if (!simulation) return undefined;
+    if (!simulation || !simulatedMachine) return undefined;
     const last = lastStep(simulation);
-    const current = simulatedMachine?.states.find((s) => s.id === simulation.currentStateId);
+    const current = simulatedMachine.states.find((s) => s.id === simulation.currentStateId);
+    const traveled = traveledPath(simulatedMachine, simulation);
+    const next = availableTransitions(simulatedMachine, simulation);
     return {
       nodeIds: [simulation.currentStateId],
       edgeIds: last ? [last.transitionId] : [],
-      failure:
-        simulatedMachine && current ? stateRole(simulatedMachine, current).failure : false,
+      visited: { nodeIds: traveled.stateIds, edgeIds: traveled.transitionIds },
+      available: {
+        // where each fireable transition starts (the current state, or the
+        // wildcard pseudo-node) and where it lands
+        nodeIds: next.flatMap((transition) => [transition.from, transition.to]),
+        edgeIds: next.map((transition) => transition.id),
+      },
+      dimOthers: true,
+      failure: current ? stateRole(simulatedMachine, current).failure : false,
       step: simulation.trail.length,
     };
   }, [simulation, simulatedMachine]);

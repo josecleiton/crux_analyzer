@@ -19,10 +19,22 @@ import { RoutedEdge } from './RoutedEdge';
 const nodeTypes = { state: StateNode, anyState: AnyStateNode, machineGroup: MachineGroupNode };
 const edgeTypes = { routed: RoutedEdge };
 
-/** Ids to emphasize (e.g. the simulation's current state and last transition). */
+/**
+ * Ids to emphasize. The simulation drives three tiers of emphasis, so the
+ * replay reads as a path instead of a single lit-up state:
+ *
+ * - `nodeIds`/`edgeIds` — the here and now: current state, last transition.
+ * - `visited` — everything already traveled (bold).
+ * - `available` — what can fire from the current state, and where it lands.
+ *
+ * With `dimOthers`, states and transitions outside those sets fade back.
+ */
 export interface GraphHighlight {
   nodeIds: string[];
   edgeIds: string[];
+  visited?: { nodeIds: string[]; edgeIds: string[] };
+  available?: { nodeIds: string[]; edgeIds: string[] };
+  dimOthers?: boolean;
   /** Paints the highlight red — the simulation sits in a failure state. */
   failure?: boolean;
   /** Bumped on every step so the arrival animation replays (even on self-loops). */
@@ -46,16 +58,39 @@ export function Graph({ nodes, edges, selection, onSelect, highlight, theme }: G
   const pulseClass = (highlight?.step ?? 0) % 2 === 0 ? 'pulse-a' : 'pulse-b';
   const failureClass = highlight?.failure ? ' is-failure' : '';
 
-  const styledNodes = nodes.map((node) => ({
-    ...node,
-    selected: selection?.kind === 'state' && selection.id === node.id,
-    className: highlight?.nodeIds.includes(node.id)
-      ? `highlighted ${pulseClass}${failureClass}`
-      : undefined,
-  }));
+  const visitedNodes = new Set(highlight?.visited?.nodeIds ?? []);
+  const visitedEdges = new Set(highlight?.visited?.edgeIds ?? []);
+  const availableNodes = new Set(highlight?.available?.nodeIds ?? []);
+  const availableEdges = new Set(highlight?.available?.edgeIds ?? []);
+
+  /** Emphasis tier of a graph element, from the highlight sets. */
+  function tier(id: string, current: boolean, visited: Set<string>, available: Set<string>) {
+    const classes: string[] = [];
+    if (visited.has(id)) classes.push('visited');
+    if (available.has(id)) classes.push('available');
+    if (highlight?.dimOthers && !current && classes.length === 0) classes.push('dimmed');
+    return classes;
+  }
+
+  const styledNodes = nodes.map((node) => {
+    const current = highlight?.nodeIds.includes(node.id) ?? false;
+    // group containers are scenery: they never take part in the emphasis
+    const classes =
+      node.type === 'machineGroup' ? [] : tier(node.id, current, visitedNodes, availableNodes);
+    if (current) classes.push('highlighted', pulseClass, ...(failureClass ? ['is-failure'] : []));
+    return {
+      ...node,
+      selected: selection?.kind === 'state' && selection.id === node.id,
+      className: classes.length > 0 ? classes.join(' ') : undefined,
+    };
+  });
   const styledEdges = edges.map((edge) => {
     const selected = selection?.kind === 'transition' && selection.id === edge.id;
     const highlighted = highlight?.edgeIds.includes(edge.id) ?? false;
+    const classes = tier(edge.id, highlighted, visitedEdges, availableEdges);
+    if (highlighted) {
+      classes.push('highlighted', ...(failureClass ? ['is-failure'] : []));
+    }
     // keep the arrowhead in sync with the stroke color of its state
     const stroke = selected
       ? colors.edgeSelected
@@ -63,11 +98,13 @@ export function Graph({ nodes, edges, selection, onSelect, highlight, theme }: G
         ? highlight?.failure
           ? colors.edgeFailure
           : colors.edgeHighlighted
-        : colors.edge;
+        : visitedEdges.has(edge.id)
+          ? colors.edgeHighlighted
+          : colors.edge;
     return {
       ...edge,
       selected,
-      className: highlighted ? `highlighted${failureClass}` : undefined,
+      className: classes.length > 0 ? classes.join(' ') : undefined,
       // the traveling pulse is drawn by the edge itself, which needs to know
       data: highlighted ? { ...edge.data, flowing: true } : edge.data,
       markerEnd:

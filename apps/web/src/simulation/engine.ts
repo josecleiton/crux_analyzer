@@ -18,6 +18,8 @@ export interface SimulationStep {
 
 export interface Simulation {
   machineId: string;
+  /** Where the replay started — the first state of the traveled path. */
+  initialStateId: string;
   currentStateId: string;
   trail: SimulationStep[];
 }
@@ -27,7 +29,12 @@ export function startSimulation(machine: DomainMachine, initialStateId?: string)
   const initial =
     machine.states.find((s) => s.id === initialStateId) ?? machine.states[0] ?? null;
   if (!initial) throw new Error(`machine ${machine.id} has no states to simulate`);
-  return { machineId: machine.id, currentStateId: initial.id, trail: [] };
+  return {
+    machineId: machine.id,
+    initialStateId: initial.id,
+    currentStateId: initial.id,
+    trail: [],
+  };
 }
 
 /**
@@ -61,6 +68,7 @@ export function fire(
   const current = machine.states.find((s) => s.id === simulation.currentStateId);
   return {
     machineId: simulation.machineId,
+    initialStateId: simulation.initialStateId,
     currentStateId: transition.to,
     trail: [
       ...simulation.trail,
@@ -77,4 +85,26 @@ export function fire(
 /** The last fired transition, for highlighting. */
 export function lastStep(simulation: Simulation): SimulationStep | null {
   return simulation.trail[simulation.trail.length - 1] ?? null;
+}
+
+/** States and transitions the replay has already been through. */
+export interface TraveledPath {
+  stateIds: string[];
+  transitionIds: string[];
+}
+
+export function traveledPath(machine: DomainMachine, simulation: Simulation): TraveledPath {
+  const stateIds = new Set<string>([simulation.initialStateId]);
+  const transitionIds: string[] = [];
+
+  for (const step of simulation.trail) {
+    const transition = machine.transitions.find((t) => t.id === step.transitionId);
+    if (!transition) continue;
+    transitionIds.push(transition.id);
+    // `from` can be the wildcard pseudo-state: it is a graph node all the same
+    stateIds.add(transition.from);
+    stateIds.add(transition.to);
+  }
+
+  return { stateIds: [...stateIds], transitionIds };
 }
