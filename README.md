@@ -86,3 +86,13 @@ QUIPU_SRC=path/to/quipu_app_crux/shared/src cargo test  # + real-app corpus test
 Select a state (optional) and hit **Simulate**: the right panel shows the
 events that can fire from the current state, firing them walks the machine —
 the graph highlights the current state and the last transition taken.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+Third-party dependencies keep their own licenses. All Rust dependencies and
+most web dependencies are permissive (MIT / Apache-2.0 / Unlicense); the one
+exception is [elkjs](https://github.com/kieler/elkjs), used unmodified for
+graph layout, which is available under `EPL-2.0 OR GPL-3.0-or-later` — this
+project relies on it under the terms of the EPL-2.0.

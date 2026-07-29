@@ -2,6 +2,7 @@
   "name": "crux-analyzer",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
   "scripts": {
     "dev": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
