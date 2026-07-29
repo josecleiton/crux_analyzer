@@ -67,6 +67,10 @@ export const en = {
   'simulation.inertAnswerNote':
     'The shell can send these back, and no transition here handles them: real behavior that changes no state.',
   'simulation.trail': 'Trail',
+  // Per step: what firing it asked the shell to do.
+  'simulation.requested': 'requested',
+  // A request on a branch the replay does not evaluate: it cannot claim it ran.
+  'simulation.mayHave': 'may have',
   'simulation.nothingFired': 'Nothing fired yet.',
   'simulation.restart': 'Restart',
 

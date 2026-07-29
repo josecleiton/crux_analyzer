@@ -543,6 +543,22 @@ body {
   counter-reset: trail;
 }
 
+/* The requests a step made, under its states: a quieter third line, so the
+   event and the states it moved between stay the headline. */
+.trail-effects {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.trail-effects .effect-conditional {
+  margin-left: 4px;
+  margin-top: 0;
+  padding: 0 4px;
+  font-size: 9px;
+}
+
 .trail-list li {
   counter-increment: trail;
   padding: 4px 8px;

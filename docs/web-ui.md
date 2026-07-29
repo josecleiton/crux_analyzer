@@ -200,8 +200,11 @@ Select a state (optional) and hit **Simulate**:
   inert under the fireable ones with a note saying exactly that, rather than
   silently hidden;
 - the replay models the **other half of Crux's loop**. Firing an event records
-  what it asked the shell to do; a request that declares an answer stays under
-  **Waiting for the shell** until an event answers it, and an event that answers
+  what it asked the shell to do — the trail carries those request names under
+  each step, which is the only place a *fire-and-forget* request (`render()`) is
+  visible at all, and a conditional one reads `may have` there because the
+  replay does not evaluate the branch it sits on. A request that declares an
+  answer stays under **Waiting for the shell** until an event answers it, and an event that answers
   a waiting request is badged `from the shell` in the fireable list — so "what
   the user can do next" and "what the shell owes you" stop looking alike. An
   answer no transition here handles is listed inert with the same kind of note

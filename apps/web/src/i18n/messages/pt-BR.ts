@@ -55,6 +55,8 @@ export const ptBR: Catalog = {
   'simulation.inertAnswerNote':
     'O shell pode enviar estes de volta, e nenhuma transição daqui os trata: comportamento real que não muda estado.',
   'simulation.trail': 'Histórico',
+  'simulation.requested': 'solicitou',
+  'simulation.mayHave': 'pode ter',
   'simulation.nothingFired': 'Nada foi disparado ainda.',
   'simulation.restart': 'Reiniciar',
 

@@ -213,8 +213,11 @@ Selecione um estado (opcional) e clique em **Simular**:
   então são listadas inertes sob as disparáveis, com uma nota dizendo
   exatamente isso, em vez de escondidas em silêncio;
 - o replay modela a **outra metade do laço do Crux**. Disparar um evento registra
-  o que ele pediu ao shell; uma solicitação que declara resposta fica em
-  **Aguardando o shell** até que um evento a responda, e o evento que responde uma
+  o que ele pediu ao shell — o histórico carrega os nomes dessas solicitações sob
+  cada passo, que é o único lugar onde uma solicitação de *disparar e esquecer*
+  (`render()`) fica visível, e uma condicional aparece ali como `pode ter`, porque
+  o replay não avalia o ramo em que ela está. Uma solicitação que declara resposta
+  fica em **Aguardando o shell** até que um evento a responda, e o evento que responde uma
   solicitação pendente recebe o selo `do shell` na lista de disparáveis — assim "o
   que o usuário pode fazer em seguida" e "o que o shell te deve" param de parecer
   a mesma coisa. Uma resposta que nenhuma transição daqui trata é listada inerte

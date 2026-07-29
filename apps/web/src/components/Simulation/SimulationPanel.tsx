@@ -126,6 +126,24 @@ export function SimulationPanel({ machine, simulation, onFire, onRestart }: Simu
               <span className="trail-states">
                 {step.fromName} → {step.toName}
               </span>
+              {/* What the step asked the shell to do. Names only — the answers
+                  are in the waiting list above and in the inspector — and a
+                  conditional request reads as "may have": the replay does not
+                  evaluate the branch it sits on, so it cannot claim it ran. */}
+              {step.effects.length > 0 ? (
+                <span className="trail-effects">
+                  {t('simulation.requested')}{' '}
+                  {step.effects.map((effect, index) => (
+                    <span key={effect.name}>
+                      {index > 0 ? ', ' : ''}
+                      {effect.name}
+                      {effect.conditional ? (
+                        <span className="effect-conditional">{t('simulation.mayHave')}</span>
+                      ) : null}
+                    </span>
+                  ))}
+                </span>
+              ) : null}
             </li>
           ))}
         </ol>
