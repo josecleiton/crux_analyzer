@@ -22,6 +22,34 @@
               ? 'dark'
               : 'light';
       })();
+
+      // Same idea for the language: resolve it before first paint so the UI
+      // never renders in English and then swaps. The storage key must match
+      // LOCALE_STORAGE_KEY in src/i18n/locale.ts, and `data-locale` is what
+      // currentLocale() reads back — the hardcoded lang="en" above is only the
+      // no-JavaScript fallback.
+      (function () {
+        var stored = null;
+        try {
+          stored = localStorage.getItem('crux-analyzer:locale');
+        } catch (error) {
+          /* storage disabled: fall back to the browser preference */
+        }
+        var locale = stored === 'en' || stored === 'pt-BR' ? stored : null;
+        if (!locale) {
+          var preferences = navigator.languages && navigator.languages.length
+            ? navigator.languages
+            : [navigator.language || 'en'];
+          for (var i = 0; i < preferences.length && !locale; i++) {
+            var language = String(preferences[i]).toLowerCase().split('-')[0];
+            if (language === 'pt') locale = 'pt-BR';
+            else if (language === 'en') locale = 'en';
+          }
+        }
+        locale = locale || 'en';
+        document.documentElement.dataset.locale = locale;
+        document.documentElement.lang = locale;
+      })();
     </script>
   </head>
   <body>

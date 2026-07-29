@@ -7,6 +7,7 @@ import type { DomainMachine } from '../../domain/types';
 import { stateRole } from '../../domain/stateRole';
 import type { Simulation } from '../../simulation/engine';
 import { availableTransitions } from '../../simulation/engine';
+import { useTranslate } from '../../i18n/useI18n';
 import { StateBadges, StateName } from '../Inspector/StateBadges';
 
 interface SimulationPanelProps {
@@ -17,6 +18,7 @@ interface SimulationPanelProps {
 }
 
 export function SimulationPanel({ machine, simulation, onFire, onRestart }: SimulationPanelProps) {
+  const t = useTranslate();
   const current = machine.states.find((s) => s.id === simulation.currentStateId);
   const available = availableTransitions(machine, simulation);
   const role = current
@@ -25,14 +27,14 @@ export function SimulationPanel({ machine, simulation, onFire, onRestart }: Simu
 
   return (
     <aside className="inspector">
-      <h2 className="panel-title">Simulation</h2>
+      <h2 className="panel-title">{t('simulation.title')}</h2>
       <p className="inspector-machine">{machine.name}</p>
-      <StateName name={current?.name ?? '?'} role={role} />
+      <StateName name={current?.name ?? t('simulation.unknownState')} role={role} />
       <StateBadges role={role} />
 
-      <h4>Send event</h4>
+      <h4>{t('simulation.sendEvent')}</h4>
       {available.length === 0 ? (
-        <p className="inspector-empty">No events can fire from here.</p>
+        <p className="inspector-empty">{t('simulation.noEvents')}</p>
       ) : (
         <ul className="event-list">
           {available.map((transition) => (
@@ -46,9 +48,9 @@ export function SimulationPanel({ machine, simulation, onFire, onRestart }: Simu
         </ul>
       )}
 
-      <h4>Trail</h4>
+      <h4>{t('simulation.trail')}</h4>
       {simulation.trail.length === 0 ? (
-        <p className="inspector-empty">Nothing fired yet.</p>
+        <p className="inspector-empty">{t('simulation.nothingFired')}</p>
       ) : (
         <ol className="trail-list">
           {simulation.trail.map((step, i) => (
@@ -66,7 +68,7 @@ export function SimulationPanel({ machine, simulation, onFire, onRestart }: Simu
       )}
 
       <button className="restart-button" onClick={onRestart}>
-        Restart
+        {t('simulation.restart')}
       </button>
     </aside>
   );

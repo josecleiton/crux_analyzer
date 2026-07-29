@@ -21,6 +21,7 @@ import { Sidebar } from './components/Sidebar/Sidebar';
 import { Inspector } from './components/Inspector/Inspector';
 import { SimulationPanel } from './components/Simulation/SimulationPanel';
 import { Toolbar } from './components/Toolbar/Toolbar';
+import { useTranslate } from './i18n/useI18n';
 import { useTheme } from './theme/useTheme';
 
 const layoutEngine: LayoutEngine = new ElkLayoutEngine();
@@ -33,6 +34,7 @@ export default function App() {
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [layouted, setLayouted] = useState<LayoutResult>({ nodes: [], edges: [] });
   const { theme, toggleTheme } = useTheme();
+  const t = useTranslate();
 
   useEffect(() => {
     let cancelled = false;
@@ -51,9 +53,14 @@ export default function App() {
     [project, activeCoreId],
   );
 
+  // Re-mapped when the locale changes: the wildcard node's label feeds its
+  // width estimate, so a longer translation has to be re-laid out, not restyled.
   const flowModel = useMemo(
-    () => (activeCore ? toFlowModel(activeCore) : { nodes: [], edges: [] }),
-    [activeCore],
+    () =>
+      activeCore
+        ? toFlowModel(activeCore, { anyState: t('state.anyState') })
+        : { nodes: [], edges: [] },
+    [activeCore, t],
   );
 
   useEffect(() => {
@@ -124,7 +131,7 @@ export default function App() {
   }
 
   if (!project) {
-    return <div className="app-loading">Loading…</div>;
+    return <div className="app-loading">{t('app.loading')}</div>;
   }
 
   return (

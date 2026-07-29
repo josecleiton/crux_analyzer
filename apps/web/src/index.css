@@ -207,6 +207,22 @@ body {
   height: 17px;
 }
 
+/* Language switcher: same footprint as the theme toggle, but it shows the
+   short code of the locale it switches to instead of an icon. */
+.toolbar button.locale-toggle {
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.toolbar button.locale-toggle:hover {
+  color: var(--text);
+}
+
 .app-body {
   display: flex;
   flex: 1;
