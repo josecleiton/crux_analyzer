@@ -213,7 +213,7 @@ localized ([i18n.md](i18n.md)). The English rendering is shown below.
 | `no-update-method` | `core X: no update method found` | an `impl App` block without an `update` fn |
 | `unknown-annotation` | `unrecognized annotation X: not one of @failure, @deprecated, @tag <name>` | a doc line looked like an annotation but is not one: a typo, a marker given an argument, or a `@tag` with no usable name |
 
-A clean corpus run (the Corpus test) extracts with **zero** warnings.
+A clean run against a real target app extracts with **zero** warnings.
 
 ### Resource warnings
 

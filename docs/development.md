@@ -25,8 +25,8 @@ just            # lists every recipe
 | Extension `.vsix` package | `just ext-package` | — |
 | Static doc site | `just site <src> <name> [base]` | `CRUX_BASE=<base> pnpm --filter web build` |
 | Rust tests | `just rust-test` | `cargo test --workspace` |
-| Corpus tests | `just corpus` | `CORPUS_SRC=<path> cargo test --workspace` |
-| Corpus coverage ratchet | `just corpus-coverage [floor]` | `cargo run -p crux-analyzer-cli -- coverage ... --min <floor>` |
+| Target-app tests (private, local) | — | `APP_SRC=<path> cargo test --workspace` |
+| Target-app coverage (private, local) | — | `just coverage <path> <name> <floor>` |
 | Clippy | `just clippy` | `cargo clippy --workspace` |
 | Supply-chain gate | `just security` | `cargo deny check` + `pnpm audit --audit-level high` |
 | Everything | `just check` | — |
@@ -46,10 +46,14 @@ just            # lists every recipe
    `crates/parser/tests/mini_recorder.rs`) — a minimal Crux-shaped app
    exercising delegation, nested events, multi-region extraction. Plain
    sources, not a compiled crate.
-3. **Corpus test** (`crates/parser/tests/corpus_hidden.rs`) — runs against a real
-   production app, gated on the `CORPUS_SRC` env var (skips with a message
+3. **Target-app test** (`crates/parser/tests/*_hidden.rs`) — runs against a
+   real production app, gated on the `APP_SRC` env var (skips with a message
    when unset). Asserts the full expected transition sets and **zero
-   warnings**. This is the ground truth for extraction quality.
+   warnings**. This is the ground truth for extraction quality — and it is
+   *not in this repository*: such a test names a private application, its
+   cores and its states, so `crates/parser/.gitignore` keeps
+   `tests/*_hidden.rs` untracked. Whoever has the source writes their own and
+   points `APP_SRC` at it; a fresh clone simply has none.
 4. **Docgen tests** (`crates/docgen`) — generator output assertions, per
    locale: that prose is translated *and* that identifiers and Mermaid node
    ids are not.
@@ -67,9 +71,11 @@ just            # lists every recipe
 
 Every increment lands only after:
 
-1. `just corpus` (includes all Rust tests) and `just clippy` — clean;
+1. `just rust-test` and `just clippy` — clean (with a private target app on the
+   machine, `APP_SRC=<path> cargo test --workspace` instead, so that test runs
+   too);
 2. `just web-test` and `just web-build` — green;
-3. a live UI check: `just corpus-model && just dev`, drive the browser, and **look**
+3. a live UI check: `just model <src> <name> && just dev`, drive the browser, and **look**
    at the result (states, transitions, inspector, simulation);
 4. logical commits in English, pushed.
 
@@ -79,7 +85,7 @@ examples (`just example-docs` must leave no diff for `en`) and check the UI in
 re-laid out, not just re-rendered.
 
 For parser changes that alter extraction semantics, add an adversarial
-cross-check: independently derive the expected transitions from the corpus
+cross-check: independently derive the expected transitions from the analyzed
 source and compare against the CLI output before trusting the tests.
 
 ### What CI enforces
@@ -103,20 +109,20 @@ Note that `pnpm install --frozen-lockfile` still runs dependency lifecycle
 scripts, so CI executes the install hooks of every transitive dependency. That is
 the main reason a new dependency deserves a look rather than a `pnpm add`.
 
-The corpus test gates itself on `CORPUS_SRC`, and that source is not public — so
-CI proves the fixture path and the corpus stays a local gate. Keep it that way
-when adding guards: anything CI cannot run is not a guard.
+A target-app test gates itself on `APP_SRC`, and lives untracked because the
+app it names is private — so CI proves the fixture path and a real app stays a
+local gate. Keep it that way when adding guards: anything CI cannot run is not
+a guard.
 
 On every push to `main`, CI also publishes a **living preview**: the
 mini-recorder fixture analyzed by the freshly built analyzer and deployed to
 GitHub Pages via `just site` — the same recipe users run, pointed at the
-public corpus. If the preview looks wrong, the release would too.
+public fixture. If the preview looks wrong, the release would too.
 
-The corpus has a coverage ratchet of its own: `just corpus-coverage` (part of
-`just check`) fails when the corpus documentation total drops below the floor
-baked into the recipe. Like the corpus test it skips itself when the source is
-absent, so in CI the fixture-guard floor is the public stand-in. When coverage
-rises, raise the floor in the `justfile` — that is the ratchet clicking.
+A private target app gets no ratchet in this repository: it is not here to
+ratchet. Run `just coverage <path> <name> <floor>` against it locally when you
+want that gate — the public counterpart, `fixture-guard`, is the one CI keeps
+clicking.
 
 A guard that cannot fail is decoration. When you add one, break it on purpose
 once and watch it go red before trusting it.
@@ -129,7 +135,7 @@ once and watch it go red before trusting it.
   See [i18n.md](i18n.md).
 - **Honesty rule** — the parser warns about anything it cannot infer; it
   never guesses and never drops silently. New inference features must keep
-  the corpus warning-free or explain each remaining warning. Reading what the
+  a real target app warning-free or explain each remaining warning. Reading what the
   source *declares* is fair game — annotations are data the parser may report —
   but inference stays banned, and guesses stay in the clients.
 - **Evidence over shape** — detection heuristics (machines, composites,

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-The original roadmap is fully implemented: syn-based parser (predicate guards, `==`/closure guards, `Default` resets, wildcard sources AND targets, value-flow analysis for runtime-assigned targets, hierarchical/composite states as `Parent/Child` paths, per-transition effects, multiple state machines per core, plus state/machine documentation and `@failure` / `@deprecated` / `@tag` annotations read from `///` doc comments), CLI (`crux-analyzer generate | docs`, both with `--watch`), doc generators (Mermaid with composite blocks and per-state notes, Markdown with a states table), and the web UI (machine sections, nested composite containers, inspector with effects — per transition and aggregated per state — and authored documentation rendered as Markdown, event/effect doc catalogs, Simulation Engine, tag filter + undocumented-states highlight, selection-in-URL deep links). The VS Code extension (`apps/vscode`) embeds the built web bundle in a webview, spawning the CLI and regenerating on save. The corpus test against a real app is gated on `CORPUS_SRC` and extracts it warning-free. `init.md` is the original project spec (in Portuguese).
+The original roadmap is fully implemented: syn-based parser (predicate guards, `==`/closure guards, `Default` resets, wildcard sources AND targets, value-flow analysis for runtime-assigned targets, hierarchical/composite states as `Parent/Child` paths, per-transition effects, multiple state machines per core, plus state/machine documentation and `@failure` / `@deprecated` / `@tag` annotations read from `///` doc comments), CLI (`crux-analyzer generate | docs`, both with `--watch`), doc generators (Mermaid with composite blocks and per-state notes, Markdown with a states table), and the web UI (machine sections, nested composite containers, inspector with effects — per transition and aggregated per state — and authored documentation rendered as Markdown, event/effect doc catalogs, Simulation Engine, tag filter + undocumented-states highlight, selection-in-URL deep links). The VS Code extension (`apps/vscode`) embeds the built web bundle in a webview, spawning the CLI and regenerating on save. Tests against a real, private target app are gated on `APP_SRC` and live as untracked `crates/parser/tests/*_hidden.rs` files — never committed, since they name the app they analyze. `init.md` is the original project spec (in Portuguese).
 
 ## Documentation
 
@@ -25,15 +25,13 @@ Tasks are driven by the root `justfile` (`just` lists everything):
 just dev                     # web UI (Vite, apps/web)
 just web-test                # vitest: mapping layers + simulation engine
 just rust-test               # cargo tests (parser unit + fixture + docgen)
-just corpus                  # + real-app corpus test (CORPUS_SRC overrides the path)
-just corpus-coverage [floor]  # corpus documentation ratchet (skips if corpus absent)
 just clippy                  # lint the workspace
-just check                   # full validation: corpus + clippy + web tests + build
+just check                   # full validation: Rust + clippy + web tests + build
 just model <src> <name>      # analyze an app into apps/web/public/model.json
 just model-watch <src> <name># same, regenerating on every save
 just site <src> <name> [base] # static doc site in apps/web/dist (model baked in)
 just docs <src> <name> [markdown|mermaid] [en|pt-BR]
-just corpus-model                   # shortcut: analyze the private corpus into the UI
+just coverage <src> <name> [min] # documentation coverage, failing below min
 just example-docs            # regenerate the example docs in every locale
 just ext-test | ext-build | ext-package   # VS Code extension (tests, build, .vsix)
 ```

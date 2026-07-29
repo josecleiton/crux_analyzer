@@ -25,8 +25,8 @@ just            # lista todas as receitas
 | Pacote `.vsix` da extensão | `just ext-package` | — |
 | Site estático de docs | `just site <src> <nome> [base]` | `CRUX_BASE=<base> pnpm --filter web build` |
 | Testes Rust | `just rust-test` | `cargo test --workspace` |
-| Testes de corpus | `just corpus` | `CORPUS_SRC=<caminho> cargo test --workspace` |
-| Catraca de cobertura do corpus | `just corpus-coverage [piso]` | `cargo run -p crux-analyzer-cli -- coverage ... --min <piso>` |
+| Testes de aplicação alvo (privados, locais) | — | `APP_SRC=<caminho> cargo test --workspace` |
+| Cobertura da aplicação alvo (privada, local) | — | `just coverage <caminho> <nome> <piso>` |
 | Clippy | `just clippy` | `cargo clippy --workspace` |
 | Gate de cadeia de suprimentos | `just security` | `cargo deny check` + `pnpm audit --audit-level high` |
 | Tudo | `just check` | — |
@@ -46,11 +46,15 @@ just            # lista todas as receitas
    `crates/parser/tests/mini_recorder.rs`) — uma aplicação mínima em forma de Crux
    exercitando delegação, eventos aninhados e extração de múltiplas regiões.
    Fontes simples, não um crate compilado.
-3. **Teste de corpus** (`crates/parser/tests/corpus_hidden.rs`) — roda contra uma
-   aplicação real de produção, condicionado à variável de ambiente `CORPUS_SRC`
+3. **Teste de aplicação alvo** (`crates/parser/tests/*_hidden.rs`) — roda contra
+   uma aplicação real de produção, condicionado à variável de ambiente `APP_SRC`
    (pula com uma mensagem quando ausente). Verifica os conjuntos completos de
    transições esperados e **zero avisos**. Esta é a verdade fundamental da
-   qualidade de extração.
+   qualidade de extração — e ela *não está neste repositório*: um teste assim
+   nomeia uma aplicação privada, seus cores e seus estados, então
+   `crates/parser/.gitignore` mantém `tests/*_hidden.rs` fora do versionamento.
+   Quem tem a fonte escreve o seu e aponta `APP_SRC` para ela; um clone novo
+   simplesmente não tem nenhum.
 4. **Testes de docgen** (`crates/docgen`) — verificações da saída dos geradores,
    por locale: que a prosa é traduzida *e* que identificadores e ids de nó Mermaid
    não são.
@@ -68,9 +72,11 @@ just            # lista todas as receitas
 
 Todo incremento só entra depois de:
 
-1. `just corpus` (inclui todos os testes Rust) e `just clippy` — limpos;
+1. `just rust-test` e `just clippy` — limpos (com uma aplicação alvo privada na
+   máquina, use `APP_SRC=<caminho> cargo test --workspace`, para que esse teste
+   rode também);
 2. `just web-test` e `just web-build` — verdes;
-3. uma verificação da UI ao vivo: `just corpus-model && just dev`, dirigir o navegador e
+3. uma verificação da UI ao vivo: `just model <src> <nome> && just dev`, dirigir o navegador e
    **olhar** o resultado (estados, transições, inspetor, simulação);
 4. commits lógicos em inglês, enviados com push.
 
@@ -81,7 +87,7 @@ dos nós, então o grafo é re-layoutado, não apenas re-renderizado.
 
 Para mudanças no parser que alteram a semântica de extração, adicione uma
 verificação cruzada adversarial: derive independentemente as transições esperadas
-a partir da fonte do corpus e compare com a saída da CLI antes de confiar nos
+a partir da fonte analisada e compare com a saída da CLI antes de confiar nos
 testes.
 
 ### O que o CI garante
@@ -106,22 +112,21 @@ das dependências, então o CI executa os hooks de instalação de cada dependê
 transitiva. Esse é o principal motivo pelo qual uma nova dependência merece uma
 olhada em vez de um `pnpm add`.
 
-O teste do corpus se auto-restringe por `CORPUS_SRC`, e essa fonte não é pública —
-então o CI comprova o caminho do fixture e o corpus continua sendo uma guarda
-local. Mantenha assim ao adicionar guardas: o que o CI não consegue rodar não é
-uma guarda.
+Um teste de aplicação alvo se auto-restringe por `APP_SRC` e fica fora do
+versionamento, porque a aplicação que ele nomeia é privada — então o CI comprova
+o caminho do fixture e uma aplicação real continua sendo uma guarda local.
+Mantenha assim ao adicionar guardas: o que o CI não consegue rodar não é uma
+guarda.
 
 A cada push na `main`, o CI também publica um **preview vivo**: o fixture
 mini-recorder analisado pelo analisador recém-compilado e publicado no GitHub
 Pages via `just site` — a mesma receita que os usuários rodam, apontada para o
-corpus público. Se o preview estiver errado, o release também estaria.
+fixture público. Se o preview estiver errado, o release também estaria.
 
-O corpus tem uma catraca de cobertura própria: `just corpus-coverage` (parte do
-`just check`) falha quando o total de documentação do Corpus cai abaixo do piso
-embutido na receita. Como o teste do corpus, ela pula a si mesma quando a fonte
-está ausente, então no CI o piso do fixture-guard é o substituto público.
-Quando a cobertura subir, eleve o piso no `justfile` — esse é o clique da
-catraca.
+Uma aplicação alvo privada não ganha catraca neste repositório: ela não está
+aqui para ser catracada. Rode `just coverage <caminho> <nome> <piso>` contra ela
+localmente quando quiser essa guarda — a contraparte pública, o `fixture-guard`,
+é a que o CI mantém clicando.
 
 Uma guarda que não pode falhar é decoração. Quando adicionar uma, quebre-a de
 propósito uma vez e veja-a ficar vermelha antes de confiar nela.
@@ -134,7 +139,7 @@ propósito uma vez e veja-a ficar vermelha antes de confiar nela.
   [i18n.md](i18n.md).
 - **Regra da honestidade** — o parser avisa sobre tudo que não consegue inferir;
   ele nunca adivinha e nunca descarta em silêncio. Novos recursos de inferência
-  devem manter o corpus livre de avisos ou explicar cada aviso restante. Ler o
+  devem manter uma aplicação alvo real livre de avisos ou explicar cada aviso restante. Ler o
   que a fonte *declara* é permitido — anotações são dados que o parser pode
   reportar — mas inferir continua proibido, e palpites ficam nos clientes.
 - **Evidência acima de forma** — heurísticas de detecção (máquinas, compostos,

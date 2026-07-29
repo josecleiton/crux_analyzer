@@ -1,0 +1,5 @@
+# Tests against private target applications. They name the app, its cores and
+# its states, so they stay on the machine that has the source — never in the
+# repository. Gate them on APP_SRC and skip when it is unset (see
+# docs/development.md).
+tests/*_hidden.rs

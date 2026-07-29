@@ -218,7 +218,7 @@ baseie ferramentas e documentação nele, já que o texto da mensagem é localiz
 | `no-update-method` | `núcleo X: método update não encontrado` | um bloco `impl App` sem função `update` |
 | `unknown-annotation` | `anotação X não reconhecida: não é @failure, @deprecated nem @tag <nome>` | uma linha de documentação parecia uma anotação mas não é: um erro de digitação, um marcador com argumento, ou um `@tag` sem nome utilizável |
 
-Uma execução limpa do corpus (o teste Corpus) extrai com **zero** avisos.
+Uma execução limpa contra uma aplicação alvo real extrai com **zero** avisos.
 
 ### Avisos de recursos
 

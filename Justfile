@@ -1,10 +1,6 @@
 # crux_analyzer — task runner (https://just.systems)
 # `just` with no arguments lists the recipes.
 
-# Absolute by default: cargo runs integration tests from the crate directory,
-# so a relative path would resolve wrongly there.
-corpus_src := env_var_or_default("CORPUS_SRC", justfile_directory() / ".." / "corpus_app" / "shared" / "src")
-
 default:
     @just --list
 
@@ -52,21 +48,6 @@ ext-package: ext-build
 rust-test:
     cargo test --workspace --locked
 
-# Rust tests including the real-app corpus (set CORPUS_SRC to override)
-corpus:
-    CORPUS_SRC={{corpus_src}} cargo test --workspace --locked
-
-# Coverage ratchet on the real-app corpus: documentation goes up, never down.
-# The floor sits at today's total — raise it when coverage rises. Local like
-# `corpus` (the Corpus source is not public), so it skips itself when the
-# directory is absent; in CI the fixture-guard floor is the public stand-in.
-corpus-coverage floor="53":
-    @if [ -d "{{corpus_src}}" ]; then \
-      just coverage "{{corpus_src}}" Corpus {{floor}}; \
-    else \
-      echo "private corpus not found at {{corpus_src}} — coverage ratchet skipped"; \
-    fi
-
 # Clippy across the workspace
 clippy:
     cargo clippy --workspace
@@ -86,15 +67,14 @@ security:
 
 # --- Everything ------------------------------------------------------------
 
-# Full validation: Rust + corpus (tests + coverage ratchet) + clippy + web
-# tests + extension tests + builds (ext-build includes web-build) + fixture
-# guard + the supply-chain gate
-check: corpus corpus-coverage clippy security web-test ext-test ext-build fixture-guard
+# Full validation: Rust tests + clippy + web tests + extension tests + builds
+# (ext-build includes web-build) + fixture guard + the supply-chain gate
+check: rust-test clippy security web-test ext-test ext-build fixture-guard
 
-# The fixture is the public corpus: it must extract with zero warnings, and the
-# documentation it declares must not regress. The floor sits below today's 67%
-# on purpose — `UploadState`'s variants are deliberately bare, so the point is
-# to catch a drop, not to chase 100%.
+# The fixture is the public stand-in for a real app: it must extract with zero
+# warnings, and the documentation it declares must not regress. The floor sits
+# below today's 67% on purpose — `UploadState`'s variants are deliberately
+# bare, so the point is to catch a drop, not to chase 100%.
 fixture-guard:
     cargo run -q -p crux-analyzer-cli -- generate \
       --src crates/parser/fixtures/mini_recorder --name "Mini Recorder" \
@@ -140,10 +120,6 @@ site src name base="/":
 docs src name format="markdown" locale="en":
     cargo run -q -p crux-analyzer-cli -- docs --src {{src}} --name "{{name}}" \
       --format {{format}} --locale {{locale}}
-
-# Analyze the private corpus into the web UI (CORPUS_SRC to override the path)
-corpus:
-    just model {{corpus_src}} Corpus
 
 # Regenerate the committed example docs, every locale
 example-docs: (example-docs-locale "en" "docs/examples/mini-recorder.md") (example-docs-locale "pt-BR" "docs/pt-BR/examples/mini-recorder.md")

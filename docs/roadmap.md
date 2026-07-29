@@ -30,11 +30,11 @@ increments; see [cli.md](cli.md) and
 [development.md](development.md#what-ci-enforces).
 
 - **CI running `just check`** — `.github/workflows/ci.yml`. `just check` already
-  did the right thing; it just never ran unless a human typed it. The corpus
-  test gates itself on `CORPUS_SRC` and that source is not public, so CI proves
-  the fixture path and the corpus stays a local gate.
+  did the right thing; it just never ran unless a human typed it. A test
+  against a private target app gates itself on `APP_SRC` and never enters this
+  repository, so CI proves the fixture path and a real app stays a local gate.
 - **`--deny-warnings`** — a global flag that exits non-zero when the parser
-  reported anything. Turns "the corpus extracts cleanly" from a note in
+  reported anything. Turns "a real app extracts cleanly" from a note in
   `parser.md` into something a pipeline enforces. Output is still written: the
   exit code is the signal.
 - **`crux-analyzer coverage`** — the share of states carrying a *description*,
@@ -48,12 +48,13 @@ Two guards came out of it that are worth keeping honest: `just fixture-guard`
 Both were broken on purpose once and watched go red — a guard that cannot fail
 is decoration.
 
-**Closed out:** the corpus now has its own ratchet — `just corpus-coverage`
-(part of `just check`) fails when the corpus total drops below the floor in the
-`justfile`, and skips itself where the source is absent, like the corpus test.
-The floor starts at today's 53%; `RecordingState` still sits at 13% with no
-description on the enum itself, which is exactly the number the ratchet now
-guards while it waits to be raised.
+**Closed out:** the private target app got a coverage ratchet of its own, a
+recipe that failed when its documentation total dropped below a floor baked
+into the `justfile`. That recipe is gone: a gate nobody outside one machine can
+run does not belong in a shared task runner, and the floor named an app this
+repository must not name. Run `just coverage <path> <name> <floor>` against a
+private app locally instead; `fixture-guard` is the public ratchet CI keeps
+clicking.
 
 ---
 
@@ -310,5 +311,5 @@ Two license obligations are unmet **today**, so they are bugs rather than plans:
   successor to §4b: the resource limits and the nesting pre-check were found by
   writing hostile inputs *by hand*, and a fuzzer finds the ones nobody thought
   of. Deferred rather than refused — it wants a CI budget (a fuzz job is not a
-  60-second gate) and a corpus to be worth anything, so it belongs after
+  60-second gate) and a seed corpus to be worth anything, so it belongs after
   distribution rather than squeezed into `just check`.

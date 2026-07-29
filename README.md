@@ -68,7 +68,7 @@ just model path/to/app/src MyApp   # analyze a Crux app and feed the UI
 just dev                           # web app: graph sections, inspector, simulation
 just docs path/to/app/src MyApp    # Markdown docs (or: ... mermaid)
 just docs path/to/app/src MyApp markdown pt-BR   # ...in Portuguese
-just check                         # full validation: Rust + corpus + clippy + web
+just check                         # full validation: Rust + clippy + web
 ```
 
 Raw equivalents:
@@ -90,7 +90,7 @@ pnpm test           # mapping layers + simulation engine
 # Crates
 cargo check
 cargo test          # parser unit + fixture + docgen tests
-CORPUS_SRC=path/to/corpus_app/shared/src cargo test  # + real-app corpus test
+APP_SRC=path/to/app/shared/src cargo test  # + a local target-app test, if you wrote one
 ```
 
 ## Simulation

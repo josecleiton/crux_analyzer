@@ -45,7 +45,7 @@ pub struct Limits {
 }
 
 impl Limits {
-    /// 2 MiB per file. The largest file in the private corpus is under 40 KiB.
+    /// 2 MiB per file. The largest file in the private target app is under 40 KiB.
     pub const DEFAULT_MAX_FILE_SIZE: u64 = 2 << 20;
     /// 256 MiB per run.
     pub const DEFAULT_MAX_TOTAL_SIZE: u64 = 256 << 20;
@@ -56,7 +56,7 @@ impl Limits {
     /// 64 levels of helper-call nesting.
     pub const DEFAULT_MAX_CALL_DEPTH: usize = 64;
     /// 192 levels of bracket nesting. `rustc` itself gives up long before this;
-    /// the deepest nesting in the private corpus is under 20.
+    /// the deepest nesting in the private target app is under 20.
     pub const DEFAULT_MAX_NESTING: usize = 192;
 }
 

@@ -3,9 +3,10 @@
 # generated examples are current, and that the fixture extracts without a
 # single warning.
 #
-# The private corpus test is gated on CORPUS_SRC and that source is not public, so
-# it skips itself here by design (see docs/development.md). CI therefore proves
-# the fixture path; the corpus stays a local gate.
+# A test against a private target app never reaches this repository — those
+# live as untracked `crates/parser/tests/*_hidden.rs` files, gated on APP_SRC
+# (see docs/development.md). CI therefore proves the fixture path; a real app
+# stays a local gate.
 name: CI
 
 on:
@@ -66,7 +67,7 @@ jobs:
 
   # A living preview of the tool on GitHub Pages: the bundled fixture
   # analyzed by the freshly built analyzer and published as a static site —
-  # the same `just site` recipe users run, pointed at the public corpus.
+  # the same `just site` recipe users run, pointed at the public fixture.
   preview:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: check

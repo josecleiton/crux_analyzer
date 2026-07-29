@@ -345,7 +345,7 @@ mod tests {
 
     #[test]
     fn an_at_sign_mid_prose_is_not_an_annotation() {
-        // Verbatim from the private corpus (`insight.rs`).
+        // Verbatim from a private target app (`insight.rs`).
         let line = "Apple constrains the shape structurally — `@Generable` leaves the model no";
         let block = doc(line);
         assert_eq!(block.doc.as_deref(), Some(line));

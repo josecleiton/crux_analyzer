@@ -32,11 +32,11 @@ independentes; veja [cli.md](cli.md) e
 
 - **CI rodando `just check`** — `.github/workflows/ci.yml`. O `just check` já
   fazia a coisa certa; ele só nunca rodava a menos que uma pessoa digitasse. O
-  teste do corpus se auto-restringe por `CORPUS_SRC` e essa fonte não é pública,
-  então o CI comprova o caminho do fixture e o corpus continua sendo uma guarda
-  local.
+  teste contra uma aplicação alvo privada se auto-restringe por `APP_SRC` e
+  nunca entra neste repositório, então o CI comprova o caminho do fixture e uma
+  aplicação real continua sendo uma guarda local.
 - **`--deny-warnings`** — uma flag global que sai com código diferente de zero
-  quando o parser reportou algo. Transforma "o corpus extrai limpo" de uma
+  quando o parser reportou algo. Transforma "uma aplicação real extrai limpo" de uma
   observação no `parser.md` em algo que um pipeline garante. A saída ainda é
   escrita: o código de saída é o sinal.
 - **`crux-analyzer coverage`** — a fração de estados que carregam uma
@@ -50,12 +50,13 @@ fixture precisa extrair com zero avisos e não perder documentação) e
 gerador). As duas foram quebradas de propósito uma vez e observadas ficando
 vermelhas — uma guarda que não pode falhar é decoração.
 
-**Encerrado:** o corpus agora tem catraca própria — `just corpus-coverage`
-(parte do `just check`) falha quando o total do Corpus cai abaixo do piso no
-`justfile`, e pula a si mesma onde a fonte está ausente, como o teste do
-corpus. O piso começa nos 53% de hoje; o `RecordingState` continua em 13% e sem
-descrição no próprio enum, que é exatamente o número que a catraca agora guarda
-enquanto espera para ser elevada.
+**Encerrado:** a aplicação alvo privada ganhou uma catraca de cobertura própria,
+uma receita que falhava quando o total de documentação dela caía abaixo de um
+piso embutido no `justfile`. Essa receita se foi: uma guarda que ninguém fora de
+uma máquina consegue rodar não pertence a um task runner compartilhado, e o piso
+nomeava uma aplicação que este repositório não deve nomear. Rode
+`just coverage <caminho> <nome> <piso>` contra uma aplicação privada localmente;
+o `fixture-guard` é a catraca pública que o CI mantém clicando.
 
 ---
 
@@ -323,5 +324,5 @@ planos:
   da §4b: os limites de recursos e a verificação prévia de aninhamento foram
   encontrados escrevendo entradas hostis *à mão*, e um fuzzer encontra as que
   ninguém pensou. Adiado, não recusado — precisa de orçamento de CI (um job de
-  fuzz não é um gate de 60 segundos) e de um corpus para valer algo, então fica
+  fuzz não é um gate de 60 segundos) e de um corpus de sementes para valer algo, então fica
   depois da distribuição em vez de espremido no `just check`.
