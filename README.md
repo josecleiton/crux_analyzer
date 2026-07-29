@@ -16,9 +16,7 @@ The UI and the generated docs speak English and Brazilian Portuguese
 
 ## Demo
 
-![The web UI analyzing the mini_recorder fixture: two orthogonal regions, the
-inspector, a simulation run, tag filtering and dark
-mode](docs/assets/demo.gif)
+![The web UI analyzing the mini_recorder fixture: two orthogonal regions, the inspector, a simulation run, tag filtering and dark mode](docs/assets/demo.gif)
 
 Nothing in that recording was authored by hand. It is the web UI on
 [crates/parser/fixtures/mini_recorder/](crates/parser/fixtures/mini_recorder/),
@@ -37,8 +35,14 @@ you see is what the parser extracted from that Rust source:
 - the **tag filter** (`retryable`, a `@tag` declared in a doc comment), the
   undocumented-states highlight, and the locale and theme toggles.
 
-Reproduce it with `just model` + `just dev` against the fixture, or read the
-CLI's take on the same input in
+Reproduce it against the same fixture, no Crux app needed:
+
+```sh
+just model crates/parser/fixtures/mini_recorder "Mini Recorder"
+just dev
+```
+
+Or read the CLI's take on that same input in
 [docs/examples/mini-recorder.md](docs/examples/mini-recorder.md).
 
 ## Structure
