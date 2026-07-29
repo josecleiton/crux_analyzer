@@ -4,12 +4,16 @@
 use crux_analyzer_i18n::Locale;
 use crux_analyzer_model::{DocumentedName, Machine, Project, State, StateDecl};
 
-use crate::{effects_cell, has_documented_states, machine_diagram, marker_label, Labels};
+use crate::{
+    effects_cell, has_documented_states, machine_diagram, marker_label, one_line, Labels,
+};
 
 pub fn markdown(project: &Project, locale: Locale) -> String {
     let labels = Labels::for_locale(locale);
     let mut out = String::new();
-    push_line(&mut out, &format!("# {}", project.project));
+    // The project name defaults to a *directory* name, which can hold anything
+    // a filesystem allows — newlines included.
+    push_line(&mut out, &format!("# {}", one_line(&project.project)));
 
     for core in &project.cores {
         push_line(&mut out, "");
@@ -22,19 +26,21 @@ pub fn markdown(project: &Project, locale: Locale) -> String {
                 &format!("### {}: {}", labels.machine, machine.name),
             );
 
-            // The machine's own description, verbatim: Markdown handles
+            // The machine's own description as a block: Markdown handles
             // multi-paragraph prose natively, so only table cells need
-            // flattening.
+            // flattening — but prose is untrusted text either way.
             if let Some(doc) = &machine.doc {
                 push_line(&mut out, "");
-                push_line(&mut out, doc.trim());
+                push_line(&mut out, &prose_block(doc.trim()));
             }
             push_machine_annotations(&mut out, machine, &labels);
 
+            let diagram = machine_diagram(machine, &labels);
+            let fence = fence_for(&diagram);
             push_line(&mut out, "");
-            push_line(&mut out, "```mermaid");
-            push_line(&mut out, &machine_diagram(machine, &labels));
-            push_line(&mut out, "```");
+            push_line(&mut out, &format!("{fence}mermaid"));
+            push_line(&mut out, &diagram);
+            push_line(&mut out, &fence);
 
             push_states(&mut out, machine, &labels);
 
@@ -181,9 +187,9 @@ fn push_states(out: &mut String, machine: &Machine, labels: &Labels) {
             continue;
         }
         push_line(out, "");
-        push_line(out, &format!("##### {}", state.name));
+        push_line(out, &format!("##### {}", one_line(&state.name)));
         push_line(out, "");
-        push_line(out, doc.trim());
+        push_line(out, &prose_block(doc.trim()));
     }
 }
 
@@ -226,8 +232,145 @@ fn paragraphs(doc: &str) -> Vec<&str> {
 
 /// Escapes author prose for a Markdown table cell: a row is one line, and a
 /// bare `|` would open a new column.
+///
+/// The backslash goes first, or prose containing a literal `\|` would become
+/// `\\|` — a rendered backslash followed by an *unescaped* pipe, which opens a
+/// column anyway. Backticks are escaped too: one stray backtick spills code
+/// formatting across the rest of the row.
 fn table_cell(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ").replace('|', "\\|")
+    let flat: String = text
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .filter(|c| !c.is_control())
+        .collect();
+    let escaped = flat
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('\\', "\\\\")
+        .replace('|', "\\|")
+        .replace('`', "\\`");
+    // A cell holds the same author Markdown a prose block does, links included.
+    // Last, so the `&#58;` it may emit is not re-escaped by the `&` pass above.
+    neutralize_unsafe_urls(&escaped)
+}
+
+/// Author prose as a Markdown block, with the two break-outs neutralized.
+///
+/// Author Markdown is a *feature* — `**bold**`, lists and backticks are meant to
+/// render, here and in the web UI — so this is deliberately not an escape of
+/// Markdown syntax. What it removes is the ability to leave Markdown:
+///
+/// - `<` becomes `&lt;`, so raw HTML in a doc comment cannot become a real
+///   element in a published document. GitHub sanitizes rendered Markdown, but
+///   mdBook, Docusaurus, Jekyll and VitePress generally do not. `Vec<String>`
+///   in prose still renders as `Vec<String>`.
+/// - a fence-shaped line (```` ``` ````, `~~~`) is indented so it cannot close
+///   the fence this document opened around a diagram.
+///
+/// See `docs/security.md`.
+fn prose_block(text: &str) -> String {
+    let escaped = text
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
+    let fenced = escaped
+        .lines()
+        .map(|line| {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                format!("&#96;{}", &trimmed[1..])
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    neutralize_unsafe_urls(&fenced)
+}
+
+/// URL schemes a Markdown link or image in author prose may use.
+const SAFE_SCHEMES: &[&str] = &["http", "https", "mailto"];
+
+/// Defuses `[text](javascript:…)` and friends.
+///
+/// Escaping `<` kills raw HTML and autolinks, but a *Markdown* link is preserved
+/// on purpose — author Markdown is a feature — and `[click](javascript:alert(1))`
+/// renders as a working `<a href="javascript:…">` in any renderer that does not
+/// sanitize. The web UI refuses those schemes at render time
+/// (`StateDoc.tsx`); a published document has no such layer, so the generator
+/// has to.
+///
+/// The scheme's colon becomes `&#58;`, which leaves every visible character in
+/// place while turning the target into an inert relative path. Deliberately not
+/// a Markdown parser and deliberately no `regex` dependency: it only has to
+/// recognize a scheme, and over-escaping a colon in a link target is harmless.
+fn neutralize_unsafe_urls(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut out = String::with_capacity(text.len());
+    // Everything before this index has been copied. Prose is UTF-8 and the
+    // markers are ASCII, so slicing at a marker is always on a char boundary.
+    let mut copied = 0;
+    let mut i = 0;
+
+    while i + 1 < bytes.len() {
+        // A link target opens with `](` (inline) or `]:` (reference definition).
+        if bytes[i] != b']' || !matches!(bytes[i + 1], b'(' | b':') {
+            i += 1;
+            continue;
+        }
+
+        let inline = bytes[i + 1] == b'(';
+        let target_start = i + 2;
+        // The target runs to the closing paren, or to end of line for a
+        // reference definition.
+        let end = bytes[target_start..]
+            .iter()
+            .position(|&b| b == b'\n' || (inline && b == b')'))
+            .map_or(bytes.len(), |offset| target_start + offset);
+
+        out.push_str(&text[copied..target_start]);
+        out.push_str(&defuse_scheme(&text[target_start..end]));
+        copied = end;
+        i = end;
+    }
+
+    out.push_str(&text[copied..]);
+    out
+}
+
+/// Escapes the scheme colon of `target` unless the scheme is allowed. Relative
+/// targets, anchors and scheme-less paths pass through untouched.
+fn defuse_scheme(target: &str) -> String {
+    let trimmed = target.trim_start();
+    let Some(colon) = trimmed.find(':') else {
+        return target.to_string();
+    };
+    // A colon that comes after a path separator is not a scheme.
+    let scheme = &trimmed[..colon];
+    if scheme.contains(['/', '?', '#', ' ']) {
+        return target.to_string();
+    }
+    if SAFE_SCHEMES.contains(&scheme.to_ascii_lowercase().as_str()) {
+        return target.to_string();
+    }
+    target.replacen(':', "&#58;", 1)
+}
+
+/// A fence long enough to contain `body`.
+///
+/// A state or event name cannot contain a backtick, but a doc comment reaching a
+/// Mermaid note can — and three of them would close the fence and drop the rest
+/// of the diagram into the document as prose.
+fn fence_for(body: &str) -> String {
+    let longest_run = body
+        .split(|c| c != '`')
+        .map(str::len)
+        .max()
+        .unwrap_or(0);
+    "`".repeat(longest_run.max(2) + 1)
 }
 
 fn push_line(out: &mut String, line: &str) {

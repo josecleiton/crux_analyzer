@@ -45,13 +45,16 @@ ext-package: ext-build
 
 # --- Rust ------------------------------------------------------------------
 
-# All Rust tests (parser unit + fixtures + docgen)
+# All Rust tests (parser unit + fixtures + docgen).
+#
+# `--locked` so a test run can never quietly rewrite Cargo.lock: the committed
+# lockfile is what was reviewed, and it is what must be built.
 rust-test:
-    cargo test --workspace
+    cargo test --workspace --locked
 
 # Rust tests including the real-app corpus (set CORPUS_SRC to override)
 corpus:
-    CORPUS_SRC={{corpus_src}} cargo test --workspace
+    CORPUS_SRC={{corpus_src}} cargo test --workspace --locked
 
 # Coverage ratchet on the real-app corpus: documentation goes up, never down.
 # The floor sits at today's total — raise it when coverage rises. Local like
@@ -68,11 +71,25 @@ corpus-coverage floor="53":
 clippy:
     cargo clippy --workspace
 
+# --- Security --------------------------------------------------------------
+
+# Supply-chain gate: advisories, license policy, banned and git dependencies
+# (policy in `deny.toml`), plus the npm side. Blocking, as part of `check` —
+# the reasoning is in `docs/security.md`.
+#
+# cargo-deny is installed on demand rather than being a documented prerequisite:
+# a gate people skip because it needs setup is not a gate.
+security:
+    @command -v cargo-deny >/dev/null || cargo install --locked cargo-deny
+    cargo deny check
+    pnpm audit --audit-level high
+
 # --- Everything ------------------------------------------------------------
 
 # Full validation: Rust + corpus (tests + coverage ratchet) + clippy + web
 # tests + extension tests + builds (ext-build includes web-build) + fixture
-check: corpus corpus-coverage clippy web-test ext-test ext-build fixture-guard
+# guard + the supply-chain gate
+check: corpus corpus-coverage clippy security web-test ext-test ext-build fixture-guard
 
 # The fixture is the public corpus: it must extract with zero warnings, and the
 # documentation it declares must not regress. The floor sits below today's 67%

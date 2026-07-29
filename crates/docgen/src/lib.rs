@@ -8,6 +8,8 @@
 //! prose through [`Labels`]. Everything else they emit is Markdown/Mermaid
 //! syntax or model data, which is locale-independent by contract.
 
+use std::collections::HashMap;
+
 use crux_analyzer_model::{Machine, Marker, State, StateDecl, Transition};
 
 mod coverage;
@@ -20,19 +22,149 @@ pub use labels::Labels;
 pub use markdown::markdown;
 pub use mermaid::{mermaid_diagrams, Diagram};
 
-/// Mermaid identifier for a state (or the wildcard pseudo-state). Composite
-/// leaves (`Active/Loading`) become `Active_Loading`.
-fn state_id(state: &str) -> String {
-    if state == State::ANY {
-        "any_state".to_string()
-    } else {
-        state.replace('/', "_")
+/// Words Mermaid's state-diagram grammar claims for itself. A state named after
+/// one of these cannot be a bare node id — `enum State { end }` is legal Rust,
+/// and `end` alone would break the whole diagram.
+const MERMAID_KEYWORDS: &[&str] = &[
+    "state",
+    "note",
+    "end",
+    "direction",
+    "class",
+    "classDef",
+    "click",
+    "style",
+    "as",
+    "stateDiagram",
+    "left",
+    "right",
+    "of",
+];
+
+/// Whether `name` can be used verbatim as a Mermaid node id.
+///
+/// Everything else — composite paths (`Active/Loading`), raw identifiers
+/// (`r#type`), non-ASCII identifiers, keywords — gets a generated id plus a
+/// quoted label, so the diagram keeps rendering and still shows the real name.
+fn is_safe_bare_id(name: &str) -> bool {
+    !name.is_empty()
+        && name.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        && !MERMAID_KEYWORDS.contains(&name)
+}
+
+/// Node ids for one machine: stable, collision-free, and identical to the state
+/// name whenever that name is already a safe id.
+///
+/// Built per machine because collision resolution needs to see every name at
+/// once — `Active/Loading` and a sibling variant literally named
+/// `Active_Loading` would otherwise both become `Active_Loading` and silently
+/// merge into one node.
+struct Ids {
+    by_state: HashMap<String, String>,
+}
+
+impl Ids {
+    fn build(machine: &Machine) -> Self {
+        let mut by_state: HashMap<String, String> = HashMap::new();
+        let mut taken: std::collections::HashSet<String> = std::collections::HashSet::new();
+        // `any_state` is referenced by generated lines, so it is reserved even
+        // when no state is called that.
+        taken.insert("any_state".to_string());
+
+        // States first, then composite parents (which are node ids too, though
+        // no state declares them), then transition endpoints: a `to` resolved
+        // at runtime may name something the enum does not declare.
+        let names = machine
+            .states
+            .iter()
+            .map(|s| s.name.as_str())
+            .chain(
+                machine
+                    .states
+                    .iter()
+                    .filter_map(|s| s.name.split_once('/').map(|(parent, _)| parent)),
+            )
+            .chain(
+                machine
+                    .transitions
+                    .iter()
+                    .flat_map(|t| [t.from.0.as_str(), t.to.0.as_str()]),
+            );
+
+        for name in names {
+            if name == State::ANY || by_state.contains_key(name) {
+                continue;
+            }
+            // Sanitize first, then prefix only if the result is still unusable:
+            // `Active/Loading` keeps its readable `Active_Loading` id, while a
+            // keyword (`end`) or a leading digit has to be prefixed.
+            let sanitized = sanitize_id(name);
+            let mut candidate = if is_safe_bare_id(&sanitized) {
+                sanitized
+            } else {
+                format!("s_{sanitized}")
+            };
+            let base = candidate.clone();
+            let mut suffix = 2;
+            while !taken.insert(candidate.clone()) {
+                candidate = format!("{base}_{suffix}");
+                suffix += 1;
+            }
+            by_state.insert(name.to_string(), candidate);
+        }
+
+        Self { by_state }
     }
+
+    fn id(&self, state: &str) -> &str {
+        if state == State::ANY {
+            return "any_state";
+        }
+        self.by_state.get(state).map_or("any_state", String::as_str)
+    }
+
+    /// Whether this state needs a `state "Name" as id` line for its real name to
+    /// appear in the diagram.
+    fn needs_label(&self, state: &str) -> bool {
+        state != State::ANY && self.id(state) != state
+    }
+}
+
+/// Escapes model text for a Mermaid label or note.
+///
+/// Mermaid has no backslash escape; it has *entity codes* (`#quot;`, `#60;`),
+/// which it renders back to the character. Four things have to go:
+///
+/// - `"` would close a quoted label;
+/// - `<` and `>` would be markup in a renderer configured with `htmlLabels`;
+/// - `%%` starts a comment that swallows the rest of the line;
+/// - newlines, via [`one_line`], would inject a diagram statement.
+fn mermaid_label(text: &str) -> String {
+    one_line(text)
+        .replace('"', "#quot;")
+        .replace('<', "#60;")
+        .replace('>', "#62;")
+        .replace("%%", "%\u{200b}%")
+}
+
+/// Flattens text to a single line and drops control characters.
+///
+/// Every Mermaid statement is line-terminated, so an embedded newline in author
+/// prose or an identifier would inject a diagram line. See `docs/security.md`.
+pub(crate) fn one_line(text: &str) -> String {
+    text.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .filter(|c| !c.is_control())
+        .collect()
 }
 
 /// One `stateDiagram-v2` body for a machine (without code fences).
 /// Composite leaves render nested inside their parent's block.
 fn machine_diagram(machine: &Machine, labels: &Labels) -> String {
+    let ids = Ids::build(machine);
     let mut lines = vec!["stateDiagram-v2".to_string()];
 
     if machine
@@ -44,41 +176,80 @@ fn machine_diagram(machine: &Machine, labels: &Labels) -> String {
         // transition lines refer to, so it must stay stable across locales.
         lines.push(format!(
             "    state \"{}\" as any_state",
-            labels.any_state
+            mermaid_label(labels.any_state)
         ));
     }
 
-    // Composite blocks: `state Parent { state "Child" as Parent_Child }`.
-    let mut seen_parents: Vec<&str> = Vec::new();
+    // Which states a transition already declares by mentioning them, computed
+    // once: asking per state turned this into a states × transitions scan.
+    let referenced: std::collections::HashSet<&str> = machine
+        .transitions
+        .iter()
+        .flat_map(|t| [t.from.0.as_str(), t.to.0.as_str()])
+        .collect();
+
+    // Composite children grouped by parent in one pass, preserving declaration
+    // order — the previous shape rescanned every state for each parent.
+    let mut parents: Vec<&str> = Vec::new();
+    let mut children: HashMap<&str, Vec<(&str, &str)>> = HashMap::new();
     for state in &machine.states {
-        if let Some((parent, _)) = state.name.split_once('/') {
-            if !seen_parents.contains(&parent) {
-                seen_parents.push(parent);
-                lines.push(format!("    state {parent} {{"));
-                for leaf in &machine.states {
-                    if let Some((p, child)) = leaf.name.split_once('/') {
-                        if p == parent {
-                            lines.push(format!(
-                                "        state \"{child}\" as {}",
-                                state_id(&leaf.name)
-                            ));
-                        }
-                    }
-                }
-                lines.push("    }".to_string());
+        if let Some((parent, child)) = state.name.split_once('/') {
+            if !children.contains_key(parent) {
+                parents.push(parent);
             }
-        } else if !is_referenced(machine, &state.name) {
+            children
+                .entry(parent)
+                .or_default()
+                .push((child, state.name.as_str()));
+        }
+    }
+
+    // Composite blocks: `state Parent { state "Child" as Parent_Child }`.
+    for parent in &parents {
+        // A parent whose name is not a usable id is declared with a quoted
+        // label, the same way its children are.
+        if ids.needs_label(parent) {
+            lines.push(format!(
+                "    state \"{}\" as {} {{",
+                mermaid_label(parent),
+                ids.id(parent)
+            ));
+        } else {
+            lines.push(format!("    state {parent} {{"));
+        }
+        for (child, full) in &children[*parent] {
+            lines.push(format!(
+                "        state \"{}\" as {}",
+                mermaid_label(child),
+                ids.id(full)
+            ));
+        }
+        lines.push("    }".to_string());
+    }
+
+    for state in &machine.states {
+        if state.name.contains('/') {
+            continue; // declared inside its composite block
+        }
+        if ids.needs_label(&state.name) {
+            // The name cannot be a bare id, so the label carries it.
+            lines.push(format!(
+                "    state \"{}\" as {}",
+                mermaid_label(&state.name),
+                ids.id(&state.name)
+            ));
+        } else if !referenced.contains(state.name.as_str()) {
             // Orphan simple states still show up in the diagram.
-            lines.push(format!("    {}", state_id(&state.name)));
+            lines.push(format!("    {}", ids.id(&state.name)));
         }
     }
 
     for transition in &machine.transitions {
         lines.push(format!(
             "    {} --> {}: {}",
-            state_id(&transition.from.0),
-            state_id(&transition.to.0),
-            transition.event.0,
+            ids.id(&transition.from.0),
+            ids.id(&transition.to.0),
+            mermaid_label(&transition.event.0),
         ));
     }
 
@@ -90,13 +261,19 @@ fn machine_diagram(machine: &Machine, labels: &Labels) -> String {
         if let Some(doc) = &state.doc {
             lines.push(format!(
                 "    note right of {} : {}",
-                state_id(&state.name),
+                ids.id(&state.name),
                 note_text(doc),
             ));
         }
     }
 
     lines.join("\n")
+}
+
+fn sanitize_id(name: &str) -> String {
+    name.chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect()
 }
 
 /// A doc comment as a one-line Mermaid note.
@@ -106,7 +283,9 @@ fn machine_diagram(machine: &Machine, labels: &Labels) -> String {
 /// the only place documentation is shortened.
 fn note_text(doc: &str) -> String {
     let first = doc.split("\n\n").next().unwrap_or(doc);
-    let flat = first.split_whitespace().collect::<Vec<_>>().join(" ");
+    // A note runs to end of line, so `%%` in author prose would comment out the
+    // rest of it — and a newline would inject a diagram statement.
+    let flat = mermaid_label(first);
     if flat.chars().count() <= NOTE_MAX_CHARS {
         return flat;
     }
@@ -119,13 +298,6 @@ fn note_text(doc: &str) -> String {
 }
 
 const NOTE_MAX_CHARS: usize = 72;
-
-fn is_referenced(machine: &Machine, state: &str) -> bool {
-    machine
-        .transitions
-        .iter()
-        .any(|t| t.from.0 == state || t.to.0 == state)
-}
 
 /// The localized name of a marker.
 ///

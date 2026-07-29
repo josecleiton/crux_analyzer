@@ -7,11 +7,21 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use crux_analyzer_i18n::Locale;
+use crux_analyzer_parser::Limits;
 
 mod i18n;
 mod watch;
 
 use i18n::Messages;
+
+/// Stack for the analysis thread.
+///
+/// `syn::parse_file` recurses over nested expressions and so does the walker, so
+/// nesting depth in the *input* becomes stack depth here. The parser's own depth
+/// caps bound the walkers, but not `syn` itself, and a stack overflow aborts the
+/// process rather than returning an error. A big stack is the standard answer;
+/// see `docs/security.md`.
+const ANALYSIS_STACK_SIZE: usize = 64 << 20;
 
 #[derive(Parser)]
 #[command(name = "crux-analyzer", version, about)]
@@ -30,6 +40,42 @@ struct Cli {
     /// written — the failure is the signal, for CI.
     #[arg(long, global = true)]
     deny_warnings: bool,
+
+    #[command(flatten)]
+    limits: LimitArgs,
+}
+
+/// Caps on analyzing source you may not control.
+///
+/// The defaults suit any real application; they exist so that a hostile or
+/// pathological tree cannot hang the analyzer or exhaust its memory. Hitting one
+/// emits an `analysis-truncated`, `file-too-large` or `input-too-large` warning,
+/// so `--deny-warnings` turns a truncated run into a failed one.
+#[derive(clap::Args)]
+struct LimitArgs {
+    /// Skip `.rs` files larger than this many bytes.
+    #[arg(long, global = true, value_name = "BYTES",
+          default_value_t = Limits::DEFAULT_MAX_FILE_SIZE)]
+    max_file_size: u64,
+    /// Stop reading once this many bytes of source have been loaded.
+    #[arg(long, global = true, value_name = "BYTES",
+          default_value_t = Limits::DEFAULT_MAX_TOTAL_SIZE)]
+    max_total_size: u64,
+    /// Expression-walking steps allowed per Core.
+    #[arg(long, global = true, value_name = "STEPS",
+          default_value_t = Limits::DEFAULT_MAX_STEPS)]
+    max_steps: u64,
+}
+
+impl LimitArgs {
+    fn to_limits(&self) -> Limits {
+        Limits {
+            max_file_size: self.max_file_size,
+            max_total_size: self.max_total_size,
+            max_steps: self.max_steps,
+            ..Limits::default()
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -90,9 +136,21 @@ enum DocsFormat {
 }
 
 fn main() -> ExitCode {
+    // All analysis happens on a thread with a stack large enough for deeply
+    // nested input; the main thread only waits. A panic there is reported as a
+    // failure rather than unwinding out of `main`.
+    std::thread::Builder::new()
+        .stack_size(ANALYSIS_STACK_SIZE)
+        .spawn(run)
+        .and_then(|handle| handle.join().map_err(|_| std::io::Error::other("panicked")))
+        .unwrap_or(ExitCode::FAILURE)
+}
+
+fn run() -> ExitCode {
     let cli = Cli::parse();
     let messages = Messages::new(cli.locale.unwrap_or_else(Locale::from_env));
     let deny_warnings = cli.deny_warnings;
+    let limits = cli.limits.to_limits();
 
     // `coverage` reports on the model rather than emitting it, so it has no
     // renderer, no output file and nothing to watch.
@@ -104,6 +162,7 @@ fn main() -> ExitCode {
             min,
             list,
             deny_warnings,
+            &limits,
             &messages,
         );
     }
@@ -129,13 +188,14 @@ fn main() -> ExitCode {
         };
 
     let project_name = input.name.clone().unwrap_or_else(|| directory_name(&input.src));
-    let run = || {
+    let run_analysis = || {
         run_once(
             &input.src,
             &project_name,
             out.as_deref(),
             render,
             deny_warnings,
+            &limits,
             &messages,
         )
     };
@@ -143,9 +203,9 @@ fn main() -> ExitCode {
     if watching {
         // The watcher ignores each run's exit code, so `--deny-warnings`
         // reports without ending the session.
-        watch::watch(&input.src, &messages, run)
+        watch::watch(&input.src, out.as_deref(), &messages, run_analysis)
     } else {
-        run()
+        run_analysis()
     }
 }
 
@@ -177,10 +237,11 @@ fn run_once(
     out: Option<&Path>,
     render: Renderer,
     deny_warnings: bool,
+    limits: &Limits,
     messages: &Messages,
 ) -> ExitCode {
     let locale = messages.locale();
-    let outcome = match crux_analyzer_parser::parse_project(src, project_name) {
+    let outcome = match crux_analyzer_parser::parse_project_with(src, project_name, limits) {
         Ok(outcome) => outcome,
         Err(err) => {
             eprintln!("{}: {}", messages.error_prefix(), err.message(locale));
@@ -236,10 +297,11 @@ fn report_coverage(
     min: Option<u8>,
     list: bool,
     deny_warnings: bool,
+    limits: &Limits,
     messages: &Messages,
 ) -> ExitCode {
     let locale = messages.locale();
-    let outcome = match crux_analyzer_parser::parse_project(src, project_name) {
+    let outcome = match crux_analyzer_parser::parse_project_with(src, project_name, limits) {
         Ok(outcome) => outcome,
         Err(err) => {
             eprintln!("{}: {}", messages.error_prefix(), err.message(locale));

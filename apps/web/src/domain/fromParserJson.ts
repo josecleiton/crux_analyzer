@@ -15,10 +15,27 @@ export function fromParserJson(json: ParserProjectJson): DomainProject {
       id: core.name,
       name: core.name,
       machines: core.machines.map((machine) => mapMachine(core.name, machine)),
-      eventDocs: Object.fromEntries(core.events.map((entry) => [entry.name, entry.doc])),
-      effectDocs: Object.fromEntries(core.effects.map((entry) => [entry.name, entry.doc])),
+      eventDocs: docsByName(core.events),
+      effectDocs: docsByName(core.effects),
     })),
   };
+}
+
+/**
+ * A name → description lookup with no prototype.
+ *
+ * The keys are variant names read out of the analyzed application, so they can
+ * be anything Rust allows — including `constructor` and `toString`. On an
+ * ordinary object those resolve through the prototype chain to a *function*,
+ * which is truthy, and the truthiness is what callers test before rendering.
+ * A null prototype makes a miss a miss.
+ */
+function docsByName(entries: { name: string; doc: string }[]): Record<string, string> {
+  const docs: Record<string, string> = Object.create(null);
+  for (const entry of entries) {
+    docs[entry.name] = entry.doc;
+  }
+  return docs;
 }
 
 function mapMachine(coreId: string, machine: ParserMachineJson): DomainMachine {

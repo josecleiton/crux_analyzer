@@ -63,4 +63,23 @@ describe('buildWebviewHtml', () => {
     expect(html).not.toContain('</script> in prose');
     expect(html).toContain('\\u003c/script> in prose');
   });
+
+  it('escapes the line terminators JSON.stringify leaves raw', () => {
+    // U+2028/U+2029 are line terminators to a JavaScript parser but legal
+    // unescaped inside a JSON string, so they would break the statement.
+    const html = build({ project: 'P', doc: 'before\u2028after\u2029end' });
+    expect(html).not.toContain('\u2028');
+    expect(html).not.toContain('\u2029');
+    expect(html).toContain('before\\u2028after\\u2029end');
+  });
+
+  it('produces a parseable injection for hostile prose', () => {
+    // The real requirement behind the escaping: the script still runs.
+    const doc = '</script><script>alert(1)</script>\u2028\u2029 "quotes" \\ backslash';
+    const html = build({ project: 'P', doc });
+    const injected = html.match(/window\.__CRUX_MODEL__ = (.*);<\/script>/)!;
+    expect(injected).not.toBeNull();
+    const parsed = JSON.parse(injected[1].replace(/\\u003c/g, '<'));
+    expect(parsed.doc).toBe(doc);
+  });
 });

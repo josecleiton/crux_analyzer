@@ -194,7 +194,9 @@ function parseStrings(what: string, raw: unknown): string[] {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  // Arrays excluded explicitly: they are objects, and while a missing required
+  // field would reject one anyway, "is this a record" should not answer yes.
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function invalid(detail: string): Error {

@@ -20,10 +20,28 @@ crux-analyzer generate --src <dir> [--name <project>] [--out <file>] [--watch] [
 | `--watch` | Keep watching `--src` and regenerate on every `.rs` change (debounced). |
 | `--locale` | `en` or `pt-BR`. Language of the CLI's own output and of generated prose — see below. |
 | `--deny-warnings` | Exit non-zero if the parser reported anything. Global: works on every subcommand. |
+| `--max-file-size` | Skip `.rs` files larger than this many bytes (default 2 MiB). Global. |
+| `--max-total-size` | Stop reading once this many bytes of source have been loaded (default 256 MiB). Global. |
+| `--max-steps` | Expression-walking steps allowed per Core (default 2,000,000). Global. |
 
 Warnings (see the [warnings reference](parser.md#warnings-reference)) go to
 stderr; the JSON goes to `--out`/stdout. Exit code is non-zero when parsing
 fails (e.g. no `impl App` found).
+
+### Resource limits
+
+The `--max-*` flags exist because the analyzer is routinely pointed at source
+nobody on your team wrote — a dependency, a fork's pull request, a crate someone
+downloaded. The defaults are far above any real Crux application (the test
+fixture uses a four-figure step count) and far below what it takes to hang a
+machine, so **you should never need to change them**; raise one only for a large
+codebase you trust.
+
+Every limit obeys the honesty rule: hitting one emits a warning
+([resource warnings](parser.md#resource-warnings)), so `--deny-warnings` makes a
+truncated analysis fail the run instead of publishing a quietly partial diagram.
+`docs/security.md` explains what each limit bounds and why memoization is not the
+alternative.
 
 `--deny-warnings` still writes the output — the exit code is the signal, so a
 pipeline fails while a human still gets the artifact to look at. Under

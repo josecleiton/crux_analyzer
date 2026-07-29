@@ -215,6 +215,23 @@ localized ([i18n.md](i18n.md)). The English rendering is shown below.
 
 A clean corpus run (the Corpus test) extracts with **zero** warnings.
 
+### Resource warnings
+
+The same rule applied to resources: the analyzer is pointed at source it does not
+control, so it has caps — and a cap that fires is reported rather than truncating
+the model in silence. `--deny-warnings` therefore turns a truncated analysis into
+a failed run. The caps and their flags are in [security.md](security.md#3-every-unbounded-input-dimension-gets-a-cap-and-every-cap-that-fires-is-reported)
+and [cli.md](cli.md#resource-limits).
+
+| Code | Message (`en`) | Meaning |
+| --- | --- | --- |
+| `analysis-truncated` | `core X: analysis stopped at the Y limit — the model may be incomplete` | the step, depth or call-depth budget ran out; transitions may be missing |
+| `file-too-large` | `file skipped: N bytes exceeds the M-byte limit` | over `--max-file-size`, not read |
+| `input-too-large` | `remaining files skipped: the run reached the M-byte total source limit` | over `--max-total-size`; the walk stopped |
+| `nesting-too-deep` | `file skipped: brackets nest deeper than N levels` | `syn` recurses over nesting and a stack overflow would abort the process, so this is checked on the raw text before parsing |
+| `not-a-regular-file` | `path skipped: not a regular file (symlink, device or FIFO)` | a symlinked `.rs` would read outside the tree; a FIFO would hang |
+| `source-unreadable` | `path skipped: <reason>` | a walk or metadata error — previously silent, which made a permission problem look like a complete model |
+
 ## Known limits
 
 - Bindings do not flow through helper-call parameters (a payload binding

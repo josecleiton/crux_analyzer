@@ -15,6 +15,7 @@
 //! emitted with the wildcard source `"*"`. Only assignments whose evidence
 //! exists but cannot be resolved statically are dropped with a [`Warning`].
 
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -27,13 +28,71 @@ use crate::ast_util::{
 use crate::core_finder::CoreInfo;
 use crate::index::CrateIndex;
 use crate::state_enum::StateMachine;
-use crate::{Warning, WarningKind};
+use crate::{Limits, Warning, WarningKind};
 
 /// The wildcard source: the transition fires from any state.
 pub(crate) const ANY_STATE: &str = "*";
 
 /// Maximum predicate-method resolution depth (predicates calling predicates).
 const MAX_PREDICATE_DEPTH: usize = 3;
+
+/// The walk's remaining allowance, and which limit stopped it.
+///
+/// Interior mutability because the evaluators that recurse (`eval_condition`,
+/// `eval_value_condition`, `state_leaves_of_pattern`) take `&self` — charging
+/// them through a `Cell` keeps one budget for the whole walk without turning
+/// every read-only evaluator into a `&mut self` method.
+///
+/// Every recursive entry point is wrapped `enter() … leave()`. `enter` returning
+/// `false` means a limit fired: stop descending, and let the recorded limit
+/// name become an `analysis-truncated` warning at the end of `extract`.
+struct Budget {
+    steps: Cell<u64>,
+    depth: Cell<usize>,
+    max_depth: usize,
+    max_call_depth: usize,
+    /// Name of the first limit that fired, for the warning.
+    hit: Cell<Option<&'static str>>,
+}
+
+impl Budget {
+    fn new(limits: &Limits) -> Self {
+        Self {
+            steps: Cell::new(limits.max_steps),
+            depth: Cell::new(0),
+            max_depth: limits.max_depth,
+            max_call_depth: limits.max_call_depth,
+            hit: Cell::new(None),
+        }
+    }
+
+    /// Charges one step and one level of nesting.
+    fn enter(&self) -> bool {
+        let steps = self.steps.get();
+        if steps == 0 {
+            self.record("max-steps");
+            return false;
+        }
+        let depth = self.depth.get();
+        if depth >= self.max_depth {
+            self.record("max-depth");
+            return false;
+        }
+        self.steps.set(steps - 1);
+        self.depth.set(depth + 1);
+        true
+    }
+
+    fn leave(&self) {
+        self.depth.set(self.depth.get() - 1);
+    }
+
+    fn record(&self, limit: &'static str) {
+        if self.hit.get().is_none() {
+            self.hit.set(Some(limit));
+        }
+    }
+}
 
 /// A transition attributed to a specific state machine (enum + field —
 /// the same enum can drive more than one machine through different fields).
@@ -80,6 +139,7 @@ pub(crate) fn extract(
     index: &CrateIndex,
     core: &CoreInfo,
     machines: &[StateMachine],
+    limits: &Limits,
     warnings: &mut Vec<Warning>,
 ) -> Vec<RawTransition> {
     let Some(update) = index.find_fn(Some(&core.name), "update") else {
@@ -102,6 +162,7 @@ pub(crate) fn extract(
         effects_by_arm: HashMap::new(),
         arm_counter: 0,
         call_stack: vec![(Some(core.name.clone()), "update".to_string())],
+        budget: Budget::new(limits),
     };
     walker.walk_block(
         update.block,
@@ -117,6 +178,7 @@ pub(crate) fn extract(
     );
 
     // Attach the effects observed under each event arm to its transitions.
+    let truncated = walker.budget.hit.get();
     let effects_by_arm = walker.effects_by_arm;
     let mut out = walker.out;
     for (transition, arm) in &mut out {
@@ -124,6 +186,21 @@ pub(crate) fn extract(
             transition.effects = effects.clone();
         }
     }
+
+    // A limit that fired means the model may be missing transitions. Saying so
+    // is the honesty rule applied to resources — and it makes `--deny-warnings`
+    // fail the run rather than publish a quietly partial diagram.
+    if let Some(limit) = truncated {
+        warnings.push(Warning {
+            file: update.file.to_path_buf(),
+            line: 0,
+            kind: WarningKind::AnalysisTruncated {
+                core: core.name.clone(),
+                limit: limit.to_string(),
+            },
+        });
+    }
+
     out.into_iter().map(|(transition, _)| transition).collect()
 }
 
@@ -139,6 +216,10 @@ struct Walker<'w, 'a> {
     /// Functions currently being walked — breaks recursion cycles while still
     /// allowing the same helper to be re-walked under a different context.
     call_stack: Vec<(Option<String>, String)>,
+    /// What this walk is still allowed to explore. The call stack breaks
+    /// *cycles*; only this bounds the exponential fan-out of a diamond call
+    /// graph, and the nesting depth of hostile input.
+    budget: Budget,
 }
 
 impl<'w, 'a> Walker<'w, 'a> {
@@ -197,7 +278,23 @@ impl<'w, 'a> Walker<'w, 'a> {
         }
     }
 
+    /// Every expression descent is charged here — this is the single choke
+    /// point that bounds both the walk's total work and its nesting depth.
     fn walk_expr(
+        &mut self,
+        expr: &'a syn::Expr,
+        ctx: &Ctx<'a>,
+        self_ty: &Option<String>,
+        file: &Path,
+    ) {
+        if !self.budget.enter() {
+            return;
+        }
+        self.walk_expr_inner(expr, ctx, self_ty, file);
+        self.budget.leave();
+    }
+
+    fn walk_expr_inner(
         &mut self,
         expr: &'a syn::Expr,
         ctx: &Ctx<'a>,
@@ -309,6 +406,12 @@ impl<'w, 'a> Walker<'w, 'a> {
         let key = (callee_self.clone(), callee_name.clone());
         if self.call_stack.contains(&key) {
             return; // recursion cycle
+        }
+        // A cycle-free call chain can still be arbitrarily long, and each level
+        // multiplies the work below it.
+        if self.call_stack.len() >= self.budget.max_call_depth {
+            self.budget.record("max-call-depth");
+            return;
         }
         let Some(callee) = self.index.find_fn(callee_self.as_deref(), &callee_name) else {
             // External function: `render()` is crux_core's render effect.
@@ -597,7 +700,26 @@ impl<'w, 'a> Walker<'w, 'a> {
     ///
     /// `self_fields` are extra field spellings accepted as the state field —
     /// `"self"` inside predicate methods on the state enum.
+    /// Charged and depth-guarded: `&&`/`||` chains and `!` nest arbitrarily in
+    /// hostile input. Being cut off reports `Unresolved` — there *is* a
+    /// condition here and we could not resolve it — which drops the transition
+    /// with a warning rather than inventing a source state.
     fn eval_condition(
+        &self,
+        condition: &syn::Expr,
+        machine: &StateMachine,
+        self_fields: &[&str],
+        depth: usize,
+    ) -> GuardEval {
+        if !self.budget.enter() {
+            return GuardEval::Unresolved;
+        }
+        let result = self.eval_condition_inner(condition, machine, self_fields, depth);
+        self.budget.leave();
+        result
+    }
+
+    fn eval_condition_inner(
         &self,
         condition: &syn::Expr,
         machine: &StateMachine,
@@ -727,6 +849,21 @@ impl<'w, 'a> Walker<'w, 'a> {
     /// `State::Idle` → `[Idle]`; `State::Active(ActiveState::Ready)` →
     /// `[Active/Ready]`; `State::Active(_)` → every `Active/*` leaf.
     fn state_leaves_of_pattern(&self, pat: &syn::Pat, machine: &StateMachine) -> Vec<String> {
+        if !self.budget.enter() {
+            return Vec::new();
+        }
+        let result = self.state_leaves_of_pattern_inner(pat, machine);
+        self.budget.leave();
+        result
+    }
+
+    /// Nests through `|`, `@`, parens and references, so a pattern of nothing
+    /// but `((((…))))` recurses as deep as the input is nested.
+    fn state_leaves_of_pattern_inner(
+        &self,
+        pat: &syn::Pat,
+        machine: &StateMachine,
+    ) -> Vec<String> {
         let is_machine_enum = |name: &str| name == machine.enum_name || name == "Self";
         match pat {
             syn::Pat::Path(path) => match enum_variant_path(&path.path) {

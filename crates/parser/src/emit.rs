@@ -30,17 +30,27 @@ pub(crate) fn to_core(core: &CoreInfo, machines: &[StateMachine], raw: Vec<RawTr
             let raw_transitions =
                 by_machine.remove(&(machine.enum_name.clone(), machine.field_name.clone()))?;
 
+            // Deduplicated through a set, not a linear scan: a wide guard can
+            // fan one assignment out to variants × events, and comparing every
+            // new transition against every kept one is quadratic in that.
             let mut transitions: Vec<Transition> = Vec::new();
+            let mut seen: std::collections::HashSet<(String, String, String, Vec<String>)> =
+                std::collections::HashSet::new();
             for raw in raw_transitions {
-                let transition = Transition {
+                if !seen.insert((
+                    raw.from.clone(),
+                    raw.event.clone(),
+                    raw.to.clone(),
+                    raw.effects.clone(),
+                )) {
+                    continue;
+                }
+                transitions.push(Transition {
                     from: State(raw.from),
                     event: Event(raw.event),
                     to: State(raw.to),
                     effects: raw.effects.into_iter().map(Effect).collect(),
-                };
-                if !transitions.contains(&transition) {
-                    transitions.push(transition);
-                }
+                });
             }
 
             Some(Machine {

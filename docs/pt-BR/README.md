@@ -17,6 +17,7 @@ documentação viva (UI web interativa, documentos Mermaid/Markdown).
 | [UI Web](web-ui.md) | Seções, inspetor, filtros, simulação, motor de layout |
 | [Extensão do VS Code](vscode.md) | As máquinas de estado ao lado do código, regenerando ao salvar |
 | [Internacionalização](i18n.md) | Locales, catálogos, o que nunca deve ser traduzido |
+| [Segurança](security.md) | Modelo de ameaça, as regras de desenvolvimento, o que é garantido deliberadamente |
 | [Desenvolvimento](development.md) | Setup, testes, corpus, convenções, pipeline de validação |
 | [Roadmap](roadmap.md) | Trabalho planejado, em ordem, e o que deliberadamente não será feito |
 | [Exemplo de saída](examples/mini-recorder.md) | Documentação gerada pela CLI a partir do fixture de teste |

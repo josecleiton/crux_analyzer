@@ -95,6 +95,21 @@ rejuntam naturalmente, já que Markdown trata uma quebra simples como quebra
 suave. Tooltips de nós e seções são atributos `title` nativos, então ali a
 prosa continua texto puro.
 
+Essa prosa vem de qualquer repositório que tenha sido analisado, então três
+limites são declarados explicitamente em vez de herdados dos padrões da
+biblioteca — veja
+[security.md](security.md#1-prosa-do-autor-é-texto-não-confiável-em-todo-lugar-onde-chega),
+e o `StateDoc.test.tsx` se você for mudá-los:
+
+- **destinos de link** só podem ser `http`, `https` ou `mailto`, e abrem com
+  `rel="noopener noreferrer nofollow"`. Um link `javascript:` renderiza como
+  texto inerte.
+- **imagens nunca são buscadas.** Um `![](https://host/pixel.png)` num
+  comentário de documentação reportaria cada leitor de um documento publicado a
+  esse host, então o texto alternativo é mostrado no lugar dela.
+- **HTML cru não tem caminho até o DOM.** Sem `dangerouslySetInnerHTML`, e
+  `rehype-raw` não deve ser adicionado.
+
 ## Filtrando o canvas
 
 Dois filtros de leitura. Ambos dizem "estes, não o resto" do mesmo jeito que a

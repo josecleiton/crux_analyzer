@@ -220,6 +220,24 @@ baseie ferramentas e documentação nele, já que o texto da mensagem é localiz
 
 Uma execução limpa do corpus (o teste Corpus) extrai com **zero** avisos.
 
+### Avisos de recursos
+
+A mesma regra aplicada a recursos: o analisador é apontado para código que não
+controla, então tem limites — e um limite acionado é reportado em vez de truncar o
+modelo em silêncio. O `--deny-warnings` portanto transforma uma análise truncada
+em uma execução falha. Os limites e suas flags estão em
+[security.md](security.md#3-toda-dimensão-ilimitada-de-entrada-recebe-um-limite-e-todo-limite-acionado-é-reportado)
+e em [cli.md](cli.md#limites-de-recursos).
+
+| Código | Mensagem (`pt-BR`) | Significado |
+| --- | --- | --- |
+| `analysis-truncated` | `núcleo X: a análise parou no limite de Y — o modelo pode estar incompleto` | o orçamento de passos, profundidade ou profundidade de chamadas acabou; transições podem estar faltando |
+| `file-too-large` | `arquivo ignorado: N bytes excede o limite de M bytes` | acima de `--max-file-size`, não lido |
+| `input-too-large` | `arquivos restantes ignorados: a execução alcançou o limite total de M bytes de código-fonte` | acima de `--max-total-size`; a caminhada parou |
+| `nesting-too-deep` | `arquivo ignorado: os delimitadores aninham mais de N níveis` | o `syn` recursa sobre aninhamento e um stack overflow abortaria o processo, então isto é verificado no texto bruto antes do parsing |
+| `not-a-regular-file` | `caminho ignorado: não é um arquivo regular (link simbólico, dispositivo ou FIFO)` | um `.rs` com link simbólico leria fora da árvore; um FIFO travaria |
+| `source-unreadable` | `caminho ignorado: <motivo>` | um erro de caminhada ou de metadados — antes silencioso, o que fazia um problema de permissão parecer um modelo completo |
+
 ## Limites conhecidos
 
 - Bindings não fluem por parâmetros de chamadas auxiliares (um binding de payload

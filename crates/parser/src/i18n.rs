@@ -8,18 +8,36 @@
 //! Identifiers interpolated into these messages (core, machine and state
 //! names) come from the analyzed application's source and are never
 //! translated.
+//!
+//! They are, however, *sanitized*: an identifier or a doc-comment line is
+//! attacker-controlled text on its way to a terminal, and an ANSI escape
+//! sequence embedded in one would rewrite the operator's screen. [`sanitize`]
+//! runs over every rendered diagnostic — see `docs/security.md`.
 
 use crux_analyzer_i18n::Locale;
 
 use crate::{ParseError, WarningKind};
 
+/// Strips control characters from text bound for a terminal.
+///
+/// Applied to whole rendered messages rather than to each interpolation, so a
+/// variant added later cannot forget it. Newlines and tabs go too: a diagnostic
+/// is one line, and a doc comment that smuggles in a newline would otherwise
+/// forge a second one.
+pub(crate) fn sanitize(text: &str) -> String {
+    text.chars()
+        .map(|c| if c.is_control() { '\u{fffd}' } else { c })
+        .collect()
+}
+
 impl WarningKind {
     /// The message for this diagnostic in `locale`.
     pub fn message(&self, locale: Locale) -> String {
-        match locale {
+        let raw = match locale {
             Locale::En => self.message_en(),
             Locale::PtBr => self.message_pt_br(),
-        }
+        };
+        sanitize(&raw)
     }
 
     fn message_en(&self) -> String {
@@ -42,6 +60,26 @@ impl WarningKind {
                 "unrecognized annotation `{annotation}`: not one of @failure, \
                  @deprecated, @tag <name>"
             ),
+            WarningKind::AnalysisTruncated { core, limit } => format!(
+                "core {core}: analysis stopped at the {limit} limit — the model \
+                 may be incomplete. Raise it if this source is trusted."
+            ),
+            WarningKind::FileTooLarge { size, max } => {
+                format!("file skipped: {size} bytes exceeds the {max}-byte limit")
+            }
+            WarningKind::InputTooLarge { max } => format!(
+                "remaining files skipped: the run reached the {max}-byte total \
+                 source limit"
+            ),
+            WarningKind::SourceUnreadable { reason } => {
+                format!("path skipped: {reason}")
+            }
+            WarningKind::NotARegularFile => {
+                "path skipped: not a regular file (symlink, device or FIFO)".to_string()
+            }
+            WarningKind::NestingTooDeep { max } => {
+                format!("file skipped: brackets nest deeper than {max} levels")
+            }
         }
     }
 
@@ -66,13 +104,40 @@ impl WarningKind {
                 "anotação `{annotation}` não reconhecida: não é @failure, \
                  @deprecated nem @tag <nome>"
             ),
+            WarningKind::AnalysisTruncated { core, limit } => format!(
+                "núcleo {core}: a análise parou no limite de {limit} — o modelo \
+                 pode estar incompleto. Aumente o limite se esta fonte é confiável."
+            ),
+            WarningKind::FileTooLarge { size, max } => format!(
+                "arquivo ignorado: {size} bytes excede o limite de {max} bytes"
+            ),
+            WarningKind::InputTooLarge { max } => format!(
+                "arquivos restantes ignorados: a execução alcançou o limite total \
+                 de {max} bytes de código-fonte"
+            ),
+            WarningKind::SourceUnreadable { reason } => {
+                format!("caminho ignorado: {reason}")
+            }
+            WarningKind::NotARegularFile => {
+                "caminho ignorado: não é um arquivo regular (link simbólico, \
+                 dispositivo ou FIFO)"
+                    .to_string()
+            }
+            WarningKind::NestingTooDeep { max } => format!(
+                "arquivo ignorado: os delimitadores aninham mais de {max} níveis"
+            ),
         }
     }
 }
 
 impl ParseError {
-    /// The message for this failure in `locale`.
+    /// The message for this failure in `locale`. Sanitized like a warning: the
+    /// path and `syn`'s prose both quote the analyzed source.
     pub fn message(&self, locale: Locale) -> String {
+        sanitize(&self.raw_message(locale))
+    }
+
+    fn raw_message(&self, locale: Locale) -> String {
         match locale {
             Locale::En => match self {
                 ParseError::Io(path, err) => format!("failed to read {}: {err}", path.display()),
@@ -113,6 +178,20 @@ mod tests {
             WarningKind::UnknownAnnotation {
                 annotation: "@failur".into(),
             },
+            WarningKind::AnalysisTruncated {
+                core: "Recorder".into(),
+                limit: "max-steps".into(),
+            },
+            WarningKind::FileTooLarge {
+                size: 9_000_000,
+                max: 2_097_152,
+            },
+            WarningKind::InputTooLarge { max: 268_435_456 },
+            WarningKind::SourceUnreadable {
+                reason: "permission denied".into(),
+            },
+            WarningKind::NotARegularFile,
+            WarningKind::NestingTooDeep { max: 192 },
         ]
     }
 
@@ -159,8 +238,46 @@ mod tests {
                 "dynamic-target",
                 "unknown-event",
                 "unresolvable-source",
-                "unknown-annotation"
+                "unknown-annotation",
+                "analysis-truncated",
+                "file-too-large",
+                "input-too-large",
+                "source-unreadable",
+                "not-a-regular-file",
+                "nesting-too-deep"
             ]
         );
+    }
+
+    /// A doc comment is attacker-controlled text and a diagnostic goes to a
+    /// terminal: an ANSI escape smuggled through an annotation must not survive
+    /// into the rendered message. See `docs/security.md`.
+    #[test]
+    fn diagnostics_strip_control_characters() {
+        let kind = WarningKind::UnknownAnnotation {
+            annotation: "@x\u{1b}[31mred\u{7}\nfake line".into(),
+        };
+        for locale in Locale::ALL {
+            let message = kind.message(locale);
+            assert!(
+                !message.chars().any(char::is_control),
+                "{locale}: {message:?} still carries a control character"
+            );
+            // The visible text survives — only the control bytes are replaced.
+            assert!(message.contains("red"), "{locale}");
+        }
+    }
+
+    #[test]
+    fn rendered_warnings_sanitize_the_path_too() {
+        let warning = crate::Warning {
+            file: std::path::PathBuf::from("src/\u{1b}[2Kevil.rs"),
+            line: 3,
+            kind: WarningKind::NotARegularFile,
+        };
+        for locale in Locale::ALL {
+            let rendered = warning.render(locale);
+            assert!(!rendered.chars().any(char::is_control), "{locale}");
+        }
     }
 }

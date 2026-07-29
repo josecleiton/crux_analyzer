@@ -29,12 +29,15 @@ use std::path::{Path, PathBuf};
 use crux_analyzer_i18n::Locale;
 use crux_analyzer_model::Project;
 
+pub use limits::Limits;
+
 mod annotations;
 mod ast_util;
 mod core_finder;
 mod emit;
 mod i18n;
 mod index;
+mod limits;
 mod loader;
 mod state_enum;
 #[cfg(test)]
@@ -81,6 +84,25 @@ pub enum WarningKind {
     /// (`@failur`), a marker given an argument, or a `@tag` with no usable
     /// name. Reported rather than left inert, so the mistake is visible.
     UnknownAnnotation { annotation: String },
+    /// A resource limit stopped the walk before the Core was fully explored,
+    /// so the model may be missing transitions. See [`Limits`].
+    AnalysisTruncated { core: String, limit: String },
+    /// A source file exceeded `--max-file-size` and was skipped.
+    FileTooLarge { size: u64, max: u64 },
+    /// The run reached `--max-total-size`; the remaining files were skipped.
+    InputTooLarge { max: u64 },
+    /// A path under the source directory could not be read or walked. Reported
+    /// rather than skipped silently: a permission error otherwise yields a
+    /// quietly partial model.
+    SourceUnreadable { reason: String },
+    /// A path was skipped because it is not a regular file — a symlink, a
+    /// device, a socket or a FIFO. Following it would read outside the source
+    /// tree, or never terminate.
+    NotARegularFile,
+    /// A file nests brackets deeper than `max` and was skipped without being
+    /// parsed: `syn` recurses over nesting, and its stack overflow would abort
+    /// the process rather than return an error.
+    NestingTooDeep { max: usize },
 }
 
 impl WarningKind {
@@ -94,6 +116,12 @@ impl WarningKind {
             WarningKind::UnknownEvent { .. } => "unknown-event",
             WarningKind::UnresolvableSource { .. } => "unresolvable-source",
             WarningKind::UnknownAnnotation { .. } => "unknown-annotation",
+            WarningKind::AnalysisTruncated { .. } => "analysis-truncated",
+            WarningKind::FileTooLarge { .. } => "file-too-large",
+            WarningKind::InputTooLarge { .. } => "input-too-large",
+            WarningKind::SourceUnreadable { .. } => "source-unreadable",
+            WarningKind::NotARegularFile => "not-a-regular-file",
+            WarningKind::NestingTooDeep { .. } => "nesting-too-deep",
         }
     }
 }
@@ -108,10 +136,13 @@ pub struct Warning {
 
 impl Warning {
     /// `file:line: message`, with the message in `locale`.
+    ///
+    /// The path is sanitized like the message: it comes from the analyzed tree,
+    /// and this string is written to a terminal.
     pub fn render(&self, locale: Locale) -> String {
         format!(
             "{}:{}: {}",
-            self.file.display(),
+            i18n::sanitize(&self.file.display().to_string()),
             self.line,
             self.kind.message(locale)
         )
@@ -133,16 +164,40 @@ pub struct ParseOutcome {
     pub warnings: Vec<Warning>,
 }
 
-/// Parses the Rust sources under `src_dir` and produces the semantic model.
+/// Parses the Rust sources under `src_dir` with the default [`Limits`].
 pub fn parse_project(src_dir: &Path, project_name: &str) -> Result<ParseOutcome, ParseError> {
-    let sources = loader::load_sources(src_dir)?;
-    parse_sources(&sources, project_name)
+    parse_project_with(src_dir, project_name, &Limits::default())
+}
+
+/// Parses the Rust sources under `src_dir` under caller-chosen [`Limits`].
+///
+/// Analyzing source you do not control is the case these limits exist for; the
+/// defaults are sized for that, and a limit that fires is reported as a
+/// [`Warning`] rather than silently truncating the model.
+pub fn parse_project_with(
+    src_dir: &Path,
+    project_name: &str,
+    limits: &Limits,
+) -> Result<ParseOutcome, ParseError> {
+    let mut warnings = Vec::new();
+    let sources = loader::load_sources(src_dir, limits, &mut warnings)?;
+    parse_loaded(&sources, project_name, limits, warnings)
 }
 
 /// Same as [`parse_project`] over already-loaded sources (used by tests).
+#[cfg(test)]
 pub(crate) fn parse_sources(
     sources: &[loader::SourceFile],
     project_name: &str,
+) -> Result<ParseOutcome, ParseError> {
+    parse_loaded(sources, project_name, &Limits::default(), Vec::new())
+}
+
+fn parse_loaded(
+    sources: &[loader::SourceFile],
+    project_name: &str,
+    limits: &Limits,
+    loader_warnings: Vec<Warning>,
 ) -> Result<ParseOutcome, ParseError> {
     let index = index::build_index(sources);
     let detection = state_enum::find_state_machines(&index);
@@ -156,11 +211,12 @@ pub(crate) fn parse_sources(
     if cores.is_empty() {
         return Err(ParseError::NoCoreFound);
     }
-    let mut warnings = annotation_warnings(&machines);
+    let mut warnings = loader_warnings;
+    warnings.extend(annotation_warnings(&machines));
     let mut model_cores = Vec::new();
 
     for core in &cores {
-        let extraction = transitions::extract(&index, core, &machines, &mut warnings);
+        let extraction = transitions::extract(&index, core, &machines, limits, &mut warnings);
         model_cores.push(emit::to_core(core, &machines, extraction));
     }
 
@@ -178,25 +234,25 @@ pub(crate) fn parse_sources(
 /// Only enums that became state machines are inspected, so a doc comment on an
 /// unrelated enum can never produce noise. Deduplicated because
 /// `use X as Y` registers a clone of the same declaration under a second name,
-/// which makes one typo reachable twice.
+/// which makes one typo reachable twice — through a set, so a file full of
+/// annotation typos costs linear time rather than quadratic.
 fn annotation_warnings(machines: &[state_enum::StateMachine]) -> Vec<Warning> {
     let mut warnings: Vec<Warning> = Vec::new();
+    let mut seen: std::collections::HashSet<(PathBuf, usize, String)> =
+        std::collections::HashSet::new();
     for machine in machines {
         let blocks = std::iter::once(&machine.docs).chain(&machine.variant_docs);
         for problem in blocks.flat_map(|block| &block.problems) {
-            let warning = Warning {
+            if !seen.insert((machine.file.clone(), problem.line, problem.text.clone())) {
+                continue;
+            }
+            warnings.push(Warning {
                 file: machine.file.clone(),
                 line: problem.line,
                 kind: WarningKind::UnknownAnnotation {
                     annotation: problem.text.clone(),
                 },
-            };
-            if !warnings
-                .iter()
-                .any(|seen| seen.file == warning.file && seen.line == warning.line && seen.kind == warning.kind)
-            {
-                warnings.push(warning);
-            }
+            });
         }
     }
     warnings

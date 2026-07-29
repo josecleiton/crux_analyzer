@@ -11,9 +11,9 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-crux-analyzer-docgen = { path = "../docgen" }
-crux-analyzer-i18n = { path = "../i18n" }
-crux-analyzer-model = { path = "../model" }
-crux-analyzer-parser = { path = "../parser" }
+crux-analyzer-docgen = { path = "../docgen", version = "0.1.0" }
+crux-analyzer-i18n = { path = "../i18n", version = "0.1.0" }
+crux-analyzer-model = { path = "../model", version = "0.1.0" }
+crux-analyzer-parser = { path = "../parser", version = "0.1.0" }
 notify = "8"
 serde_json = { workspace = true }

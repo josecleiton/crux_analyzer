@@ -1,0 +1,55 @@
+# Supply-chain policy for the Rust workspace, enforced by `cargo deny check`
+# (run via `just security`, which `just check` depends on).
+#
+# The analyzer is a tool the public runs over its own source, so a compromised or
+# unmaintained dependency is a problem for every user of it, not just for this
+# repository. See `docs/security.md`.
+
+[graph]
+# Only what actually ships is in scope. Checking every target would drag in
+# Windows and wasm trees that this workspace never builds.
+all-features = true
+
+[advisories]
+version = 2
+# No exceptions today. When one becomes unavoidable, add the RUSTSEC id here
+# *with a comment saying why and when to remove it* — an ignore list without
+# reasons is how an advisory stays ignored forever.
+ignore = []
+
+[licenses]
+version = 2
+# The workspace is MIT. This list is exactly the permissive set its dependency
+# tree uses today — kept tight on purpose, so a new dependency arriving under a
+# different license is a decision someone makes rather than a surprise.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "ISC",
+    "Unicode-3.0",
+    # `notify` (the --watch backend). A public-domain dedication, so it imposes
+    # no obligations on this MIT workspace.
+    "CC0-1.0",
+]
+confidence-threshold = 0.9
+
+[bans]
+# Duplicate major versions are a warning, not a failure: `serde_derive` builds on
+# syn 3 while the parser uses syn 2, and `notify` and `clap` pull different
+# `windows-sys` majors. All legitimate, none of it ours to resolve.
+multiple-versions = "warn"
+# No wildcard versions on published crates — a `*` accepts whatever is newest at
+# build time, which is the opposite of a reviewed dependency. The workspace's own
+# `path` dependencies are exempt: they are this repository.
+wildcards = "deny"
+allow-wildcard-paths = true
+# Nothing here yet. This is where a crate goes when it must never be pulled in.
+deny = []
+
+[sources]
+# Everything must come from crates.io. A git dependency — however convenient —
+# is an unreviewed, unversioned, potentially force-pushed input.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

@@ -18,6 +18,12 @@
   ],
   "main": "./out/extension.js",
   "l10n": "./l10n",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "%capabilities.untrustedWorkspaces%"
+    }
+  },
   "contributes": {
     "commands": [
       {
@@ -32,6 +38,7 @@
         "cruxAnalyzer.binary": {
           "type": "string",
           "default": "crux-analyzer",
+          "scope": "machine",
           "description": "%config.binary%"
         },
         "cruxAnalyzer.src": {

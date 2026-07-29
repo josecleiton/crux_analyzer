@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveSourceDir } from './sourceDir';
+import { isContained, resolveSourceDir } from './sourceDir';
 
 const never = () => false;
 
@@ -23,6 +23,46 @@ describe('resolveSourceDir', () => {
   });
 
   it('normalizes the joining slashes', () => {
-    expect(resolveSourceDir('/lib/core/', '/ws/', never)).toBe('/ws/lib/core/');
+    // A leading separator reads as workspace-relative, and redundant separators
+    // collapse — including the trailing one.
+    expect(resolveSourceDir('/lib/core/', '/ws/', never)).toBe('/ws/lib/core');
+    expect(resolveSourceDir('lib//core', '/ws', never)).toBe('/ws/lib/core');
+  });
+
+  /**
+   * `cruxAnalyzer.src` is workspace-scoped, so a cloned repository's
+   * `.vscode/settings.json` sets it. It must not be able to point the analyzer —
+   * or the file watcher that follows it — outside the folder the user opened.
+   */
+  it('refuses a setting that escapes the workspace root', () => {
+    for (const escape of [
+      '../secrets',
+      '../../etc',
+      'shared/../../etc',
+      './../etc',
+      '..\\windows\\system32',
+      '/../etc',
+    ]) {
+      expect(resolveSourceDir(escape, '/ws', () => true), escape).toBeNull();
+    }
+  });
+
+  it('allows a traversal that stays inside', () => {
+    expect(resolveSourceDir('shared/../src', '/ws', never)).toBe('/ws/src');
+    expect(resolveSourceDir('./src', '/ws', never)).toBe('/ws/src');
+  });
+});
+
+describe('isContained', () => {
+  it('accepts paths that stay in the workspace', () => {
+    for (const path of ['', 'src', 'shared/src', './src', 'a/../b', '/lib/core']) {
+      expect(isContained(path), path).toBe(true);
+    }
+  });
+
+  it('rejects paths that climb out', () => {
+    for (const path of ['..', '../x', 'a/../../x', '..\\x']) {
+      expect(isContained(path), path).toBe(false);
+    }
   });
 });

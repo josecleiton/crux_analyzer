@@ -118,6 +118,22 @@ pub(crate) fn as_matches_macro(mac: &syn::Macro) -> Option<MatchesArgs> {
 /// Collects every `(Enum, Variant)` referenced by a pattern, walking through
 /// or-patterns, bindings (`x @ pat`), parens, references and struct/tuple pats.
 pub(crate) fn pattern_variants(pat: &syn::Pat, out: &mut Vec<(String, String)>) {
+    pattern_variants_at(pat, out, 0);
+}
+
+/// Patterns nest without limit — `&&&&(((x)))` is valid Rust — and this walker
+/// follows that nesting, so hostile input would recurse until the stack ran
+/// out. The cap is far above any pattern a person writes; past it the extra
+/// nesting simply yields no variants. See `docs/security.md`.
+const MAX_PATTERN_DEPTH: usize = 128;
+
+fn pattern_variants_at(pat: &syn::Pat, out: &mut Vec<(String, String)>, depth: usize) {
+    if depth >= MAX_PATTERN_DEPTH {
+        return;
+    }
+    let pattern_variants = |pat: &syn::Pat, out: &mut Vec<(String, String)>| {
+        pattern_variants_at(pat, out, depth + 1)
+    };
     match pat {
         syn::Pat::Path(path) => {
             if let Some(pair) = enum_variant_path(&path.path) {
