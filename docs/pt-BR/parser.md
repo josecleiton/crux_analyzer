@@ -116,6 +116,80 @@ produz:
 Um braço que produz várias transições compartilha seu conjunto de efeitos entre
 elas (uma sobreaproximação para braços com ramificação interna).
 
+## Documentação e anotações
+
+Comentários de documentação em um enum de estado chegam ao modelo: o `///` do
+próprio enum se torna a descrição da máquina, e o de cada variante se torna a do
+seu estado. Eventos e efeitos ainda não são cobertos.
+
+```rust
+/// Where a recording session lives.
+pub enum RecorderState {
+    /// Nothing is being recorded yet.
+    Idle,
+
+    /// The upload failed. The session is kept so the user can retry.
+    ///
+    /// @failure
+    /// @tag retryable
+    Failed { reason: String },
+}
+```
+
+`///`, `/** … */` e um `#[doc = "…"]` escrito à mão todos funcionam; a
+indentação comum é removida como o rustdoc a remove, e a quebra de linha do
+autor nunca é refeita. `#[doc(hidden)]` é ignorado — ele não esconde um estado.
+
+**Anotações** são linhas `@` escritas dentro do comentário de documentação. Esse
+é o único mecanismo que não exige dependência no crate analisado: o
+crux_analyzer nunca deve ser dependência das aplicações que ele lê, então um
+atributo real está fora de questão e um atributo desconhecido não compilaria.
+
+| Anotação | Significado |
+| --- | --- |
+| `@failure` | O estado representa uma falha que a aplicação reconhece como tal. |
+| `@deprecated` | O estado está a caminho de sair. |
+| `@tag <nome>` | Um rótulo livre (`retryable`, `offline`). Vários nomes podem dividir uma linha, separados por espaços ou vírgulas. |
+
+Marcadores são um **vocabulário fechado**; `@tag` é a saída de emergência
+aberta. Deliberadamente não existe `@initial` nem `@final`: esses são derivados
+da forma do grafo e de `#[default]`, então declará-los permitiria que uma fonte
+contradissesse as transições que ela também declara.
+
+Linhas reconhecidas são removidas da descrição, e sequências de linhas em branco
+são então colapsadas — assim uma anotação escrita entre dois parágrafos produz
+exatamente a mesma prosa que uma escrita no fim.
+
+### O que é anotação e o que é prosa
+
+A regra é uma frase: **uma linha só é anotação quando está completa e bem
+formada; qualquer outra coisa é prosa.** Palavras-chave casam sem diferenciar
+maiúsculas, então um deslize de capitalização ainda funciona.
+
+| Linha | Lida como |
+| --- | --- |
+| `@failure`, `@FAILURE` | o marcador |
+| `@tag retryable, offline` | duas etiquetas |
+| ``Apple constrains it — `@Generable` leaves no room`` | prosa — `@` não é o primeiro caractere |
+| `Ask support@example.com` | prosa |
+| `@deprecated` dentro de uma cerca ` ``` ` | prosa — blocos cercados são exemplos |
+| `\@failure is how you mark one` | prosa, sem a barra invertida — a saída de emergência |
+| `@failur`, `@see`, `@tag`, `@failure porque …` | **um aviso** (veja abaixo) |
+
+Uma linha com forma de anotação que não é reconhecida é reportada em vez de
+ficar na prosa, porque um `@failur` silenciosamente inerte é exatamente a
+resposta errada e quieta que a regra de honestidade existe para evitar. Só enums
+que de fato se tornaram máquinas são inspecionados, então um comentário de
+documentação em um enum não relacionado nunca gera aviso.
+
+### Estados compostos
+
+Um pai composto não tem nó próprio no modelo — apenas suas folhas
+`Pai/Filho`. Então cada folha **herda** a documentação da variante pai:
+marcadores e etiquetas se unem (o pai primeiro), e a prosa do pai é colocada
+acima da do filho em vez de ser substituída por ela. Nada do que o autor
+escreveu é descartado.
+
 ## Referência de avisos
 
 A regra da honestidade: o que não pode ser inferido estaticamente é exposto,
@@ -133,6 +207,7 @@ baseie ferramentas e documentação nele, já que o texto da mensagem é localiz
 | `unresolvable-source` | `a condição do estado de origem não pôde ser resolvida estaticamente` | a guarda referencia o estado mas derrota a análise (por exemplo, um predicado irresolvível) |
 | `dynamic-target` | `o estado de destino é dinâmico (atribuído a partir de um valor definido em tempo de execução)` | o valor atribuído não tem tipagem de payload nem restrições resolvíveis |
 | `no-update-method` | `núcleo X: método update não encontrado` | um bloco `impl App` sem função `update` |
+| `unknown-annotation` | `anotação X não reconhecida: não é @failure, @deprecated nem @tag <nome>` | uma linha de documentação parecia uma anotação mas não é: um erro de digitação, um marcador com argumento, ou um `@tag` sem nome utilizável |
 
 Uma execução limpa do corpus (o teste Quipu) extrai com **zero** avisos.
 
@@ -149,3 +224,12 @@ Uma execução limpa do corpus (o teste Quipu) extrai com **zero** avisos.
 - Colisões de nome entre módulos são resolvidas por preferência ao mesmo arquivo e
   por dicas de alias (`use path::Event as RecordingEvent`), não por resolução
   completa da árvore de módulos.
+- Documentar um enum de estado não o faz aparecer: uma máquina ainda precisa de
+  pelo menos uma transição extraída para chegar ao modelo.
+- Quando duas declarações compartilham um nome, a documentação vem da que ganha a
+  colisão (a com mais variantes), como todo o resto sobre ela.
+- `#[cfg_attr(…, doc = "…")]` não é seguido, e links intra-doc do rustdoc
+  (`` [`Self::Unavailable`] ``) viajam literalmente — só resolvem no rustdoc.
+- Uma anotação escrita errado é reportada, não corrigida: não há casamento por
+  aproximação, porque adivinhar quase-acertos trocaria uma resposta errada e
+  quieta por outra.

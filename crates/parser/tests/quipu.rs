@@ -141,7 +141,33 @@ fn extracts_quipu_recording_state_machine() {
     }
     assert_eq!(insight_triples.len(), insight_expected.len(), "{insight_triples:#?}");
 
-    // Everything in the corpus is now statically accounted for.
+    // The corpus documents its own states, so the model carries that prose.
+    assert!(
+        insights.doc.as_deref().is_some_and(|doc| !doc.is_empty()),
+        "the InsightStatus enum's own doc comment must reach the machine"
+    );
+    let unsupported = insights
+        .states
+        .iter()
+        .find(|s| s.name == "Unsupported")
+        .expect("Unsupported state not found");
+    let doc = unsupported.doc.as_deref().expect("Unsupported must be documented");
+    assert!(
+        doc.contains("\n\n"),
+        "a multi-paragraph doc comment must keep its paragraph break: {doc:?}"
+    );
+    // Nothing in the corpus declares an annotation, so nothing is marked.
+    assert!(
+        core.machines
+            .iter()
+            .flat_map(|m| &m.states)
+            .all(|s| s.markers.is_empty() && s.tags.is_empty()),
+        "no corpus state declares a marker or tag yet"
+    );
+
+    // Everything in the corpus is now statically accounted for — including
+    // that ordinary documentation (a `@Generable` mid-sentence, in the
+    // InsightStatus docs) never produces an annotation warning.
     assert!(
         outcome.warnings.is_empty(),
         "expected no warnings, got: {:#?}",
