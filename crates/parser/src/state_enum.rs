@@ -10,15 +10,19 @@
 //! # Composite (hierarchical) states
 //!
 //! A variant with exactly one unnamed field whose type is another crate enum
-//! (`State::Active(ActiveState)`) is a composite state: its leaves are
-//! `Active/Loading`, `Active/Ready`, ... — statechart-style nesting encoded
-//! as `/`-separated paths in the contract.
+//! (`State::Active(ActiveState)`) is a composite state — its leaves are
+//! `Active/Loading`, `Active/Ready`, ... statechart-style nesting encoded as
+//! `/`-separated paths — but only when the code shows positive evidence of
+//! treating the child as a sub-state: a nested variant pattern like
+//! `State::Active(ActiveState::Loading)` somewhere in the crate. Without
+//! that evidence the field is payload data (`State::Failed(ErrorCode)`) and
+//! the variant stays a plain leaf.
 
 use std::collections::BTreeSet;
 
 use syn::visit::Visit;
 
-use crate::ast_util::enum_variant_of_expr;
+use crate::ast_util::{as_matches_macro, enum_variant_of_expr, enum_variant_path};
 use crate::index::{CrateIndex, EnumDecl};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,16 +62,28 @@ impl StateMachine {
     }
 }
 
-pub(crate) fn find_state_machines(index: &CrateIndex) -> Vec<StateMachine> {
+/// Machines detected in the crate, plus the set of enums whose variants are
+/// dispatched on in patterns (used to tell nested event enums from payload
+/// data enums).
+pub(crate) struct Detection {
+    pub machines: Vec<StateMachine>,
+    pub dispatched_enums: BTreeSet<String>,
+}
+
+pub(crate) fn find_state_machines(index: &CrateIndex) -> Detection {
     let mut collector = Collector {
         index,
         assigned: BTreeSet::new(),
+        nested_patterns: BTreeSet::new(),
+        dispatched_enums: BTreeSet::new(),
     };
     for fn_info in &index.fns {
         collector.visit_block(fn_info.block);
     }
 
-    collector
+    let nested_patterns = collector.nested_patterns;
+    let dispatched_enums = collector.dispatched_enums;
+    let machines = collector
         .assigned
         .into_iter()
         .map(|(enum_name, field_name)| {
@@ -79,7 +95,7 @@ pub(crate) fn find_state_machines(index: &CrateIndex) -> Vec<StateMachine> {
                 .max_by_key(|decl| decl.variants.len())
                 .cloned();
             let (variants, composites) = decl
-                .map(|decl| expand_leaves(&decl, index))
+                .map(|decl| expand_leaves(&enum_name, &decl, index, &nested_patterns))
                 .unwrap_or_default();
             StateMachine {
                 enum_name,
@@ -88,16 +104,36 @@ pub(crate) fn find_state_machines(index: &CrateIndex) -> Vec<StateMachine> {
                 composites,
             }
         })
-        .collect()
+        .collect();
+
+    Detection {
+        machines,
+        dispatched_enums,
+    }
 }
 
-/// Expands composite variants into `Parent/Child` leaves.
-fn expand_leaves(decl: &EnumDecl, index: &CrateIndex) -> (Vec<String>, Vec<(String, String)>) {
+/// Expands composite variants into `Parent/Child` leaves. A variant is only
+/// composite when a nested variant pattern (`Parent::Variant(Child::X)`)
+/// exists somewhere in the crate — sub-state evidence, mirroring the
+/// assignment-evidence rule for machines themselves.
+fn expand_leaves(
+    enum_name: &str,
+    decl: &EnumDecl,
+    index: &CrateIndex,
+    nested_patterns: &BTreeSet<(String, String, String)>,
+) -> (Vec<String>, Vec<(String, String)>) {
     let mut leaves = Vec::new();
     let mut composites = Vec::new();
 
     for (position, variant) in decl.variants.iter().enumerate() {
-        match composite_child_enum(decl, position, index) {
+        let child = composite_child_enum(decl, position, index).filter(|(child_enum, _)| {
+            nested_patterns.contains(&(
+                enum_name.to_string(),
+                variant.clone(),
+                child_enum.clone(),
+            ))
+        });
+        match child {
             Some((child_enum, child_decl)) => {
                 composites.push((variant.clone(), child_enum));
                 for child in &child_decl.variants {
@@ -134,9 +170,79 @@ struct Collector<'a> {
     index: &'a CrateIndex<'a>,
     /// (enum, field) pairs with assignment evidence.
     assigned: BTreeSet<(String, String)>,
+    /// Nested variant patterns seen anywhere: (parent enum, variant, child enum).
+    nested_patterns: BTreeSet<(String, String, String)>,
+    /// Enums whose variants appear in any pattern.
+    dispatched_enums: BTreeSet<String>,
+}
+
+impl<'a> Collector<'a> {
+    /// Records `Parent::Variant(Child::X ..)` pattern nesting as sub-state
+    /// evidence.
+    fn record_nested_patterns(&mut self, pat: &syn::Pat) {
+        match pat {
+            syn::Pat::TupleStruct(tuple) => {
+                if let Some((parent, variant)) = enum_variant_path(&tuple.path) {
+                    let mut inner = Vec::new();
+                    for element in &tuple.elems {
+                        crate::ast_util::pattern_variants(element, &mut inner);
+                    }
+                    for (child_enum, _) in inner {
+                        self.nested_patterns.insert((parent.clone(), variant.clone(), child_enum));
+                    }
+                }
+                for element in &tuple.elems {
+                    self.record_nested_patterns(element);
+                }
+            }
+            syn::Pat::Or(or) => {
+                for case in &or.cases {
+                    self.record_nested_patterns(case);
+                }
+            }
+            syn::Pat::Ident(ident) => {
+                if let Some((_, subpat)) = &ident.subpat {
+                    self.record_nested_patterns(subpat);
+                }
+            }
+            syn::Pat::Paren(paren) => self.record_nested_patterns(&paren.pat),
+            syn::Pat::Reference(reference) => self.record_nested_patterns(&reference.pat),
+            _ => {}
+        }
+    }
+
+    fn record_dispatched(&mut self, pat: &syn::Pat) {
+        let mut variants = Vec::new();
+        crate::ast_util::pattern_variants(pat, &mut variants);
+        for (enum_name, variant) in variants {
+            if self
+                .index
+                .enum_decls(&enum_name)
+                .iter()
+                .any(|decl| decl.has_variant(&variant))
+            {
+                self.dispatched_enums.insert(enum_name);
+            }
+        }
+    }
 }
 
 impl<'a, 'ast> Visit<'ast> for Collector<'a> {
+    fn visit_pat(&mut self, pat: &'ast syn::Pat) {
+        self.record_nested_patterns(pat);
+        self.record_dispatched(pat);
+        syn::visit::visit_pat(self, pat);
+    }
+
+    fn visit_macro(&mut self, mac: &'ast syn::Macro) {
+        // `matches!` patterns are token soup to the visitor — parse them.
+        if let Some(args) = as_matches_macro(mac) {
+            self.record_nested_patterns(&args.pat);
+            self.record_dispatched(&args.pat);
+        }
+        syn::visit::visit_macro(self, mac);
+    }
+
     fn visit_expr_assign(&mut self, assign: &'ast syn::ExprAssign) {
         // Direct: `*.field = Enum::Variant` (any construction form).
         if let Some(field) = crate::ast_util::last_field_name(&assign.left) {
