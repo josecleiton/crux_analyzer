@@ -140,8 +140,8 @@ coverage src name min="0":
 # the model baked in. `base` is the path the site will be served from —
 # default root, e.g. `just site ../app/src MyApp /crux-docs/` for Pages.
 site src name base="/":
-    just model {{src}} {{name}}
-    CRUX_BASE={{base}} pnpm --filter web build
+    just model "{{src}}" "{{name}}"
+    CRUX_BASE="{{base}}" pnpm --filter web build
     @echo "Static site ready in apps/web/dist (base {{base}}) — serve it over HTTP, not file://"
 
 # Generate docs: just docs path/to/app/src MyApp [markdown|mermaid] [en|pt-BR]
