@@ -57,8 +57,6 @@ export const ptBR: Catalog = {
   'simulation.trail': 'Histórico',
   'simulation.requested': 'solicitou',
   'simulation.mayHave': 'pode ter',
-  'simulation.stepBack': 'voltar até aqui',
-  'simulation.stepForward': 'avançar até aqui',
   'simulation.aheadNote':
     'Passos que o replay deixou para trás. Eles ficam guardados, não dados: disparar o mesmo evento de novo entra neles, e um movimento diferente os substitui.',
   'simulation.nothingFired': 'Nada foi disparado ainda.',

@@ -550,25 +550,6 @@ body {
   font-style: italic;
 }
 
-/* Standing at another point of the run. Quiet until hovered — the trail is a
-   record first and a control second. */
-.trail-goto {
-  float: right;
-  padding: 0 4px;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  background: none;
-  font-family: system-ui, -apple-system, sans-serif;
-  font-size: 10px;
-  color: var(--text-faint);
-  cursor: pointer;
-}
-
-.trail-goto:hover {
-  border-color: var(--sim-border);
-  color: var(--sim-text);
-}
-
 /* The requests a step made, under its states: a quieter third line, so the
    event and the states it moved between stay the headline. */
 .trail-effects {
@@ -587,14 +568,34 @@ body {
 
 .trail-list li {
   counter-increment: trail;
-  padding: 4px 8px;
   margin-bottom: 4px;
-  background: var(--bg-subtle);
-  border-radius: 4px;
-  font-size: 12px;
 }
 
-.trail-list li::before {
+/* The card carries the box, so it can be a <button>: clicking a step stands
+   there. Quiet by default — the trail is a record first and a control second. */
+.trail-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: var(--bg-subtle);
+  font: inherit;
+  font-size: 12px;
+  color: inherit;
+}
+
+button.trail-card {
+  cursor: pointer;
+}
+
+button.trail-card:hover {
+  border-color: var(--sim-border);
+  background: var(--sim-soft);
+}
+
+.trail-card::before {
   content: counter(trail) '. ';
   color: var(--text-faint);
 }

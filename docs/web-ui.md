@@ -222,9 +222,10 @@ Select a state (optional) and hit **Simulate**:
 - the viewport follows the replay: when the state just entered is not fully in
   view, the canvas pans to center it, keeping the zoom untouched — a step that
   lands on screen never moves the canvas;
-- **the trail is where you stand**, not just what happened: every step but the
-  current one offers `back to here` / `forward to here`, and going back does
-  *not* throw away what you had done — the later steps stay listed and inert
+- **the trail is where you stand**, not just what happened: clicking any step but
+  the current one stands there — back for one already taken, forward for one
+  rewound past. The card itself is the control (a real button, so it is reachable
+  by keyboard), and going back does *not* throw away what you had done — the later steps stay listed and inert
   (`ahead`), with a note saying so. Firing the same event again walks into them;
   a different move is what replaces them. Any position is rebuilt by *replaying*
   the recorded run, never from stored snapshots, so the current state, the

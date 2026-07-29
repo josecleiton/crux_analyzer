@@ -136,6 +136,32 @@ export function SimulationPanel({
             // not taken.
             const here = i === simulation.trail.length - 1;
             const ahead = i >= simulation.trail.length;
+            const card = (
+              <>
+                <span className="trail-event">{step.event}</span>
+                <span className="trail-states">
+                  {step.fromName} → {step.toName}
+                </span>
+                {/* What the step asked the shell to do. Names only — the answers
+                    are in the waiting list above and in the inspector — and a
+                    conditional request reads as "may have": the replay does not
+                    evaluate the branch it sits on, so it cannot claim it ran. */}
+                {step.effects.length > 0 ? (
+                  <span className="trail-effects">
+                    {t('simulation.requested')}{' '}
+                    {step.effects.map((effect, index) => (
+                      <span key={effect.name}>
+                        {index > 0 ? ', ' : ''}
+                        {effect.name}
+                        {effect.conditional ? (
+                          <span className="effect-conditional">{t('simulation.mayHave')}</span>
+                        ) : null}
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
+              </>
+            );
             return (
             <li
               key={`${step.transitionId}-${i}`}
@@ -144,36 +170,19 @@ export function SimulationPanel({
                   .filter(Boolean)
                   .join(' ') || undefined
               }
+              aria-current={here ? 'step' : undefined}
             >
-              {/* Every step but the current one is a place to stand: earlier ones
-                  go back, rewound ones go forward again. */}
-              {here ? null : (
-                <button className="trail-goto" onClick={() => onGoToStep(i + 1)}>
-                  {ahead ? t('simulation.stepForward') : t('simulation.stepBack')}
+              {/* The card *is* the control: clicking a step stands there — back
+                  for one already taken, forward for one rewound past. A real
+                  button, so it is reachable by keyboard; where the replay
+                  already stands there is nowhere to go. */}
+              {here ? (
+                <span className="trail-card">{card}</span>
+              ) : (
+                <button className="trail-card" onClick={() => onGoToStep(i + 1)}>
+                  {card}
                 </button>
               )}
-              <span className="trail-event">{step.event}</span>
-              <span className="trail-states">
-                {step.fromName} → {step.toName}
-              </span>
-              {/* What the step asked the shell to do. Names only — the answers
-                  are in the waiting list above and in the inspector — and a
-                  conditional request reads as "may have": the replay does not
-                  evaluate the branch it sits on, so it cannot claim it ran. */}
-              {step.effects.length > 0 ? (
-                <span className="trail-effects">
-                  {t('simulation.requested')}{' '}
-                  {step.effects.map((effect, index) => (
-                    <span key={effect.name}>
-                      {index > 0 ? ', ' : ''}
-                      {effect.name}
-                      {effect.conditional ? (
-                        <span className="effect-conditional">{t('simulation.mayHave')}</span>
-                      ) : null}
-                    </span>
-                  ))}
-                </span>
-              ) : null}
             </li>
             );
           })}
