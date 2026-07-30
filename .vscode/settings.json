@@ -1,0 +1,4 @@
+{
+  "cruxAnalyzer.src": "crates/parser/fixtures/mini_recorder",
+  "cruxAnalyzer.projectName": "Mini Recorder"
+}
