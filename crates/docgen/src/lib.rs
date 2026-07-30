@@ -148,6 +148,7 @@ fn mermaid_label(text: &str) -> String {
         .replace('<', "#60;")
         .replace('>', "#62;")
         .replace("%%", "%\u{200b}%")
+        .replace(':', "#58;")
 }
 
 /// Flattens text to a single line and drops control characters.
@@ -610,7 +611,10 @@ mod tests {
             "{doc}"
         );
         // An undocumented state still has a row, so the table is the state list.
-        assert!(doc.contains("| Orphan | initial, final | — | — | — |"), "{doc}");
+        assert!(
+            doc.contains("| Orphan | initial, final | — | — | — |"),
+            "{doc}"
+        );
     }
 
     #[test]
@@ -628,7 +632,10 @@ mod tests {
         let en = markdown(&project, Locale::En);
         assert!(en.contains("### Events"), "{en}");
         // the whole description survives, unwrapped into the cell
-        assert!(en.contains("| `Play` | Starts playback. Queues the track first. |"), "{en}");
+        assert!(
+            en.contains("| `Play` | Starts playback. Queues the track first. |"),
+            "{en}"
+        );
         assert!(en.contains("### Effects"), "{en}");
         assert!(en.contains("| `Audio::Start` | Begins capture. |"), "{en}");
 
@@ -636,7 +643,10 @@ mod tests {
         let pt = markdown(&project, Locale::PtBr);
         assert!(pt.contains("### Eventos"), "{pt}");
         assert!(pt.contains("### Efeitos"), "{pt}");
-        assert!(pt.contains("| `Play` | Starts playback. Queues the track first. |"), "{pt}");
+        assert!(
+            pt.contains("| `Play` | Starts playback. Queues the track first. |"),
+            "{pt}"
+        );
 
         // the undocumented project emits no catalog at all
         let bare = markdown(&sample(), Locale::En);
@@ -648,7 +658,10 @@ mod tests {
         let doc = markdown(&documented_sample(), Locale::En);
         let description = doc.find("Plays one track at a time.").expect("description");
         assert!(description < doc.find("```mermaid").unwrap(), "{doc}");
-        assert!(description > doc.find("### Machine: PlayerState").unwrap(), "{doc}");
+        assert!(
+            description > doc.find("### Machine: PlayerState").unwrap(),
+            "{doc}"
+        );
     }
 
     /// A cell is one line, so a longer description is repeated in full below
@@ -657,7 +670,10 @@ mod tests {
     fn markdown_restates_a_multi_paragraph_description_in_full() {
         let doc = markdown(&documented_sample(), Locale::En);
         assert!(doc.contains("##### Stopped"), "{doc}");
-        assert!(doc.contains("The track stays loaded, so\nplay resumes it."), "{doc}");
+        assert!(
+            doc.contains("The track stays loaded, so\nplay resumes it."),
+            "{doc}"
+        );
         // The single-paragraph state needs no section of its own.
         assert!(!doc.contains("##### Playing"), "{doc}");
     }
@@ -692,10 +708,12 @@ mod tests {
     #[test]
     fn markdown_escapes_pipes_and_newlines_in_a_description() {
         let mut project = sample();
-        project.cores[0].machines[0].states[1].doc =
-            Some("Either a | or a\nwrapped line.".into());
+        project.cores[0].machines[0].states[1].doc = Some("Either a | or a\nwrapped line.".into());
         let doc = markdown(&project, Locale::En);
-        assert!(doc.contains("| Playing | final | Either a \\| or a wrapped line. |"), "{doc}");
+        assert!(
+            doc.contains("| Playing | final | Either a \\| or a wrapped line. |"),
+            "{doc}"
+        );
     }
 
     /// A cell is prose, not a literal: the same backticks that render as code
@@ -710,7 +728,10 @@ mod tests {
             doc.contains("| Playing | final | `progress` is how far along the bar it is. |"),
             "{doc}"
         );
-        assert!(!doc.contains("\\`"), "backtick escaped into the reader's view: {doc}");
+        assert!(
+            !doc.contains("\\`"),
+            "backtick escaped into the reader's view: {doc}"
+        );
     }
 
     /// A cell is one row: the pipe still has to be escaped inside a code span,
@@ -720,7 +741,10 @@ mod tests {
         let mut project = sample();
         project.cores[0].machines[0].states[1].doc = Some("Either `a | b` or nothing.".into());
         let doc = markdown(&project, Locale::En);
-        assert!(doc.contains("| Playing | final | Either `a \\| b` or nothing. |"), "{doc}");
+        assert!(
+            doc.contains("| Playing | final | Either `a \\| b` or nothing. |"),
+            "{doc}"
+        );
     }
 
     #[test]
@@ -738,7 +762,10 @@ mod tests {
         assert!(doc.contains("Audio is reaching the speakers."), "{doc}");
         assert!(doc.contains("`idle-ish`"), "{doc}");
         assert!(!doc.contains("| State |"), "English label leaked: {doc}");
-        assert!(!doc.contains("deprecated |"), "English marker leaked: {doc}");
+        assert!(
+            !doc.contains("deprecated |"),
+            "English marker leaked: {doc}"
+        );
     }
 
     /// The honesty rule as an assertion: switching locale must not touch a
@@ -783,7 +810,10 @@ mod tests {
         };
         let body = &mermaid_diagrams(&project, Locale::En)[0].mermaid;
         assert!(body.contains("state Active {"), "{body}");
-        assert!(body.contains("state \"Loading\" as Active_Loading"), "{body}");
+        assert!(
+            body.contains("state \"Loading\" as Active_Loading"),
+            "{body}"
+        );
         assert!(body.contains("Idle --> Active_Loading: Start"), "{body}");
     }
 
@@ -799,7 +829,10 @@ mod tests {
         assert!(body.contains("Stopped --> Playing: Play"), "{body}");
         assert!(body.contains("state \"any state\" as any_state"), "{body}");
         assert!(body.contains("any_state --> Stopped: Reset"), "{body}");
-        assert!(body.contains("\n    Orphan"), "orphan state must appear: {body}");
+        assert!(
+            body.contains("\n    Orphan"),
+            "orphan state must appear: {body}"
+        );
     }
 
     #[test]
@@ -809,7 +842,10 @@ mod tests {
         assert!(doc.contains("## Core: Player"), "{doc}");
         assert!(doc.contains("### Machine: PlayerState"), "{doc}");
         assert!(doc.contains("```mermaid\nstateDiagram-v2"), "{doc}");
-        assert!(doc.contains("| Stopped | `Play` | Playing | `Render`, `Audio::Start` |"), "{doc}");
+        assert!(
+            doc.contains("| Stopped | `Play` | Playing | `Render`, `Audio::Start` |"),
+            "{doc}"
+        );
         assert!(doc.contains("| *any* | `Reset` | Stopped | — |"), "{doc}");
     }
 
@@ -819,7 +855,10 @@ mod tests {
         assert!(doc.contains("## Núcleo: Player"), "{doc}");
         assert!(doc.contains("### Máquina: PlayerState"), "{doc}");
         assert!(doc.contains("| De | Evento | Para | Efeitos |"), "{doc}");
-        assert!(doc.contains("| *qualquer* | `Reset` | Stopped | — |"), "{doc}");
+        assert!(
+            doc.contains("| *qualquer* | `Reset` | Stopped | — |"),
+            "{doc}"
+        );
         // The project title and every identifier are data, not prose.
         assert!(doc.contains("# Sample"), "{doc}");
         assert!(
@@ -861,10 +900,15 @@ mod tests {
         // `event / action`, with a conditional request marked as such. The
         // callback events stay out of the diagram.
         assert!(
-            body.contains("Stopped --> Playing: Play / Render, Audio::Start, Http::Report?"),
+            body.contains(
+                "Stopped --> Playing: Play / Render, Audio#58;#58;Start, Http#58;#58;Report?"
+            ),
             "{body}"
         );
-        assert!(!body.contains("Started"), "callbacks belong in the tables: {body}");
+        assert!(
+            !body.contains("Started"),
+            "callbacks belong in the tables: {body}"
+        );
         // A transition that requests nothing keeps a bare event label.
         assert!(body.contains("any_state --> Stopped: Reset"), "{body}");
     }
@@ -921,7 +965,10 @@ mod tests {
     #[test]
     fn mermaid_localizes_the_wildcard_label_but_not_its_node_id() {
         let body = &mermaid_diagrams(&sample(), Locale::PtBr)[0].mermaid;
-        assert!(body.contains("state \"qualquer estado\" as any_state"), "{body}");
+        assert!(
+            body.contains("state \"qualquer estado\" as any_state"),
+            "{body}"
+        );
         // The id is diagram syntax: the transition line must still resolve.
         assert!(body.contains("any_state --> Stopped: Reset"), "{body}");
         assert!(body.starts_with("stateDiagram-v2"), "{body}");
