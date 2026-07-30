@@ -378,7 +378,7 @@ primeiro, como as etiquetas quiseram.
 
 ---
 
-## 6. Máquinas atribuídas só por value flow — a primeira lacuna real de parsing que a adoção encontrou
+## 6. Máquinas atribuídas só por value flow — detecção feita, aliasing de origem aberto
 
 Encontrada rodando contra um app alvo, e reproduzível só pela forma. Dois enums de
 status de forma deliberadamente idêntica, ambos guardados por entidade em uma
@@ -420,10 +420,11 @@ partir do tipo associado `Model`**: mirror enums são construídos dentro de str
 de view, nunca guardados pelo model, então a alcançabilidade os separa sem
 heurística de nome e sem enfraquecer a regra da honestidade.
 
-Dois pré-requisitos, ambos descobertos ao dimensionar isso, e ambos maiores que a
-mudança de detecção em si:
+Dois pré-requisitos, ambos descobertos ao dimensionar isso e ambos maiores que a
+mudança de detecção em si. Os dois já estão feitos; ficam registrados aqui porque
+cada um codifica uma distinção que um refactor posterior achataria com facilidade:
 
-- **Tipos de campo de struct são registrados sem atravessar coleções.** O índice
+- **Tipos de campo de struct eram registrados sem atravessar coleções.** O índice
   guarda o tipo de um campo como o último segmento do caminho, então
   `items: Vec<Entry>` é indexado como `("items", "Vec")` e uma travessia de
   alcançabilidade quebra no `Vec` — que é exatamente onde vive um status por
@@ -436,19 +437,61 @@ mudança de detecção em si:
   que `default()` em um campo `Option<E>` dá `None` e não uma variante de `E` —
   desempacotar ali inventaria uma atribuição. Então um campo carrega os dois tipos:
   declarado (rege os resets) e alcançável (rege a travessia).
-- **O tipo associado `Model` nunca é resolvido.** O core finder lê os tipos
-  associados `Event` e `Effect` e ignora `Model`. Barato — o helper
-  `associated_type` que já existe cobre — mas hoje não existe.
+- **O tipo associado `Model` nunca era resolvido.** O core finder lia os tipos
+  associados `Event` e `Effect` e ignorava `Model`. Barato — o helper
+  `associated_type` que já existia cobria — mas nada tinha precisado dele antes.
 
-### Entregar o warning primeiro
+Também adicionado no caminho: um limite de profundidade nos dois walkers de tipo.
+Argumentos genéricos aninham sem limite e o pré-check de brackets do loader conta
+`(`, `[` e `{`, nunca `<`, então um `Box<Box<…>>` fundo o bastante estouraria a
+pilha. O desempacotador `Box`/`Rc`/`Arc` que já existia tinha a mesma exposição.
 
-O diagnóstico é separável do alargamento e vale por si: um `WarningKind` novo
-(`untracked-state-enum`) para um enum de crate cujas variantes são despachadas e que
-tipa um campo alcançável pelo model, mas que não tem evidência de atribuição.
-Precisa do mesmo pré-requisito de resolver o `Model`, não precisa de desempacotar
-coleções, e transforma silêncio em um fato visível e sujeito a `--deny-warnings`. As
-duas metades precisam de entradas nos catálogos de locale `en` + `pt-BR` e de uma
-adição à referência de warnings no [parser.md](parser.md).
+### O que entrou ✅
+
+Os dois pré-requisitos e o alargamento em si, mais o fixture versionado
+`value_flow_status` que a seção acima pedia. A regra de evidência está no
+[parser.md](parser.md#detecção-de-máquinas); nenhum `WarningKind` novo foi
+necessário, então os catálogos de locale ficaram intactos.
+
+Duas coisas saíram diferentes do planejado. O diagnóstico `untracked-state-enum`
+nunca foi escrito: com a detecção alargada não existe mais uma ausência silenciosa
+para reportar, e inventar um warning para um enum que o parser agora extrai seria
+ruído. E um silêncio *diferente* apareceu no lugar dele, que é sobre o que trata o
+resto desta seção.
+
+### Ainda aberto: constraints de origem fazem aliasing de campos homônimos
+
+Alargar a detecção expôs uma segunda lacuna, pré-existente e pior que a primeira
+porque ela derruba uma transição de uma máquina que o leitor *vê*. A evidência de
+origem é chaveada por nome de campo; o espelho de valor que resolve alvos é
+chaveado por caminho exato. Então um guard em `other.status` restringe uma máquina
+em `field: status` mesmo quando `other` é outro registro. Em uma escrita de
+carry-over os dois conjuntos então se intersectam em nada:
+
+```rust
+if this.status == Pending && matches!(other.status, Done | Deferred) {
+    this.status = other.status.clone();   // {Pending} ∩ {Done, Deferred} = ∅
+}
+```
+
+Um conjunto de origem vazio fazia o laço de emissão iterar zero vezes — nenhuma
+transição, nenhum warning. Isso agora é reportado como `unresolvable-source`, que é
+o paliativo honesto e não a correção: a transição é real e sua origem *é*
+derivável.
+
+A correção é fazer a avaliação de origem ciente de caminho, como o espelho de valor
+já é. O que faz disso mais que uma linha: chavear por nome de campo é estrutural,
+porque `model.session.state` e um `session.state` local são o mesmo objeto alcançado
+de dois jeitos, e só a chave grosseira enxerga isso. Então a discriminação tem que
+ser no *receiver* — um guard cujo receiver é um binding diferente do receiver da
+atribuição não é evidência sobre o objeto atribuído — e receivers não estão
+disponíveis onde as condições são registradas hoje, só onde a atribuição é tratada.
+Isso é um refactor pequeno do `Ctx`, não um patch.
+
+Até isso entrar, `parse_project` sobre um app real reporta esses warnings em vez de
+extrair limpo, então o `--deny-warnings` ainda não pode ser apontado para um.
+O `crates/parser/tests/value_flow_status.rs` fixa o comportamento atual, incluindo
+o warning — aquele teste é feito para mudar quando a correção chegar.
 
 **A outra metade daquela investigação, e explicitamente não é trabalho de parser.**
 O mesmo app documentava uma segunda máquina que o analyzer também não pegou — mas

@@ -30,12 +30,30 @@ is derived from the `syn` AST.
 
 A state machine is a pair `(enum, field)` with **assignment evidence**:
 
-- direct: `*.field = Enum::Variant` (any construction form), or
-- via reset: `*.x = T::default()` where struct `T` has a field `field: Enum`.
+- direct: `*.field = Enum::Variant` (any construction form),
+- via reset: `*.x = T::default()` where struct `T` has a field `field: Enum`, or
+- via **value flow into a model-reachable field**: `*.field = <runtime value>`,
+  where the `Model` associated type reaches a field of that name typed as an
+  enum the crate dispatches on in patterns.
 
 No naming convention is required. Assignment is the discriminating signal:
 ViewModel mirror enums are only ever *constructed* into view structs, never
 assigned to a model field, so they never become machines.
+
+The third form exists because which side owns a transition decides how the core
+writes it. A status the *shell* drives is only ever stored by the core — from an
+event payload, or cloned from another record — so it never names its enum at the
+assignment, and the first two forms miss it entirely. Model reachability is what
+supplies the missing type: the walk starts at the `Model` associated type and
+follows struct fields through the containers that hold them (`Vec<Entry>` →
+`Entry`, maps through their value type), so a status held once per entity still
+counts. A mirror enum is not reachable, so requiring reachability keeps the
+original exclusion intact without a naming heuristic.
+
+Two limits worth naming. Only struct fields are followed, so a struct sitting
+behind an enum variant is not reached. And reachability is an *additional* path,
+not a filter on the first two: an enum assigned literally still becomes a machine
+whether or not the model holds it.
 
 The same enum may drive several machines through different fields (two
 sessions of the same type); transitions are attributed by `(enum, field)` and
@@ -85,6 +103,16 @@ Conditions compose through `&&` (intersection), `||` (union of concrete
 sides), `!` (complement). A concrete constraint wins over an unresolvable
 conjunct — the emitted set may then be a superset of the truth, which is the
 right bias for documentation.
+
+**Source evidence is keyed by field name, not by object.** A guard on
+`other.status` therefore constrains a machine on `field: status` even when
+`other` is a *different* record of the same type — the value mirror used for
+targets is keyed by exact path, but this one is not. Where such a guard is
+conjoined with one on the record being written (`this.status == Pending &&
+matches!(other.status, Done | Deferred)`), the two sets intersect to nothing.
+That contradiction cannot describe a real branch, so rather than dropping the
+transition in silence it is reported as `unresolvable-source`. Resolving the
+aliasing is planned — [roadmap.md §6](roadmap.md).
 
 ## Targets (`to`) and value-flow
 
@@ -279,13 +307,16 @@ localized ([i18n.md](i18n.md)). The English rendering is shown below.
 | Code | Message (`en`) | Meaning |
 | --- | --- | --- |
 | `unknown-event` | `could not infer the triggering event` | a state assignment was reached with no event label in scope (e.g. under a catch-all arm with unknown context) |
-| `unresolvable-source` | `source-state condition could not be resolved statically` | the guard references the state but defeats analysis (e.g. an unresolvable predicate) |
+| `unresolvable-source` | `source-state condition could not be resolved statically` | the guard references the state but defeats analysis: an unresolvable predicate, or guards that intersect to nothing because two objects' same-named fields were read as one (see below) |
 | `dynamic-target` | `target state is dynamic (assigned from a runtime value)` | the assigned value has no payload typing and no resolvable constraints |
 | `no-update-method` | `core X: no update method found` | an `impl App` block without an `update` fn |
 | `unknown-annotation` | `unrecognized annotation X: not one of @failure, @deprecated, @tag <name>` | a doc line looked like an annotation but is not one: a typo, a marker given an argument, or a `@tag` with no usable name |
 | `unresolved-effect-callback` | `effect callback not resolved: the event this request is answered with is not named at the call site` | a `then_send` whose argument builds no event (a function, or a value computed elsewhere). The request is recorded; its answer is not |
 
-A clean run against a real target app extracts with **zero** warnings.
+The `mini_recorder` fixture extracts with **zero** warnings, which `just check`
+enforces with `--deny-warnings`. A real target app currently reports the
+field-name aliasing described under [Source states](#source-states-from); that is
+a known gap with a planned fix, not a property of the app.
 
 ### Resource warnings
 

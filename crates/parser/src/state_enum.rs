@@ -86,6 +86,7 @@ pub(crate) fn find_state_machines(index: &CrateIndex) -> Detection {
     let mut collector = Collector {
         index,
         assigned: BTreeSet::new(),
+        value_flow_fields: BTreeSet::new(),
         nested_patterns: BTreeSet::new(),
         dispatched_enums: BTreeSet::new(),
     };
@@ -95,8 +96,21 @@ pub(crate) fn find_state_machines(index: &CrateIndex) -> Detection {
 
     let nested_patterns = collector.nested_patterns;
     let dispatched_enums = collector.dispatched_enums;
-    let machines = collector
-        .assigned
+    let value_flow_fields = collector.value_flow_fields;
+    let mut assigned = collector.assigned;
+
+    // Value-flow evidence. A field written from an event payload or cloned from
+    // another field never names its enum at the assignment, so the field name
+    // alone is not evidence — it becomes evidence when the `Model` holds a
+    // field of that name typed as an enum the crate dispatches on. See
+    // `docs/roadmap.md` §6.
+    for (enum_name, field_name) in model_reachable_enum_fields(index) {
+        if value_flow_fields.contains(&field_name) && dispatched_enums.contains(&enum_name) {
+            assigned.insert((enum_name, field_name));
+        }
+    }
+
+    let machines = assigned
         .into_iter()
         .map(|(enum_name, field_name)| {
             // With colliding names, prefer the declaration with most
@@ -127,6 +141,46 @@ pub(crate) fn find_state_machines(index: &CrateIndex) -> Detection {
         machines,
         dispatched_enums,
     }
+}
+
+/// `(enum, field)` pairs for every enum-typed field reachable from a Core's
+/// `Model` associated type, following struct fields through the containers that
+/// hold them (`Vec<Entry>` → `Entry`, so a status held per entity counts).
+///
+/// This is what makes value-flow assignment safe to accept as evidence.
+/// ViewModel mirror enums are *constructed* into view structs and never held by
+/// the model, so they are not reachable and stay out — the same exclusion the
+/// literal-assignment rule achieves, without a naming heuristic.
+///
+/// Only struct fields are followed. A struct sitting behind an enum variant is
+/// not reached, which is the next widening if a real application wants it. The
+/// walk needs no depth cap: `visited` admits each type once and the type graph
+/// is finite, so a cyclic model terminates.
+fn model_reachable_enum_fields(index: &CrateIndex) -> BTreeSet<(String, String)> {
+    let mut found = BTreeSet::new();
+    let mut visited = BTreeSet::new();
+    let mut queue: Vec<String> = index
+        .trait_impls
+        .iter()
+        .filter(|imp| imp.trait_name == "App")
+        .filter_map(|imp| crate::core_finder::associated_type(imp.item, "Model"))
+        .collect();
+
+    while let Some(type_name) = queue.pop() {
+        if !visited.insert(type_name.clone()) {
+            continue;
+        }
+        let Some(strct) = index.structs.get(&type_name) else {
+            continue;
+        };
+        for field in &strct.fields {
+            if !index.enum_decls(&field.reachable).is_empty() {
+                found.insert((field.reachable.clone(), field.name.clone()));
+            }
+            queue.push(field.reachable.clone());
+        }
+    }
+    found
 }
 
 /// The leaves of a state enum: their names, the documentation authored on
@@ -206,8 +260,12 @@ fn composite_child_enum(
 
 struct Collector<'a> {
     index: &'a CrateIndex<'a>,
-    /// (enum, field) pairs with assignment evidence.
+    /// (enum, field) pairs with literal assignment evidence.
     assigned: BTreeSet<(String, String)>,
+    /// Field names assigned from something other than a recognized variant
+    /// path — an event payload, a `.clone()` of another field. Half-evidence:
+    /// the type is missing, and model reachability supplies it.
+    value_flow_fields: BTreeSet<String>,
     /// Nested variant patterns seen anywhere: (parent enum, variant, child enum).
     nested_patterns: BTreeSet<(String, String, String)>,
     /// Enums whose variants appear in any pattern.
@@ -282,16 +340,25 @@ impl<'a, 'ast> Visit<'ast> for Collector<'a> {
     }
 
     fn visit_expr_assign(&mut self, assign: &'ast syn::ExprAssign) {
-        // Direct: `*.field = Enum::Variant` (any construction form).
         if let Some(field) = crate::ast_util::last_field_name(&assign.left) {
-            if let Some((enum_name, variant)) = enum_variant_of_expr(&assign.right) {
-                if self
-                    .index
-                    .enum_decls(&enum_name)
-                    .iter()
-                    .any(|decl| decl.has_variant(&variant))
-                {
+            // Direct: `*.field = Enum::Variant` (any construction form).
+            let literal = enum_variant_of_expr(&assign.right)
+                .filter(|(enum_name, variant)| {
+                    self.index
+                        .enum_decls(enum_name)
+                        .iter()
+                        .any(|decl| decl.has_variant(variant))
+                })
+                .map(|(enum_name, _)| enum_name);
+            match literal {
+                Some(enum_name) => {
                     self.assigned.insert((enum_name, field));
+                }
+                // Everything else assigned into a field: a payload binding, a
+                // clone of another field, a call result. Resolved against the
+                // model in `find_state_machines`.
+                None => {
+                    self.value_flow_fields.insert(field);
                 }
             }
         }
@@ -299,9 +366,12 @@ impl<'a, 'ast> Visit<'ast> for Collector<'a> {
         // Reset: `*.x = T::default()` assigns every enum-typed field of `T`.
         if let Some(type_name) = default_call_type(&assign.right) {
             if let Some(strct) = self.index.structs.get(&type_name) {
-                for (field_name, field_type) in &strct.fields {
-                    if !self.index.enum_decls(field_type).is_empty() {
-                        self.assigned.insert((field_type.clone(), field_name.clone()));
+                for field in &strct.fields {
+                    // The declared type, not the reachable one: `default()` on
+                    // an `Option<E>` field is `None`, not a variant of `E`.
+                    if !self.index.enum_decls(&field.declared).is_empty() {
+                        self.assigned
+                            .insert((field.declared.clone(), field.name.clone()));
                     }
                 }
             }

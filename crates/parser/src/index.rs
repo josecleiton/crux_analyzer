@@ -54,10 +54,26 @@ impl EnumDecl {
     }
 }
 
-/// A struct declaration: named fields as `(name, last-segment type)`.
+/// A named field of a struct, carrying two readings of its type because two
+/// analyses need different ones.
+#[derive(Debug, Clone)]
+pub(crate) struct StructField {
+    pub name: String,
+    /// The last path segment as written: `Vec` for `Vec<Draft>`, `Option` for
+    /// `Option<E>`. What a `T::default()` reset actually assigns, and so the
+    /// only sound reading there — `default()` on an `Option<E>` field yields
+    /// `None`, not a variant of `E`, and unwrapping would invent a transition.
+    pub declared: String,
+    /// The type looked through collections and smart pointers: `Draft` for
+    /// `Vec<Draft>`. What model reachability follows, so that state held
+    /// per-entity inside a collection the model owns is still reachable.
+    pub reachable: String,
+}
+
+/// A struct declaration: its named fields, in declaration order.
 #[derive(Debug, Clone)]
 pub(crate) struct StructDecl {
-    pub fields: Vec<(String, String)>,
+    pub fields: Vec<StructField>,
 }
 
 impl EnumDecl {
@@ -183,12 +199,17 @@ fn index_items<'a>(
                             .iter()
                             .filter_map(|field| {
                                 let name = field.ident.as_ref()?.to_string();
-                                let ty = if let syn::Type::Path(p) = &field.ty {
-                                    p.path.segments.last()?.ident.to_string()
-                                } else {
+                                let syn::Type::Path(path) = &field.ty else {
                                     return None;
                                 };
-                                Some((name, ty))
+                                let declared =
+                                    path.path.segments.last()?.ident.to_string();
+                                Some(StructField {
+                                    name,
+                                    reachable: reachable_type_name(&field.ty, 0)
+                                        .unwrap_or_else(|| declared.clone()),
+                                    declared,
+                                })
                             })
                             .collect(),
                     },
@@ -321,7 +342,22 @@ fn variant_fields(fields: &syn::Fields) -> Vec<VariantField> {
         .collect()
 }
 
+/// Generic arguments nest without limit — `Box<Box<Box<…>>>` is valid Rust —
+/// and both type walkers below follow that nesting, so hostile input would
+/// recurse until the stack ran out. The loader's bracket pre-check does not
+/// help here: it counts `(`, `[` and `{`, never `<`. Past the cap the type
+/// simply yields no name, which both callers already handle. See
+/// `docs/security.md`.
+const MAX_TYPE_DEPTH: usize = 64;
+
 fn unwrapped_type_name(ty: &syn::Type) -> Option<String> {
+    unwrapped_type_name_at(ty, 0)
+}
+
+fn unwrapped_type_name_at(ty: &syn::Type, depth: usize) -> Option<String> {
+    if depth >= MAX_TYPE_DEPTH {
+        return None;
+    }
     let syn::Type::Path(type_path) = ty else { return None };
     let segment = type_path.path.segments.last()?;
     match &segment.arguments {
@@ -334,10 +370,49 @@ fn unwrapped_type_name(ty: &syn::Type) -> Option<String> {
             else {
                 return None;
             };
-            unwrapped_type_name(inner)
+            unwrapped_type_name_at(inner, depth + 1)
         }
         _ => None,
     }
+}
+
+/// The type a struct field ultimately holds, looking through the containers
+/// that state can sit inside: smart pointers, interior mutability, `Option`,
+/// and the collections a model uses to hold one entry per entity. Maps yield
+/// their *value* type — a key is not where state lives.
+///
+/// Deliberately separate from [`unwrapped_type_name`] rather than a widening of
+/// it: that one also feeds composite-state detection, where looking through a
+/// `Vec` would change what can be read as a sub-state.
+fn reachable_type_name(ty: &syn::Type, depth: usize) -> Option<String> {
+    if depth >= MAX_TYPE_DEPTH {
+        return None;
+    }
+    let syn::Type::Path(type_path) = ty else { return None };
+    let segment = type_path.path.segments.last()?;
+    let args = match &segment.arguments {
+        syn::PathArguments::None => return Some(segment.ident.to_string()),
+        syn::PathArguments::AngleBracketed(args) => args,
+        syn::PathArguments::Parenthesized(_) => return None,
+    };
+    let types: Vec<&syn::Type> = args
+        .args
+        .iter()
+        .filter_map(|arg| match arg {
+            syn::GenericArgument::Type(ty) => Some(ty),
+            _ => None,
+        })
+        .collect();
+    let inner = match (segment.ident.to_string().as_str(), types.as_slice()) {
+        (
+            "Box" | "Rc" | "Arc" | "RefCell" | "Cell" | "Mutex" | "RwLock" | "Option" | "Vec"
+            | "VecDeque" | "BTreeSet" | "HashSet",
+            [inner],
+        ) => *inner,
+        ("HashMap" | "BTreeMap", [_key, value]) => *value,
+        _ => return None,
+    };
+    reachable_type_name(inner, depth + 1)
 }
 
 /// Parameter binding names of a function signature.

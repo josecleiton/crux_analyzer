@@ -90,7 +90,7 @@ pub(crate) fn find_cores(
 }
 
 /// Resolves `type <name> = X;` inside the impl block to the ident `X`.
-fn associated_type(item: &syn::ItemImpl, name: &str) -> Option<String> {
+pub(crate) fn associated_type(item: &syn::ItemImpl, name: &str) -> Option<String> {
     item.items.iter().find_map(|impl_item| {
         if let syn::ImplItem::Type(assoc) = impl_item {
             if assoc.ident == name {

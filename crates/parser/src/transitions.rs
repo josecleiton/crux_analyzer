@@ -158,7 +158,7 @@ struct Ctx<'a> {
     facts: Vec<(String, String, Vec<String>)>,
     /// Bindings introduced by the current event arm's pattern:
     /// binding name → payload type (`Event::Updated { status }` → status:
-    /// InsightStatus). Valid within the arm body only.
+    /// JobStatus). Valid within the arm body only.
     payload_bindings: HashMap<String, String>,
     /// The event arm this code belongs to — transitions and effects found
     /// under the same arm are associated with each other.
@@ -663,7 +663,7 @@ impl<'w, 'a> Walker<'w, 'a> {
     }
 
     /// Bindings introduced by an event-arm pattern, with their payload types:
-    /// `Event::Updated { id, status }` → `{id: String, status: InsightStatus}`;
+    /// `Event::Updated { id, status }` → `{id: String, status: JobStatus}`;
     /// `Event::Sync(state)` → `{state: State}` (positional).
     fn payload_bindings(&self, pat: &syn::Pat) -> HashMap<String, String> {
         let mut bindings = HashMap::new();
@@ -1599,10 +1599,9 @@ impl<'w, 'a> Walker<'w, 'a> {
             .machines
             .iter()
             .filter(|machine| {
-                strct
-                    .fields
-                    .iter()
-                    .any(|(name, ty)| *name == machine.field_name && *ty == machine.enum_name)
+                strct.fields.iter().any(|field| {
+                    field.name == machine.field_name && field.declared == machine.enum_name
+                })
             })
             .filter_map(|machine| {
                 let default = self
@@ -1642,6 +1641,20 @@ impl<'w, 'a> Walker<'w, 'a> {
                 for event in events {
                     self.push(machine, ANY_STATE.to_string(), event.clone(), to.clone(), ctx);
                 }
+            }
+            // Contradictory constraints: the conditions in force intersect to
+            // nothing, so no state satisfies them all. Real code does not write
+            // an unreachable assignment — what it usually means is that two
+            // *different* objects' same-named fields were read as one, because
+            // source constraints are keyed by field name while the value
+            // mirror is keyed by exact path. The assignment is real either way,
+            // so it must not vanish silently. See `docs/roadmap.md` §6.
+            GuardEval::Known(from_states) if from_states.is_empty() => {
+                self.warnings.push(Warning {
+                    file: file.to_path_buf(),
+                    line,
+                    kind: WarningKind::UnresolvableSource { to: to.clone() },
+                });
             }
             GuardEval::Known(from_states) => {
                 for event in events {

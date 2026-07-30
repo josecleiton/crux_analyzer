@@ -30,13 +30,31 @@ Crux — tudo é derivado da AST do `syn`.
 
 Uma máquina de estado é um par `(enum, campo)` com **evidência de atribuição**:
 
-- direta: `*.campo = Enum::Variante` (qualquer forma de construção), ou
-- via reset: `*.x = T::default()` onde a struct `T` tem um campo `campo: Enum`.
+- direta: `*.campo = Enum::Variante` (qualquer forma de construção),
+- via reset: `*.x = T::default()` onde a struct `T` tem um campo `campo: Enum`, ou
+- via **value flow em um campo alcançável pelo model**: `*.campo = <valor de
+  runtime>`, onde o tipo associado `Model` alcança um campo com aquele nome tipado
+  como um enum que o crate despacha em padrões.
 
 Nenhuma convenção de nomenclatura é exigida. A atribuição é o sinal
 discriminante: enums espelho de ViewModel são apenas *construídos* dentro de
 structs de visão, nunca atribuídos a um campo do modelo, então nunca se tornam
 máquinas.
+
+A terceira forma existe porque qual lado é dono de uma transição decide como o core
+a escreve. Um status que a *shell* dirige só é armazenado pelo core — de um payload
+de evento, ou clonado de outro registro — então ele nunca nomeia seu enum na
+atribuição, e as duas primeiras formas o perdem por completo. A alcançabilidade pelo
+model é o que fornece o tipo que falta: a travessia começa no tipo associado `Model`
+e segue campos de struct através dos containers que os guardam (`Vec<Entry>` →
+`Entry`, mapas pelo tipo de valor), então um status guardado uma vez por entidade
+ainda conta. Um enum espelho não é alcançável, então exigir alcançabilidade mantém a
+exclusão original intacta sem heurística de nome.
+
+Dois limites que vale nomear. Só campos de struct são seguidos, então uma struct
+atrás de uma variante de enum não é alcançada. E a alcançabilidade é um caminho
+*adicional*, não um filtro sobre as duas primeiras: um enum atribuído literalmente
+continua virando máquina, o model o guardando ou não.
 
 O mesmo enum pode dirigir várias máquinas através de campos diferentes (duas
 sessões do mesmo tipo); transições são atribuídas por `(enum, campo)` e os nomes
@@ -87,6 +105,16 @@ Condições compõem por `&&` (interseção), `||` (união dos lados concretos) 
 (complemento). Uma restrição concreta vence um conjunto irresolvível — o conjunto
 emitido pode então ser um superconjunto da verdade, que é o viés correto para
 documentação.
+
+**A evidência de origem é chaveada por nome de campo, não por objeto.** Um guard em
+`other.status` portanto restringe uma máquina em `campo: status` mesmo quando
+`other` é um registro *diferente* do mesmo tipo — o espelho de valor usado para
+destinos é chaveado por caminho exato, este não. Onde um guard desses é conjugado
+com outro sobre o registro que está sendo escrito (`this.status == Pending &&
+matches!(other.status, Done | Deferred)`), os dois conjuntos se intersectam em nada.
+Essa contradição não pode descrever um branch real, então em vez de derrubar a
+transição em silêncio ela é reportada como `unresolvable-source`. Resolver o
+aliasing está planejado — [roadmap.md §6](roadmap.md).
 
 ## Destinos (`to`) e fluxo de valores
 
@@ -284,13 +312,16 @@ baseie ferramentas e documentação nele, já que o texto da mensagem é localiz
 | Código | Mensagem (`pt-BR`) | Significado |
 | --- | --- | --- |
 | `unknown-event` | `não foi possível inferir o evento que a dispara` | uma atribuição de estado foi alcançada sem rótulo de evento em escopo (por exemplo, sob um braço catch-all com contexto desconhecido) |
-| `unresolvable-source` | `a condição do estado de origem não pôde ser resolvida estaticamente` | a guarda referencia o estado mas derrota a análise (por exemplo, um predicado irresolvível) |
+| `unresolvable-source` | `a condição do estado de origem não pôde ser resolvida estaticamente` | a guarda referencia o estado mas derrota a análise: um predicado irresolvível, ou guardas que se intersectam em nada porque campos homônimos de dois objetos foram lidos como um (veja acima) |
 | `dynamic-target` | `o estado de destino é dinâmico (atribuído a partir de um valor definido em tempo de execução)` | o valor atribuído não tem tipagem de payload nem restrições resolvíveis |
 | `no-update-method` | `núcleo X: método update não encontrado` | um bloco `impl App` sem função `update` |
 | `unknown-annotation` | `anotação X não reconhecida: não é @failure, @deprecated nem @tag <nome>` | uma linha de documentação parecia uma anotação mas não é: um erro de digitação, um marcador com argumento, ou um `@tag` sem nome utilizável |
 | `unresolved-effect-callback` | `callback de efeito não resolvido: o evento que responde a esta solicitação não é nomeado no local da chamada` | um `then_send` cujo argumento não constrói evento algum (uma função, ou um valor calculado em outro lugar). A solicitação é registrada; a resposta dela, não |
 
-Uma execução limpa contra uma aplicação alvo real extrai com **zero** avisos.
+O fixture `mini_recorder` extrai com **zero** avisos, o que o `just check` garante
+com `--deny-warnings`. Uma aplicação alvo real hoje reporta o aliasing por nome de
+campo descrito em [Estados de origem](#estados-de-origem-from); isso é uma lacuna
+conhecida com correção planejada, não uma propriedade da aplicação.
 
 ### Avisos de recursos
 

@@ -365,7 +365,7 @@ adoption first, like tags got.
 
 ---
 
-## 6. Value-flow-only state machines — the first real parsing gap adoption found
+## 6. Value-flow-only state machines — detection done, source aliasing open
 
 Found by running against a target app, and reproducible from the shape alone. Two
 status enums of deliberately identical shape, both held per-entity in a
@@ -407,10 +407,11 @@ associated type**: mirror enums are constructed into view structs, never held by
 the model, so reachability separates them without a naming heuristic and without
 weakening the honesty rule.
 
-Two prerequisites, both discovered while sizing this, and both larger than the
-detection change itself:
+Two prerequisites, both discovered while sizing this and both larger than the
+detection change itself. Both are now done; kept here because each encodes a
+distinction that a later refactor could easily flatten back:
 
-- **Struct field types are recorded without looking through collections.** The
+- **Struct field types were recorded without looking through collections.** The
   index stores a field's type as the last path segment, so `items: Vec<Entry>`
   indexes as `("items", "Vec")` and a reachability walk breaks at the `Vec` —
   which is exactly where a per-entity status lives (`Model` → … → some substate
@@ -423,19 +424,60 @@ detection change itself:
   than any variant of `E` — unwrapping there would invent an assignment. So a
   field carries both types: declared (drives resets) and reachable (drives the
   walk).
-- **The `Model` associated type is never resolved.** The core finder reads the
-  `Event` and `Effect` associated types and ignores `Model`. Cheap — the existing
-  `associated_type` helper covers it — but it does not exist today.
+- **The `Model` associated type was never resolved.** The core finder read the
+  `Event` and `Effect` associated types and ignored `Model`. Cheap — the existing
+  `associated_type` helper covered it — but nothing had needed it before.
 
-### Ship the warning first
+Also added while here: a depth cap on both type walkers. Generic arguments nest
+without limit and the loader's bracket pre-check counts `(`, `[` and `{` but
+never `<`, so `Box<Box<…>>` deep enough would have overflowed the stack. The
+pre-existing `Box`/`Rc`/`Arc` unwrapper had the same exposure.
 
-The diagnostic is separable from the widening and worth having on its own: a new
-`WarningKind` (`untracked-state-enum`) for a crate enum whose variants are
-dispatched on and which types a model-reachable field, but which has no
-assignment evidence. It needs the same `Model`-resolution prerequisite, no
-collection unwrapping, and it turns silence into a visible, `--deny-warnings`-able
-fact. Both halves need locale catalog entries in `en` + `pt-BR` and an addition to
-the warnings reference in [parser.md](parser.md).
+### What landed ✅
+
+Both prerequisites and the widening itself, plus the tracked
+`value_flow_status` fixture the section above asked for. The evidence rule is in
+[parser.md](parser.md#machine-detection); no new `WarningKind` was needed, so the
+locale catalogs are untouched.
+
+Two things came out differently than planned. The `untracked-state-enum`
+diagnostic was never written: with detection widened there is no longer a silent
+absence to report, and inventing a warning for an enum the parser now extracts
+would be noise. And a *different* silent drop turned up in its place, which is
+what the rest of this section is now about.
+
+### Still open: source constraints alias same-named fields
+
+Widening detection exposed a second gap, pre-existing and worse than the first
+because it drops a transition from a machine the reader can *see*. Source
+evidence is keyed by field name; the value mirror that resolves targets is keyed
+by exact path. So a guard on `other.status` constrains a machine on
+`field: status` even when `other` is a different record. In a carry-over write the
+two conjuncts then intersect to nothing:
+
+```rust
+if this.status == Pending && matches!(other.status, Done | Deferred) {
+    this.status = other.status.clone();   // {Pending} ∩ {Done, Deferred} = ∅
+}
+```
+
+An empty source set made the emit loop iterate zero times — no transition, no
+warning. That is now reported as `unresolvable-source`, which is the honest
+stopgap and not the fix: the transition is real and its source *is* derivable.
+
+The fix is to make source evaluation path-aware, as the value mirror already is.
+What makes it more than a one-liner: field-name keying is load-bearing, because
+`model.session.state` and a local `session.state` are the same object reached two
+ways, and only the coarse key sees that. So the discrimination has to be on the
+*receiver* — a guard whose receiver is a different binding from the assignment's
+receiver is not evidence about the assigned object — and receivers are not
+available where conditions are recorded today, only where the assignment is
+handled. That is a small refactor of `Ctx`, not a patch.
+
+Until it lands, `parse_project` over a real app reports these warnings rather
+than extracting cleanly, so `--deny-warnings` cannot be pointed at one yet.
+`crates/parser/tests/value_flow_status.rs` pins the current behaviour, including
+the warning — that test is meant to change when the fix lands.
 
 **The other half of that investigation, and explicitly not parser work.** The same
 app documented a second machine that the analyzer also missed — but there the code
