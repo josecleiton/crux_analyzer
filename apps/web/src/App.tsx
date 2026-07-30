@@ -3,7 +3,6 @@ import { loadProject } from './data/loadProject';
 import type { DomainProject } from './domain/types';
 import { machineOf } from './domain/fromParserJson';
 import { declaredTags, focusFor } from './domain/focus';
-import { stateRole } from './domain/stateRole';
 import { toFlowModel } from './flow/toFlowModel';
 import type { LayoutEngine, LayoutResult } from './layout/LayoutEngine';
 import { ElkLayoutEngine } from './layout/ElkLayoutEngine';
@@ -148,7 +147,6 @@ export default function App() {
       };
     }
     const last = lastStep(simulation);
-    const current = simulatedMachine.states.find((s) => s.id === simulation.currentStateId);
     const traveled = traveledPath(simulatedMachine, simulation);
     const next = availableTransitions(simulatedMachine, simulation);
     return {
@@ -162,7 +160,6 @@ export default function App() {
         edgeIds: next.map((transition) => transition.id),
       },
       dimOthers: true,
-      failure: current ? stateRole(simulatedMachine, current).failure : false,
       step: simulation.trail.length,
     };
   }, [simulation, simulatedMachine, activeCore, tagQuery, undocumentedOnly]);

@@ -68,6 +68,15 @@ Roles are painted on the canvas at all times, simulation or not
 
 The Inspector and the simulation panel repeat the roles as badges.
 
+A role that carries a color of its own — failure, final, deprecated, in that
+precedence (`roleColor`) — keeps it wherever the UI talks about **arriving** at
+that state: the box on the canvas at every tier of the simulation's emphasis,
+an event that would take you there, the step of the trail that already did.
+Ordinary states have no such color and the simulation paints them in its own
+green. The colors reach all of those through one set of tokens (`--role-*` in
+`index.css`, defaulting to the simulation's green), so a role gains a color by
+adding a `role-*` block and no rule anywhere else changes.
+
 ## Documentation from the source
 
 Doc comments on the analyzed app's state enum reach the model and are rendered
@@ -219,8 +228,13 @@ Select a state (optional) and hit **Simulate**:
   and the step is animated: the transition's stroke flows as dashes with a
   pulse traveling along its route, the state that was just entered pops and
   then breathes, and the new trail entry slides in;
-- landing on a **failure** state turns that whole highlight red (edge, label,
-  arrowhead, ring), so failure paths stand out from healthy ones;
+- a box the run touches keeps its own color, so a colored state never reads as
+  healthy: standing on a **failure** paints that box red whole — border, wash,
+  label and ring — a **final** one violet, and one the run only passed through
+  keeps its color under the traveled tier's bold. What is fireable from here is
+  outlined in the color of where it lands, and so is the event offered in the
+  panel. The transitions stay green throughout: the arrow is the run moving, and
+  the box is what says where it arrived;
 - the viewport follows the replay: when the state just entered is not fully in
   view, the canvas pans to center it, keeping the zoom untouched — a step that
   lands on screen never moves the canvas;

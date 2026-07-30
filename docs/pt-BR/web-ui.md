@@ -73,6 +73,15 @@ Os papéis são pintados no canvas o tempo todo, com ou sem simulação
 
 O Inspetor e o painel de simulação repetem os papéis como selos.
 
+Um papel que tem cor própria — falha, terminal, obsoleto, nessa precedência
+(`roleColor`) — a mantém em todo lugar onde a UI fala sobre **chegar** naquele
+estado: a box no canvas em todos os níveis de ênfase da simulação, um evento que
+levaria você até lá, o passo do histórico que já levou. Estados comuns não têm
+essa cor e a simulação os pinta no seu próprio verde. As cores chegam a tudo isso
+por um único conjunto de tokens (`--role-*` no `index.css`, com o verde da
+simulação como padrão), então um papel ganha cor adicionando um bloco `role-*` e
+nenhuma regra em nenhum outro lugar muda.
+
 ## Documentação vinda da fonte
 
 Comentários de documentação no enum de estado da aplicação analisada chegam ao
@@ -233,8 +242,13 @@ Selecione um estado (opcional) e clique em **Simular**:
   passo é animado: o traço da transição flui em tracejado com um pulso viajando
   pela rota, o estado que acabou de ser alcançado dá um salto e depois respira, e
   a nova entrada do histórico desliza para dentro;
-- aterrissar em um estado de **falha** deixa todo esse destaque vermelho (aresta,
-  rótulo, ponta da seta, anel), então caminhos de falha se destacam dos saudáveis;
+- uma box que a corrida toca mantém a cor dela, então um estado colorido nunca se
+  lê como saudável: parar em uma **falha** pinta aquela box inteira de vermelho —
+  borda, fundo, rótulo e anel —, uma **terminal** de violeta, e uma por onde a
+  corrida só passou mantém sua cor sob o negrito do nível percorrido. O que é
+  disparável daqui fica contornado na cor de onde aterrissa, e o evento oferecido
+  no painel também. As transições seguem verdes em todos os casos: a seta é a
+  corrida se movendo, e a box é o que diz onde ela chegou;
 - a view acompanha o replay: quando o estado recém-alcançado não está
   inteiramente visível, o canvas pana para centralizá-lo, sem mexer no zoom — um
   passo que cai na tela nunca move o canvas;

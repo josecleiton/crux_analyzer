@@ -4,7 +4,7 @@
  */
 
 import type { DomainMachine } from '../../domain/types';
-import { stateRole } from '../../domain/stateRole';
+import { roleColor, stateRole } from '../../domain/stateRole';
 import type { Simulation } from '../../simulation/engine';
 import {
   availableTransitions,
@@ -43,6 +43,22 @@ export function SimulationPanel({
     ? stateRole(machine, current)
     : { initial: false, failure: false, deprecated: false, final: false };
 
+  /**
+   * The color of the state a transition leads to, as a class or nothing.
+   *
+   * Both lists in this panel are lists of *destinations* — an event you can
+   * send is where it would take you, a step of the trail is where it took you —
+   * so both are painted by where they point, never by where the replay happens
+   * to be standing. An ordinary destination has no class and keeps the run's
+   * own green.
+   */
+  function targetRoleClass(transitionId: string): string {
+    const target = machine.transitions.find((t) => t.id === transitionId)?.to;
+    const state = target ? machine.states.find((s) => s.id === target) : undefined;
+    const color = state ? roleColor(stateRole(machine, state)) : null;
+    return color ? `role-${color}` : '';
+  }
+
   return (
     <aside className="inspector">
       <h2 className="panel-title">{t('simulation.title')}</h2>
@@ -62,7 +78,10 @@ export function SimulationPanel({
             const answer = answerOf(transition.id);
             return (
               <li key={transition.id}>
-                <button className="event-button" onClick={() => onFire(transition.id)}>
+                <button
+                  className={`event-button ${targetRoleClass(transition.id)}`.trimEnd()}
+                  onClick={() => onFire(transition.id)}
+                >
                   {transition.event}
                   <span className="event-target"> → {transition.toName}</span>
                   {/* The shell owes this one: it can arrive with no user input. */}
@@ -166,7 +185,11 @@ export function SimulationPanel({
             <li
               key={`${step.transitionId}-${i}`}
               className={
-                [here ? 'trail-new' : '', ahead ? 'trail-ahead' : '']
+                [
+                  here ? 'trail-new' : '',
+                  ahead ? 'trail-ahead' : '',
+                  targetRoleClass(step.transitionId),
+                ]
                   .filter(Boolean)
                   .join(' ') || undefined
               }

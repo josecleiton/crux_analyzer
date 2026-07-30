@@ -53,8 +53,6 @@ export interface GraphHighlight {
   available?: { nodeIds: string[]; edgeIds: string[] };
   kept?: { nodeIds: string[]; edgeIds: string[] };
   dimOthers?: boolean;
-  /** Paints the highlight red — the simulation sits in a failure state. */
-  failure?: boolean;
   /** Bumped on every step so the arrival animation replays (even on self-loops). */
   step?: number;
 }
@@ -113,7 +111,6 @@ export function Graph({
   // Alternating pulse class: re-adding the same class would not restart the
   // arrival animation when a transition loops back to the current state.
   const pulseClass = (highlight?.step ?? 0) % 2 === 0 ? 'pulse-a' : 'pulse-b';
-  const failureClass = highlight?.failure ? ' is-failure' : '';
 
   const visitedNodes = new Set(highlight?.visited?.nodeIds ?? []);
   const visitedEdges = new Set(highlight?.visited?.edgeIds ?? []);
@@ -144,7 +141,7 @@ export function Graph({
     const classes = GROUP_TYPES.has(node.type ?? '')
       ? []
       : tier(node.id, current, visitedNodes, availableNodes, keptNodes);
-    if (current) classes.push('highlighted', pulseClass, ...(failureClass ? ['is-failure'] : []));
+    if (current) classes.push('highlighted', pulseClass);
     return {
       ...node,
       selected: selection?.kind === 'state' && selection.id === node.id,
@@ -155,19 +152,15 @@ export function Graph({
     const selected = selection?.kind === 'transition' && selection.id === edge.id;
     const highlighted = highlight?.edgeIds.includes(edge.id) ?? false;
     const classes = tier(edge.id, highlighted, visitedEdges, availableEdges, keptEdges);
-    if (highlighted) {
-      classes.push('highlighted', ...(failureClass ? ['is-failure'] : []));
-    }
-    // keep the arrowhead in sync with the stroke color of its state
+    if (highlighted) classes.push('highlighted');
+    // keep the arrowhead in sync with the stroke color of its state. The step
+    // that just fired is the run moving, so it stays the simulation's color
+    // whatever role the state it landed on has.
     const stroke = selected
       ? colors.edgeSelected
-      : highlighted
-        ? highlight?.failure
-          ? colors.edgeFailure
-          : colors.edgeHighlighted
-        : visitedEdges.has(edge.id)
-          ? colors.edgeHighlighted
-          : colors.edge;
+      : highlighted || visitedEdges.has(edge.id)
+        ? colors.edgeHighlighted
+        : colors.edge;
     return {
       ...edge,
       selected,

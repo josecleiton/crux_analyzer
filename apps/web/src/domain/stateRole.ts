@@ -109,3 +109,22 @@ export function stateRole(machine: DomainMachine, state: DomainState): StateRole
     final: state.outgoing.length === 0,
   };
 }
+
+/**
+ * The role whose color a state is painted in, or `null` for the ordinary ones —
+ * the ones the simulation is free to paint in its own green.
+ *
+ * A state with a color of its own keeps it wherever the UI talks about arriving
+ * there: the box on the canvas, an event that would take you to it, the step of
+ * the trail that already did. That is one decision, so it is made once here
+ * instead of by each of those clients. The precedence mirrors what the static
+ * node styles already do to a state carrying more than one role.
+ */
+export type RoleColor = 'failure' | 'final' | 'deprecated';
+
+export function roleColor(role: StateRole): RoleColor | null {
+  if (role.failure) return 'failure';
+  if (role.final) return 'final';
+  if (role.deprecated) return 'deprecated';
+  return null;
+}

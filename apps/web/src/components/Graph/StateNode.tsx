@@ -15,7 +15,21 @@
  */
 
 import { Handle, Position } from '@xyflow/react';
-import type { NodeProps } from '@xyflow/react';
+import type { Node, NodeProps } from '@xyflow/react';
+
+/**
+ * Which `role-*` palette this box uses, if any: the `--role-*` tokens the
+ * simulation's emphasis tiers paint with, so a state with a color of its own
+ * keeps it instead of taking the run's green. An ordinary state has no class
+ * and those tokens stay green — which is why the tier rules need no per-role
+ * selector of their own.
+ */
+function roleClass(data: Node['data']): string {
+  if (data.failure) return 'role-failure';
+  if (data.final) return 'role-final';
+  if (data.deprecated) return 'role-deprecated';
+  return '';
+}
 
 export function StateNode({ data, selected }: NodeProps) {
   const className = [
@@ -24,6 +38,10 @@ export function StateNode({ data, selected }: NodeProps) {
     data.deprecated ? 'state-deprecated' : '',
     data.failure ? 'state-failure' : '',
     data.final ? 'state-final' : '',
+    // The color this box keeps whatever the simulation is saying about it. Same
+    // precedence as `roleColor` in domain/stateRole.ts, and the same one the
+    // role classes above resolve to when a state carries more than one.
+    roleClass(data),
     selected ? 'selected' : '',
   ]
     .filter(Boolean)

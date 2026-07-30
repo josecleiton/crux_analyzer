@@ -41,21 +41,27 @@
   --edge-stroke: #8792a2;
   --edge-stroke-selected: #6366f1;
   --edge-stroke-highlighted: #059669;
-  --edge-stroke-failure: #dc2626;
   --edge-label-text: #4b5563;
 
   --state-deprecated: #b45309;
   --state-deprecated-text: #92400e;
   --state-deprecated-bg: #fffbeb;
+  --state-deprecated-border: #fde68a;
+  --state-deprecated-ring: rgba(180, 83, 9, 0.18);
 
+  /* Roles the simulation can wear carry the same four tokens the simulation's
+     own green does — strong, text, wash, soft border — plus a ring. */
   --state-failure: #ef4444;
   --state-failure-text: #b91c1c;
   --state-failure-bg: #fef2f2;
+  --state-failure-border: #fecaca;
   --state-failure-ring: rgba(239, 68, 68, 0.22);
 
   --state-final: #7c3aed;
   --state-final-text: #6d28d9;
   --state-final-bg: #f5f3ff;
+  --state-final-border: #ddd6fe;
+  --state-final-ring: rgba(124, 58, 237, 0.2);
 
   --state-initial: #0284c7;
   --state-initial-text: #0369a1;
@@ -96,25 +102,73 @@
   --edge-stroke: #7c8798;
   --edge-stroke-selected: #818cf8;
   --edge-stroke-highlighted: #34d399;
-  --edge-stroke-failure: #f87171;
   --edge-label-text: #aab3c2;
 
   --state-deprecated: #fbbf24;
   --state-deprecated-text: #fcd34d;
   --state-deprecated-bg: #2a2110;
+  --state-deprecated-border: #4a3a15;
+  --state-deprecated-ring: rgba(251, 191, 36, 0.22);
 
   --state-failure: #f87171;
   --state-failure-text: #fca5a5;
   --state-failure-bg: #2b1719;
+  --state-failure-border: #4a2529;
   --state-failure-ring: rgba(248, 113, 113, 0.26);
 
   --state-final: #a78bfa;
   --state-final-text: #c4b5fd;
   --state-final-bg: #241f3a;
+  --state-final-border: #392f5c;
+  --state-final-ring: rgba(167, 139, 250, 0.26);
 
   --state-initial: #38bdf8;
   --state-initial-text: #7dd3fc;
   --state-initial-bg: #10222e;
+}
+
+/* --- The color a state's role gives it ---------------------------------- */
+
+/* A state with a color of its own (a failure, a dead end) is not painted like
+   any other, and neither is anything the simulation says about *arriving* there:
+   the box on the canvas, an event that would take you to it, the step of the
+   trail that already did. They all read the same four tokens plus a ring, and a
+   `role-*` class re-points those tokens for its own subtree — so another
+   colored role is one more block here and no new rule anywhere else.
+
+   The default is the simulation's own green, which is why an ordinary
+   destination needs no class at all. The arrow between two states keeps it in
+   every case: it belongs to the run, not to what the run landed on. */
+:root {
+  --role: var(--sim);
+  --role-text: var(--sim-text);
+  --role-bg: var(--sim-soft);
+  --role-border: var(--sim-border);
+  --role-ring: var(--sim-ring);
+}
+
+.role-failure {
+  --role: var(--state-failure);
+  --role-text: var(--state-failure-text);
+  --role-bg: var(--state-failure-bg);
+  --role-border: var(--state-failure-border);
+  --role-ring: var(--state-failure-ring);
+}
+
+.role-final {
+  --role: var(--state-final);
+  --role-text: var(--state-final-text);
+  --role-bg: var(--state-final-bg);
+  --role-border: var(--state-final-border);
+  --role-ring: var(--state-final-ring);
+}
+
+.role-deprecated {
+  --role: var(--state-deprecated);
+  --role-text: var(--state-deprecated-text);
+  --role-bg: var(--state-deprecated-bg);
+  --role-border: var(--state-deprecated-border);
+  --role-ring: var(--state-deprecated-ring);
 }
 
 * {
@@ -547,22 +601,25 @@ body {
 
 /* --- Simulation --------------------------------------------------------- */
 
+/* An event you can send is a destination, so it is painted like one: the class
+   the panel puts on it re-points these tokens at the role of the state it would
+   take you to, and an ordinary one keeps the run's green. */
 .event-button {
   display: block;
   width: 100%;
   text-align: left;
   padding: 6px 8px;
-  border: 1px solid var(--sim-border);
+  border: 1px solid var(--role-border);
   border-radius: 4px;
-  background: var(--sim-soft);
+  background: var(--role-bg);
   font-family: ui-monospace, monospace;
   font-size: 12px;
-  color: var(--sim-text);
+  color: var(--role-text);
   cursor: pointer;
 }
 
 .event-button:hover {
-  border-color: var(--sim);
+  border-color: var(--role);
 }
 
 .event-target {
@@ -603,7 +660,9 @@ body {
 }
 
 /* The card carries the box, so it can be a <button>: clicking a step stands
-   there. Quiet by default — the trail is a record first and a control second. */
+   there. Quiet by default — the trail is a record first and a control second —
+   and its hover is the color of the state that step landed on, since standing
+   there is where clicking it takes you. */
 .trail-card {
   display: block;
   width: 100%;
@@ -622,8 +681,8 @@ button.trail-card {
 }
 
 button.trail-card:hover {
-  border-color: var(--sim-border);
-  background: var(--sim-soft);
+  border-color: var(--role);
+  background: var(--role-bg);
 }
 
 .trail-card::before {
@@ -969,9 +1028,11 @@ button.trail-card:hover {
   opacity: 0.22;
 }
 
-/* ...what can fire from the current state stays fully readable... */
+/* ...what can fire from the current state stays fully readable, outlined in the
+   color of the box itself: an event that would take you somewhere colored says
+   so on the canvas the same way it says so in the panel... */
 .react-flow__node.available .state-node {
-  border-color: var(--sim);
+  border-color: var(--role);
 }
 
 .react-flow__edge.available .routed-edge {
@@ -983,11 +1044,13 @@ button.trail-card:hover {
   stroke: var(--sim);
 }
 
-/* ...and the traveled path is the boldest thing on the canvas. */
+/* ...and the traveled path is the boldest thing on the canvas. Bold is what
+   marks it as traveled; the color is still the box's own, so a failure the run
+   passed through does not read as healthy once it has moved on. */
 .react-flow__node.visited .state-node {
-  border-color: var(--sim);
-  background: var(--sim-soft);
-  color: var(--sim-text);
+  border-color: var(--role);
+  background: var(--role-bg);
+  color: var(--role-text);
   font-weight: 700;
 }
 
@@ -1015,19 +1078,17 @@ button.trail-card:hover {
 
 /* --- Graph: simulation highlight + animations --------------------------- */
 
+/* Where the replay stands: the box wears its own color whole — border, wash,
+   label and ring. For an ordinary state those tokens are the run's green, so
+   this one rule covers standing anywhere. */
 .state-node.highlighted,
 .react-flow__node.highlighted .state-node {
-  --pulse-color: var(--sim);
-  --pulse-ring: var(--sim-ring);
+  --pulse-color: var(--role);
+  --pulse-ring: var(--role-ring);
   border-color: var(--pulse-color);
+  background: var(--role-bg);
+  color: var(--role-text);
   box-shadow: 0 0 0 3px var(--pulse-ring);
-}
-
-/* the simulation sits in a failure state: the whole highlight turns red */
-.react-flow__node.highlighted.is-failure .state-node {
-  --pulse-color: var(--state-failure);
-  --pulse-ring: var(--state-failure-ring);
-  color: var(--state-failure-text);
 }
 
 /* arrival pop (two names so re-entering the same state replays it) +
@@ -1210,18 +1271,8 @@ button.trail-card:hover {
   fill: var(--sim-text);
 }
 
-.react-flow__edge.highlighted.is-failure .routed-edge {
-  stroke: var(--edge-stroke-failure);
-}
-
-.react-flow__edge.highlighted.is-failure .edge-label-box {
-  stroke: var(--state-failure);
-  fill: var(--state-failure-bg);
-}
-
-.react-flow__edge.highlighted.is-failure .edge-label-text {
-  fill: var(--state-failure-text);
-}
+/* The step itself stays green whatever it landed on: the arrow is the run
+   moving, and the box it arrives at is what says where that was. */
 
 @keyframes edge-flow {
   to {
@@ -1231,10 +1282,6 @@ button.trail-card:hover {
 
 .edge-pulse {
   fill: var(--edge-stroke-highlighted);
-}
-
-.react-flow__edge.is-failure .edge-pulse {
-  fill: var(--edge-stroke-failure);
 }
 
 /* --- Reduced motion ------------------------------------------------------ */

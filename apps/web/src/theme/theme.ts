@@ -51,7 +51,6 @@ export interface GraphColors {
   edge: string;
   edgeSelected: string;
   edgeHighlighted: string;
-  edgeFailure: string;
 }
 
 export function readGraphColors(): GraphColors {
@@ -62,6 +61,5 @@ export function readGraphColors(): GraphColors {
     edge: token('--edge-stroke', '#8792a2'),
     edgeSelected: token('--edge-stroke-selected', '#6366f1'),
     edgeHighlighted: token('--edge-stroke-highlighted', '#059669'),
-    edgeFailure: token('--edge-stroke-failure', '#dc2626'),
   };
 }
