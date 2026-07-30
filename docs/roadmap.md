@@ -2,9 +2,11 @@
 
 > 🌐 **English** · [Português (Brasil)](pt-BR/roadmap.md)
 
-The original spec (`init.md`) is fully implemented. What follows is not "more
-parsing" — the parser understands what it set out to understand. The open work
-is about **adoption** and about **keeping the documentation from rotting**.
+The original spec (`init.md`) is fully implemented, so most of what follows is
+about **adoption** and about **keeping the documentation from rotting** rather
+than about more parsing. One exception, and it took a real app to find it: §6 is
+a state machine the parser reads enough of to know it exists and still does not
+extract — the first genuine parsing gap since the spec was met.
 
 This document is the single source for planned work; `CLAUDE.md` points here
 rather than keeping its own list.
@@ -159,7 +161,7 @@ threat model, rules, and the properties that must not be traded away — and
   keeping the pins fresh.
 
 Deliberately *not* done: fuzzing the parser (`cargo-fuzz` over `parse_project`)
-would be the natural next step and is listed in §6.
+would be the natural next step and is listed in §7.
 
 ---
 
@@ -363,7 +365,92 @@ adoption first, like tags got.
 
 ---
 
-## 6. Deliberately not doing yet
+## 6. Value-flow-only state machines — the first real parsing gap adoption found
+
+Found by running against a target app, and reproducible from the shape alone. Two
+status enums of deliberately identical shape, both held per-entity in a
+collection the model owns, both documented as state machines by the app. One is
+extracted; the other is invisible.
+
+The whole difference is a single line. Detection requires *literal* assignment
+evidence — `*.field = Enum::Variant`, or a `T::default()` reset
+([state_enum.rs](../crates/parser/src/state_enum.rs)). The extracted one has
+exactly one such line, because the core is what *initiates* that piece of work
+and so is what writes the in-progress variant; value-flow analysis then picks up
+the remaining `= status` payload assignments for free. The invisible one has
+none: the shell owns initiating the work there, so the core only ever *stores*
+what the shell reports — via a payload assignment and a field-to-field `.clone()`.
+Neither is a literal variant path.
+
+That asymmetry in the app is honest: it reflects which side owns the transition,
+and no rewrite earns the diagram without inventing an assignment that misstates
+that ownership. The gap is ours.
+
+**What makes it a gap rather than a limitation:** the parser *reads* the enum it
+fails to extract. Guards comparing it — an `==` against one variant, a `matches!`
+over two more — already put it in `dispatched_enums`. So the parser knows the
+enum exists, knows its variants, and emits no machine **and no warning**: silence
+where the honesty rule requires a diagnostic.
+
+A generic fixture reproducing this belongs in `crates/parser/tests` alongside
+`mini_recorder`, so the case is covered by a tracked test rather than only by a
+private one.
+
+### The evidence rule: model-reachable fields
+
+Widening detection to accept value-flow assignment cannot be as simple as "any
+field whose declared type is a dispatched crate enum" — that readmits the
+ViewModel mirror enums the literal-assignment rule exists to exclude
+([state_enum.rs](../crates/parser/src/state_enum.rs) opens by saying so). The
+decision is to require the assigned field be **reachable from the `Model`
+associated type**: mirror enums are constructed into view structs, never held by
+the model, so reachability separates them without a naming heuristic and without
+weakening the honesty rule.
+
+Two prerequisites, both discovered while sizing this, and both larger than the
+detection change itself:
+
+- **Struct field types are recorded without looking through collections.** The
+  index stores a field's type as the last path segment, so `items: Vec<Entry>`
+  indexes as `("items", "Vec")` and a reachability walk breaks at the `Vec` —
+  which is exactly where a per-entity status lives (`Model` → … → some substate
+  → `Vec<Entry>` → the status field). `variant_fields` has an unwrapper, but it
+  looks through `Box`/`Rc`/`Arc` only. This wants a *separate* unwrapper for
+  struct fields rather than widening the shared one, for two reasons: the shared
+  one also feeds composite-state detection, where teaching it about `Vec` changes
+  what can be read as a sub-state; and the `T::default()` reset path needs the
+  *declared* type, since `default()` on an `Option<E>` field yields `None` rather
+  than any variant of `E` — unwrapping there would invent an assignment. So a
+  field carries both types: declared (drives resets) and reachable (drives the
+  walk).
+- **The `Model` associated type is never resolved.** The core finder reads the
+  `Event` and `Effect` associated types and ignores `Model`. Cheap — the existing
+  `associated_type` helper covers it — but it does not exist today.
+
+### Ship the warning first
+
+The diagnostic is separable from the widening and worth having on its own: a new
+`WarningKind` (`untracked-state-enum`) for a crate enum whose variants are
+dispatched on and which types a model-reachable field, but which has no
+assignment evidence. It needs the same `Model`-resolution prerequisite, no
+collection unwrapping, and it turns silence into a visible, `--deny-warnings`-able
+fact. Both halves need locale catalog entries in `en` + `pt-BR` and an addition to
+the warnings reference in [parser.md](parser.md).
+
+**The other half of that investigation, and explicitly not parser work.** The same
+app documented a second machine that the analyzer also missed — but there the code
+holds no enum at all, just several correlated fields (an optional id, a boolean,
+a progress float) reset together by one method. Nothing exists for assignment
+analysis to find, and the parser is right not to guess: inferring a machine from
+a boolean and an `Option` is precisely the name-shaped inference that stays in the
+clients ([architecture.md](architecture.md#hard-rules)). A machine like that wants
+an enum in the application first — which is also what would make its impossible
+combinations unrepresentable. Recorded so the distinction is on file: **a missing
+diagram is a parser gap only when the source actually declares the states.**
+
+---
+
+## 7. Deliberately not doing yet
 
 - **PlantUML generator.** Listed in `init.md`, but Mermaid already renders
   natively on GitHub/GitLab and `just site` covers the rest. A whole new

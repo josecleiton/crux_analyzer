@@ -2,10 +2,12 @@
 
 > 🌐 [English](../roadmap.md) · **Português (Brasil)**
 
-A especificação original (`init.md`) está totalmente implementada. O que vem a
-seguir não é "mais parsing" — o parser entende o que se propôs a entender. O
-trabalho aberto é sobre **adoção** e sobre **impedir que a documentação
-apodreça**.
+A especificação original (`init.md`) está totalmente implementada, então a maior
+parte do que vem a seguir é sobre **adoção** e sobre **impedir que a documentação
+apodreça**, não sobre mais parsing. Uma exceção, e foi preciso um app real para
+encontrá-la: a §6 é uma máquina de estados que o parser lê o suficiente para saber
+que existe e ainda assim não extrai — a primeira lacuna genuína de parsing desde
+que a especificação foi cumprida.
 
 Este documento é a fonte única do trabalho planejado; o `CLAUDE.md` aponta para
 cá em vez de manter a própria lista.
@@ -168,7 +170,7 @@ honestidade do parser.
   `just check`, com o dependabot mantendo os pins frescos.
 
 Deliberadamente *não* feito: fuzzing do parser (`cargo-fuzz` sobre
-`parse_project`) seria o próximo passo natural e está listado na §6.
+`parse_project`) seria o próximo passo natural e está listado na §7.
 
 ---
 
@@ -376,7 +378,93 @@ primeiro, como as etiquetas quiseram.
 
 ---
 
-## 6. Deliberadamente ainda não
+## 6. Máquinas atribuídas só por value flow — a primeira lacuna real de parsing que a adoção encontrou
+
+Encontrada rodando contra um app alvo, e reproduzível só pela forma. Dois enums de
+status de forma deliberadamente idêntica, ambos guardados por entidade em uma
+coleção que o model possui, ambos documentados como máquinas de estados pelo app.
+Um é extraído; o outro é invisível.
+
+A diferença inteira é uma linha. A detecção exige evidência de atribuição
+*literal* — `*.campo = Enum::Variant`, ou um reset `T::default()`
+([state_enum.rs](../../crates/parser/src/state_enum.rs)). O que é extraído tem
+exatamente uma linha dessas, porque é o core que *inicia* aquele trabalho e
+portanto é o core que escreve a variante de "em andamento"; a análise de value flow
+então colhe de graça as atribuições `= status` restantes vindas de payload. O
+invisível não tem nenhuma: ali quem inicia o trabalho é a shell, então o core só
+*armazena* o que a shell reporta — por uma atribuição de payload e um `.clone()` de
+campo para campo. Nenhuma das duas é um caminho literal de variante.
+
+Essa assimetria no app é honesta: ela reflete qual lado é dono da transição, e
+nenhuma reescrita ganha o diagrama sem inventar uma atribuição que mente sobre essa
+posse. A lacuna é nossa.
+
+**O que faz disso uma lacuna e não uma limitação:** o parser *lê* o enum que deixa
+de extrair. Os guards que o comparam — um `==` contra uma variante, um `matches!`
+sobre outras duas — já o colocam em `dispatched_enums`. Então o parser sabe que o
+enum existe, conhece suas variantes, e não emite máquina **nem warning**: silêncio
+onde a regra da honestidade exige um diagnóstico.
+
+Um fixture genérico reproduzindo isso cabe em `crates/parser/tests` ao lado do
+`mini_recorder`, para o caso ficar coberto por um teste versionado em vez de só por
+um privado.
+
+### A regra de evidência: campos alcançáveis pelo model
+
+Alargar a detecção para aceitar atribuição por value flow não pode ser tão simples
+quanto "qualquer campo cujo tipo declarado seja um enum de crate despachado" — isso
+readmite os mirror enums de ViewModel que a regra de atribuição literal existe para
+excluir (o [state_enum.rs](../../crates/parser/src/state_enum.rs) abre dizendo
+exatamente isso). A decisão é exigir que o campo atribuído seja **alcançável a
+partir do tipo associado `Model`**: mirror enums são construídos dentro de structs
+de view, nunca guardados pelo model, então a alcançabilidade os separa sem
+heurística de nome e sem enfraquecer a regra da honestidade.
+
+Dois pré-requisitos, ambos descobertos ao dimensionar isso, e ambos maiores que a
+mudança de detecção em si:
+
+- **Tipos de campo de struct são registrados sem atravessar coleções.** O índice
+  guarda o tipo de um campo como o último segmento do caminho, então
+  `items: Vec<Entry>` é indexado como `("items", "Vec")` e uma travessia de
+  alcançabilidade quebra no `Vec` — que é exatamente onde vive um status por
+  entidade (`Model` → … → algum subestado → `Vec<Entry>` → o campo de status). O
+  `variant_fields` tem um desempacotador, mas ele atravessa só `Box`/`Rc`/`Arc`.
+  Isso pede um desempacotador *separado* para campos de struct em vez de alargar o
+  compartilhado, por duas razões: o compartilhado também alimenta a detecção de
+  estados compostos, onde ensiná-lo sobre `Vec` muda o que pode ser lido como
+  sub-estado; e o caminho de reset `T::default()` precisa do tipo *declarado*, já
+  que `default()` em um campo `Option<E>` dá `None` e não uma variante de `E` —
+  desempacotar ali inventaria uma atribuição. Então um campo carrega os dois tipos:
+  declarado (rege os resets) e alcançável (rege a travessia).
+- **O tipo associado `Model` nunca é resolvido.** O core finder lê os tipos
+  associados `Event` e `Effect` e ignora `Model`. Barato — o helper
+  `associated_type` que já existe cobre — mas hoje não existe.
+
+### Entregar o warning primeiro
+
+O diagnóstico é separável do alargamento e vale por si: um `WarningKind` novo
+(`untracked-state-enum`) para um enum de crate cujas variantes são despachadas e que
+tipa um campo alcançável pelo model, mas que não tem evidência de atribuição.
+Precisa do mesmo pré-requisito de resolver o `Model`, não precisa de desempacotar
+coleções, e transforma silêncio em um fato visível e sujeito a `--deny-warnings`. As
+duas metades precisam de entradas nos catálogos de locale `en` + `pt-BR` e de uma
+adição à referência de warnings no [parser.md](parser.md).
+
+**A outra metade daquela investigação, e explicitamente não é trabalho de parser.**
+O mesmo app documentava uma segunda máquina que o analyzer também não pegou — mas
+ali o código não guarda enum nenhum, só vários campos correlacionados (um id
+opcional, um booleano, um float de progresso) resetados juntos por um método. Não
+existe nada para a análise de assignments encontrar, e o parser está certo em não
+adivinhar: inferir máquina de um booleano e um `Option` é precisamente a inferência
+baseada em nome que fica nos clientes
+([architecture.md](architecture.md#regras-rígidas)). Uma máquina assim quer um enum
+na aplicação primeiro — que é também o que tornaria irrepresentáveis suas
+combinações impossíveis. Registrado para a distinção ficar documentada: **um
+diagrama ausente é lacuna do parser só quando a fonte de fato declara os estados.**
+
+---
+
+## 7. Deliberadamente ainda não
 
 - **Gerador PlantUML.** Listado no `init.md`, mas o Mermaid já renderiza
   nativamente no GitHub/GitLab e o `just site` cobre o resto. Um gerador inteiro

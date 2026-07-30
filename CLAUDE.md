@@ -87,5 +87,8 @@ wildcard-target notes, Markdown rendering). The open front is **§5
 distribution**: nothing outside this checkout can install the tool, so the plan
 there covers crates.io, prebuilt binaries and the Marketplace, in that order —
 plus two license obligations (§5.5) that are already overdue rather than
-planned. After that, the deliberate "not yet" list (§6) and whatever adoption
-teaches next.
+planned. **§6** is the one open *parsing* front, found by running against a real
+app: a state enum the parser reads in guards but never extracts, because it is
+only ever assigned by value flow — the plan there is model-reachability as
+evidence, with the missing diagnostic shippable first. After that, the deliberate
+"not yet" list (§7) and whatever adoption teaches next.
