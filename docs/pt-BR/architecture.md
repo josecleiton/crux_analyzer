@@ -86,6 +86,8 @@ flowchart TD
     domain --> sim[simulation/engine.ts\nlógica de replay pura]
     sim -->|props de destaque| graph
     domain --> inspector[components/Inspector]
+    domain --> sidebar[components/Sidebar\nsumário + visibilidade]
+    sidebar -->|ids de estados ocultos| flow
 ```
 
 ## Semântica de statecharts

@@ -9,9 +9,11 @@
 
 Três áreas, no estilo LangGraph Studio:
 
-- **Barra lateral** — os Cores do projeto. Selecionar um renderiza suas máquinas.
-  Seu rodapé aponta para o repositório deste projeto — uma URL fixa no código,
-  nunca uma lida da fonte analisada.
+- **Barra lateral** — os Cores do projeto, cada um deles um **sumário** do que
+  contém: máquinas, famílias compostas, estados (veja
+  [Sumário e visibilidade](#sumário-e-visibilidade)). Selecionar um core
+  renderiza suas máquinas. Seu rodapé aponta para o repositório deste projeto —
+  uma URL fixa no código, nunca uma lida da fonte analisada.
 - **Canvas** — as máquinas de estado. Um core com várias máquinas (regiões
   ortogonais) renderiza cada uma como uma **seção titulada**; um core de máquina
   única renderiza plano. Todo estado é um nó, toda transição é uma aresta
@@ -134,6 +136,68 @@ e o `StateDoc.test.tsx` se você for mudá-los:
   esse host, então o texto alternativo é mostrado no lugar dela.
 - **HTML cru não tem caminho até o DOM.** Sem `dangerouslySetInnerHTML`, e
   `rehype-raw` não deve ser adicionado.
+
+## Sumário e visibilidade
+
+Cada core na barra lateral carrega uma seta de expansão e seu próprio sumário. O
+core em tela abre o sumário; os outros começam recolhidos, para que um projeto
+com muitos cores continue mostrando sua lista de uma olhada — e qualquer número
+deles pode ficar aberto ao mesmo tempo.
+
+O sumário é a mesma hierarquia que o canvas desenha, um nível por indentação:
+máquina → família composta → estado. A detecção de compostos é compartilhada com
+o canvas em vez de derivada de novo (`src/domain/hierarchy.ts`), então uma linha
+do sumário e um nó nunca podem discordar sobre a qual família um estado pertence.
+
+**Um clique, um significado.** Uma linha que tem filhos os dobra — sua seta e seu
+nome fazem a mesma coisa, nos três níveis: um core, uma máquina, uma família
+composta (cujo nome em itálico é de um contêiner, não de um estado: um pai
+composto não é um estado e não seleciona nada). Clicar em um core que não está em
+tela o seleciona e o abre; no core que já está em tela, o nome o dobra de volta.
+A linha folha é a que seleciona: seleciona aquele estado, e em um core que não é
+o ativo troca para aquele core primeiro — o mesmo salto que um link direto faz.
+
+Dobrar é só apresentação. Uma máquina dobrada mantém cada um de seus estados no
+canvas; o que é desenhado é assunto da caixa de seleção, abaixo.
+
+Toda linha também carrega uma caixa de seleção, e este é o segundo canal de
+controle do leitor sobre o canvas: **um estado desmarcado sai do canvas**, junto
+com as transições que não podem mais ser desenhadas. Isso deliberadamente não é o
+esmaecimento que [Filtrando o canvas](#filtrando-o-canvas) faz — esmaecer
+responde "quais estados importam agora", visibilidade responde "sobre quais
+estados eu estou lendo, afinal", e os ocultos deixam de ocupar espaço e de
+moldar o layout.
+
+Tudo é visível por padrão: o painel abre mostrando o core inteiro, e a caixa é o
+que o leitor *desmarca*. O que decorre de remover um estado:
+
+- Uma caixa sobre um grupo — uma família, uma máquina — oculta o grupo inteiro, e
+  se lê como **mista** enquanto apenas parte dele está oculta. Mista conta como
+  ligada, então o próximo clique oculta o resto.
+- Uma transição precisa das duas pontas: ela vai embora quando qualquer uma vai.
+  Em uma aresta curinga só a ponta real conta — "qualquer estado" não é um estado
+  que se possa desmarcar — e o próprio pseudo-nó **qualquer estado** sai quando
+  não resta nenhuma aresta curinga para desenhar.
+- Um contêiner composto vai com sua última folha visível, e a seção titulada de
+  uma máquina com seu último estado visível. Uma máquina sem nada visível sai do
+  canvas *inteira*, curingas incluídos: uma transição `* → *` (origem curinga,
+  alvo em runtime) não toca nenhum estado real, e "qualquer estado" precisa
+  representar ao menos um estado em tela. As seções continuam vindo do que o core
+  *declara*, então ocultar uma máquina inteira nunca volta a achatar outra.
+- A view se reenquadra quando o grafo menor termina de ser disposto, e uma
+  seleção que perdeu aquilo que apontava é descartada — um inspetor descrevendo
+  um estado que ninguém consegue ver é pior que um vazio.
+- **Mostrar todos os estados** aparece sob o sumário enquanto algo está oculto, o
+  que faz dele o sinal de que o canvas está mostrando menos que o core inteiro.
+- Iniciar uma simulação traz de volta os estados da máquina que ela roda: um
+  replay por estados que o leitor recortou não destacaria nada. Recortar de novo
+  durante a execução continua permitido.
+
+Os estados ocultos são guardados como um conjunto de ids
+(`src/domain/visibility.ts`), então o padrão — nada oculto — não custa nada, e o
+que foi recortado em um core continua recortado quando o leitor volta a ele. Eles
+ficam fora da URL: um link direto é sobre o que olhar, não sobre o que alguém
+tinha dobrado para fora da vista.
 
 ## Filtrando o canvas
 

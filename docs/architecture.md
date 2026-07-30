@@ -86,6 +86,8 @@ flowchart TD
     domain --> sim[simulation/engine.ts\npure replay logic]
     sim -->|highlight props| graph
     domain --> inspector[components/Inspector]
+    domain --> sidebar[components/Sidebar\noutline + visibility]
+    sidebar -->|hidden state ids| flow
 ```
 
 ## Statechart semantics

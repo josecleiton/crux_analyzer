@@ -9,9 +9,11 @@
 
 Three areas, LangGraph-Studio style:
 
-- **Sidebar** — the project's Cores. Selecting one renders its machines. Its
-  footer links to this project's repository — a hardcoded URL, never one read
-  out of the analyzed source.
+- **Sidebar** — the project's Cores, each one an **outline** of what it
+  contains: machines, composite families, states (see
+  [Outline and visibility](#outline-and-visibility)). Selecting a core renders
+  its machines. Its footer links to this project's repository — a hardcoded
+  URL, never one read out of the analyzed source.
 - **Canvas** — the state machines. A core with several machines (orthogonal
   regions) renders each as a **titled section**; a single-machine core
   renders flat. Every state is a node, every transition an edge labeled with
@@ -123,6 +125,67 @@ and `StateDoc.test.tsx` if you are about to change them:
   the alt text is shown in its place.
 - **raw HTML has no path to the DOM.** No `dangerouslySetInnerHTML`, and
   `rehype-raw` must not be added.
+
+## Outline and visibility
+
+Each core in the sidebar carries a disclosure arrow and its own outline. The
+core on screen opens its outline; the others start collapsed, so a project with
+many cores still shows its list at a glance — and any number of them can be open
+at once.
+
+The outline is the same hierarchy the canvas draws, one level per indent:
+machine → composite family → state. Composite detection is shared with the
+canvas rather than re-derived (`src/domain/hierarchy.ts`), so an outline row and
+a node can never disagree about which family a state belongs to.
+
+**One click, one meaning.** A row that has children folds it — its arrow and its
+name do the same thing, at all three levels: a core, a machine, a composite
+family (whose italic name is a container's, not a state's: a composite parent is
+not a state and selects nothing). Clicking a core that is not on screen selects
+it and opens it; on the core already on screen the name folds it back. A leaf row
+is the one that selects: it selects that state, and in a core that is not the
+active one it switches to that core first — the same jump a deep link makes.
+
+Folding is presentation only. A folded machine keeps every one of its states on
+the canvas; what is drawn is the checkbox's business, below.
+
+Every row also carries a checkbox, and this is the second channel of reader
+control over the canvas: **a deselected state leaves the canvas**, along with
+the transitions that can no longer be drawn. It is deliberately not the dimming
+that [Filtering the canvas](#filtering-the-canvas) does — dimming answers
+"which states matter right now", visibility answers "which states am I reading
+about at all", and the hidden ones stop taking up space and stop shaping the
+layout.
+
+Everything is visible by default: the panel opens showing the whole core, and
+the checkbox is what the reader turns *off*. What follows from removing a state:
+
+- A checkbox over a group — a family, a machine — hides all of it, and reads
+  **mixed** while only part of it is hidden. Mixed counts as on, so the next
+  click hides the rest.
+- A transition needs both of its ends: it goes when either does. On a wildcard
+  edge only the real end counts — "any state" is not a state that can be
+  deselected — and the **any state** pseudo-node itself goes once no wildcard
+  edge is left to draw.
+- A composite container goes with its last visible leaf, and a machine's
+  titled section with its last visible state. A machine with nothing visible
+  left leaves the canvas *whole*, wildcards included: a `* → *` transition
+  (wildcard source, runtime target) touches no real state, and "any state" has
+  to stand for at least one state on screen. Sections still come from what the
+  core *declares*, so hiding one machine entirely never re-flattens another.
+- The viewport re-frames once the smaller graph is laid out, and a selection
+  that lost what it pointed at is dropped — an inspector describing a state
+  nobody can see is worse than an empty one.
+- **Show all states** appears under the outline while anything is hidden, which
+  makes it the sign that the canvas is showing less than the whole core.
+- Starting a simulation brings back the states of the machine it runs: a replay
+  through states the reader trimmed away would highlight nothing. Trimming
+  again mid-run stays allowed.
+
+Hidden states are held as a set of ids (`src/domain/visibility.ts`), so the
+default — nothing hidden — costs nothing, and what was trimmed in one core is
+still trimmed when the reader comes back to it. They stay out of the URL: a
+deep link is about what to look at, not about what someone had folded away.
 
 ## Filtering the canvas
 
