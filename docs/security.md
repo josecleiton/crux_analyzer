@@ -149,10 +149,27 @@ With the nonce alone, every split chunk is blocked and the webview renders an
 empty page — verified in a browser, not inferred. The origin is not a widening:
 `localResourceRoots` confines it to the bundle directory, and arbitrary inline
 script still needs the nonce.
+The webview policy **replaces** the static-site policy the build bakes into
+`index.html` ([§8.1](#81-the-static-site-carries-its-own-policy)) rather than
+joining it: CSP composes by intersection, and that policy's `'self'` is the
+`vscode-webview://` document origin, not the `vscode-resource` host serving the
+bundle. Both present, the entry module and the model injection are blocked while
+the hash-allowed pre-paint scripts still run — a styled, empty page. So
+`buildWebviewHtml` strips any `Content-Security-Policy` meta tag before adding
+its own, and the stripping is pinned by a test whose fixture carries the baked
+tag.
 The injected model escapes `<` and U+2028/U+2029 so author prose can neither
 close the script tag nor break the statement. **There is no webview↔host message
 channel** — the model flows one way, by injection. Do not add one without
 validating every message.
+
+#### 8.1 The static site carries its own policy
+
+The `just site` build and the GitHub Pages preview have no host to send a CSP
+header, so [`apps/web/csp.ts`](../apps/web/csp.ts) injects the meta tag at build
+time. `script-src` is `'self'` plus a **computed** hash per inline pre-paint
+script — computed from the file being written, because a hand-maintained hash
+goes stale on the first edit and a stale hash breaks the page silently.
 
 ### 9. Dependencies are reviewed, and actions are pinned
 

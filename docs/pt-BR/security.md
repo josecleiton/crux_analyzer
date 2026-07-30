@@ -157,10 +157,31 @@ webview**. As duas metades são estruturais: o nonce autoriza os scripts inline
 nonce importa**. Só com o nonce, todo chunk dividido é bloqueado e o webview
 renderiza uma página vazia — verificado num navegador, não inferido. A origem não é
 uma ampliação: o `localResourceRoots` a confina ao diretório do bundle, e script
-inline arbitrário continua precisando do nonce. O modelo injetado escapa `<` e U+2028/U+2029 para que a prosa do autor
+inline arbitrário continua precisando do nonce.
+
+A política do webview **substitui** a política de site estático que o build
+grava no `index.html` ([§8.1](#81-o-site-estático-carrega-a-própria-política)),
+em vez de se somar a ela: CSP compõe por interseção, e o `'self'` daquela
+política é a origem do documento `vscode-webview://`, não o host
+`vscode-resource` que serve o bundle. Com as duas presentes, o módulo de entrada
+e a injeção do modelo são bloqueados enquanto os scripts de pré-pintura
+liberados por hash continuam rodando — uma página estilizada e vazia. Por isso o
+`buildWebviewHtml` remove qualquer meta tag `Content-Security-Policy` antes de
+adicionar a sua, e a remoção é fixada por um teste cujo fixture carrega a tag
+gravada pelo build.
+O modelo injetado escapa `<` e U+2028/U+2029 para que a prosa do autor
 não possa fechar a tag de script nem quebrar o comando. **Não existe canal de
 mensagens webview↔host** — o modelo flui em uma direção, por injeção. Não
 adicione um sem validar cada mensagem.
+
+#### 8.1 O site estático carrega a própria política
+
+O build do `just site` e o preview no GitHub Pages não têm host para enviar um
+header de CSP, então o [`apps/web/csp.ts`](../../apps/web/csp.ts) injeta a meta
+tag em tempo de build. O `script-src` é `'self'` mais um hash **calculado** por
+script inline de pré-pintura — calculado a partir do arquivo que está sendo
+escrito, porque um hash mantido à mão fica obsoleto na primeira edição e um hash
+obsoleto quebra a página silenciosamente.
 
 ### 9. Dependências são revisadas, e actions são fixadas
 
