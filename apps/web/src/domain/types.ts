@@ -54,6 +54,11 @@ export interface DomainState {
   markers: StateMarker[];
   /** Free-form `@tag` names, verbatim: data from the analyzed app. */
   tags: string[];
+  /**
+   * The source declares this state as its enum's `#[default]` variant. Evidence
+   * about the machine, not a role — `stateRole.ts` derives `initial` from it.
+   */
+  isDefault: boolean;
   /** Transitions arriving at this state (wildcard-sourced ones included). */
   incoming: DomainTransition[];
   /** Transitions leaving specifically this state (wildcards not repeated). */

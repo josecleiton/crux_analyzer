@@ -3,10 +3,16 @@
  * facts about the machine, so they are painted whether or not a simulation
  * is running.
  *
- * `initial` — the machine's entry point: a state nothing transitions into.
- * When every state has an incoming transition (a fully cyclic machine), the
- * machine's first state is used, which is exactly where the Simulation
- * Engine starts.
+ * `initial` — the machine's entry point, in order of evidence: the state the
+ * source declares as its enum's `#[default]` variant; otherwise a state nothing
+ * transitions into; otherwise — a fully cyclic machine, where neither kind of
+ * evidence exists — the machine's first state, which is where the Simulation
+ * Engine starts. Declaration order is the weakest of the three on purpose: in a
+ * cycle it says nothing, so a `#[default]` on a later variant outranks it.
+ *
+ * The docgen generators make the same reading in `crates/docgen/src/roles.rs`.
+ * The canvas, the Mermaid diagram and the states table must not disagree about
+ * where a machine starts — change one, change both.
  *
  * `final` — a dead end: no outgoing transition of its own. A machine-wide
  * wildcard transition (`from: "*"`) may still leave it; that escape is drawn
@@ -73,6 +79,8 @@ export function isFailureName(name: string): boolean {
 }
 
 function isInitial(machine: DomainMachine, state: DomainState): boolean {
+  const declared = machine.states.find((s) => s.isDefault);
+  if (declared) return declared.id === state.id;
   if (state.incoming.length === 0) return true;
   const anyEntryPoint = machine.states.some((s) => s.incoming.length === 0);
   return !anyEntryPoint && machine.states[0]?.id === state.id;

@@ -90,7 +90,15 @@ describe('stateRole', () => {
 
 /** A bare extra state, for the heuristic-silencing cases. */
 function extraState(name: string, markers: DomainState['markers'] = []): DomainState {
-  return { id: `x/${name}`, name, markers, tags: [], incoming: [], outgoing: [] };
+  return {
+    id: `x/${name}`,
+    name,
+    markers,
+    tags: [],
+    isDefault: false,
+    incoming: [],
+    outgoing: [],
+  };
 }
 
 function withState(machine: DomainMachine, state: DomainState): DomainMachine {
@@ -134,6 +142,43 @@ describe('stateRole with declared markers', () => {
       extraState('UploadError'),
     );
     expect(stateRole(machine, machine.states.at(-1)!).failure).toBe(true);
+  });
+});
+
+describe('stateRole with a declared default', () => {
+  /** The same machine, with `#[default]` moved onto `name`. */
+  function declaring(machine: DomainMachine, name: string): DomainMachine {
+    return {
+      ...machine,
+      states: machine.states.map((s) => ({ ...s, isDefault: s.name === name })),
+    };
+  }
+
+  it('takes the entry point from the declaration in a cyclic machine', () => {
+    // AuthState is a cycle, so declaration order says nothing — which is the
+    // whole reason the parser reports `#[default]`.
+    const machine = declaring(authMachine, 'Authenticating');
+    expect(role(machine, 'Authenticating').initial).toBe(true);
+    expect(role(machine, 'SignedOut').initial).toBe(false);
+    expect(entryState(machine)?.name).toBe('Authenticating');
+  });
+
+  it('outranks a state nothing transitions into', () => {
+    // Idle is RecorderState's entry point by shape; the source is still
+    // entitled to say the machine starts somewhere else.
+    const machine = declaring(recorderMachine, 'Recording');
+    expect(role(machine, 'Recording').initial).toBe(true);
+    expect(role(machine, 'Idle').initial).toBe(false);
+  });
+
+  it('leaves the final role alone', () => {
+    const machine = declaring(recorderMachine, 'Completed');
+    expect(role(machine, 'Completed')).toEqual({
+      initial: true,
+      failure: false,
+      deprecated: false,
+      final: true,
+    });
   });
 });
 

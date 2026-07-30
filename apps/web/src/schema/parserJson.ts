@@ -53,6 +53,13 @@ export interface ParserStateJson {
   doc?: string;
   markers: ParserMarker[];
   tags: string[];
+  /**
+   * The contract's `default`: the source declares this state as its enum's
+   * `#[default]` variant. Evidence, not a role — `domain/stateRole.ts` is what
+   * turns it into `initial`. Always a boolean: "not declared" and "declared
+   * false" are the same absence.
+   */
+  isDefault: boolean;
 }
 
 /**
@@ -159,7 +166,7 @@ function parseMachine(coreName: string, raw: unknown): ParserMachineJson {
  * `{ "name": "Failed", ... }` become the same record.
  */
 function parseState(machineName: string, raw: unknown): ParserStateJson {
-  if (typeof raw === 'string') return { name: raw, markers: [], tags: [] };
+  if (typeof raw === 'string') return { name: raw, markers: [], tags: [], isDefault: false };
   if (!isRecord(raw)) {
     throw invalid(`machine "${machineName}": state must be a string or an object`);
   }
@@ -172,6 +179,10 @@ function parseState(machineName: string, raw: unknown): ParserStateJson {
     doc: parseDoc(`state "${name}"`, raw.doc),
     markers: parseMarkers(`state "${name}"`, raw.markers),
     tags: parseStrings(`state "${name}": tags`, raw.tags),
+    // Anything but `true` is "no declaration", the same leniency the markers
+    // get: a producer that writes the key some other way loses the evidence,
+    // never the model.
+    isDefault: raw.default === true,
   };
 }
 

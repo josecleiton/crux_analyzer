@@ -20,7 +20,13 @@ describe('parseProjectJson', () => {
 
   it('normalizes a bare state name into the annotated shape', () => {
     const [state] = statesOf(projectWith({ name: 'M', states: ['Idle'], transitions: [] }));
-    expect(state).toEqual({ name: 'Idle', doc: undefined, markers: [], tags: [] });
+    expect(state).toEqual({
+      name: 'Idle',
+      doc: undefined,
+      markers: [],
+      tags: [],
+      isDefault: false,
+    });
   });
 
   it('carries doc, markers and tags of an annotated state', () => {
@@ -36,6 +42,7 @@ describe('parseProjectJson', () => {
       doc: 'It broke.',
       markers: ['failure'],
       tags: ['retryable'],
+      isDefault: false,
     });
   });
 
@@ -63,6 +70,30 @@ describe('parseProjectJson', () => {
     expect(machine.tags).toEqual([]);
     expect(machine.states[0].markers).toEqual([]);
     expect(machine.states[0].tags).toEqual([]);
+  });
+
+  it('reads the declared default off a state', () => {
+    const states = statesOf(
+      projectWith({
+        name: 'M',
+        states: [{ name: 'Idle', default: true }, 'Running'],
+        transitions: [],
+      }),
+    );
+    expect(states.map((s) => s.isDefault)).toEqual([true, false]);
+  });
+
+  it('treats anything but true as no declaration', () => {
+    // The flag decides where the machine starts, so a producer that writes it
+    // some other way must not be believed.
+    const states = statesOf(
+      projectWith({
+        name: 'M',
+        states: [{ name: 'Idle', default: 'yes' }, { name: 'Running' }],
+        transitions: [],
+      }),
+    );
+    expect(states.every((s) => !s.isDefault)).toBe(true);
   });
 
   it('drops a marker it does not understand instead of rejecting the model', () => {

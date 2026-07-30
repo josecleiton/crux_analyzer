@@ -68,6 +68,7 @@ function mapMachine(coreId: string, machine: ParserMachineJson): DomainMachine {
       doc: state.doc,
       markers: state.markers,
       tags: state.tags,
+      isDefault: state.isDefault,
       incoming: transitions.filter((t) => t.to === id),
       outgoing: transitions.filter((t) => t.from === id),
     };
