@@ -1189,11 +1189,10 @@ button.trail-card:hover {
 
 .machine-group-title {
   padding: 12px 16px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--text-muted);
-  text-transform: uppercase;
   transition: color 120ms ease;
 }
 
