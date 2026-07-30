@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { buildWebviewHtml } from './webviewHtml';
 
-// The shape Vite actually emits: inline pre-paint scripts in <head>, one entry
-// module script, `modulepreload` links for the chunks it imports (the bundle is
-// code-split — elkjs has its own chunk), and one stylesheet, all root-absolute.
+// The shape Vite actually emits: the static-site CSP `apps/web/csp.ts` bakes in,
+// inline pre-paint scripts in <head>, one entry module script, `modulepreload`
+// links for the chunks it imports (the bundle is code-split — elkjs has its own
+// chunk), and one stylesheet, all root-absolute.
 const INDEX_HTML = `<!doctype html>
 <html lang="en">
   <head>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-Lzn4X5vbIdPcvF5a1Q4q0CPgn0x51ovwc1ShU53F2MI='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'" />
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>crux_analyzer</title>
@@ -77,6 +79,25 @@ describe('buildWebviewHtml', () => {
     expect(scriptSrc).not.toContain("'unsafe-inline'");
     expect(scriptSrc).not.toContain("'unsafe-eval'");
     expect(scriptSrc).not.toMatch(/(^|\s)\*/);
+  });
+
+  /**
+   * The static build bakes its own policy into `index.html`, and CSP composes by
+   * intersection: a document carrying both policies runs only what *both* allow.
+   * The site policy's `'self'` is the `vscode-webview://` document origin, not
+   * the `vscode-resource` host the bundle is served from, so leaving it in blocks
+   * the entry module and the model injection — a styled, empty page.
+   */
+  it('replaces the static-site policy instead of adding to it', () => {
+    const html = build();
+    const policies = html.match(/http-equiv="Content-Security-Policy"/g) ?? [];
+    expect(policies.length).toBe(1);
+    expect(html).toContain("script-src 'nonce-NONCE'");
+    expect(html).not.toContain("script-src 'self'");
+    expect(html).not.toContain('sha256-');
+    // and the surviving policy is the webview's, in <head> before every script
+    const cspAt = html.indexOf('http-equiv="Content-Security-Policy"');
+    expect(cspAt).toBeLessThan(html.indexOf('<script'));
   });
 
   it('re-roots the modulepreload of a split chunk', () => {

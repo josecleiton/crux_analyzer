@@ -9,7 +9,9 @@
  * - webviews cannot serve `/assets/...` — root-absolute URLs are re-rooted
  *   onto the `asWebviewUri` base the host passes in;
  * - webviews want a strict CSP — scripts run under a nonce, which is also
- *   stamped onto the bundle's own inline pre-paint scripts (theme/locale);
+ *   stamped onto the bundle's own inline pre-paint scripts (theme/locale), and
+ *   the policy the static-site build baked in is *removed* first, because two
+ *   policies on one document are enforced as their intersection;
  * - webviews have no HTTP origin to fetch `model.json` from — the model is
  *   injected as `window.__CRUX_MODEL__`, the embedding contract the web
  *   app's `loadProject` honors before it ever tries to fetch.
@@ -27,6 +29,15 @@ export interface WebviewHtmlOptions {
   /** The parser model to inject, still unparsed — passed through verbatim. */
   model: unknown;
 }
+
+/**
+ * A `<meta http-equiv="Content-Security-Policy">` tag, with the attribute in
+ * either position — the tag is generated markup, so the shape is narrow, but
+ * matching it by attribute rather than by exact text keeps this working when the
+ * bundler's output changes.
+ */
+const CSP_META =
+  /<meta\b[^>]*\bhttp-equiv=["']?content-security-policy["']?[^>]*>\s*/gi;
 
 export function buildWebviewHtml(options: WebviewHtmlOptions): string {
   const { indexHtml, webRootUri, cspSource, nonce, model } = options;
@@ -62,6 +73,15 @@ export function buildWebviewHtml(options: WebviewHtmlOptions): string {
 
   return (
     indexHtml
+      // The static-site policy the bundler baked in (apps/web/csp.ts) must go
+      // before ours is added. CSP composes by intersection, never by override:
+      // that policy allows scripts from `'self'` plus a hash per pre-paint
+      // script, and in a webview `'self'` is the `vscode-webview://` document
+      // origin, not the `vscode-resource` host serving the bundle. Left in
+      // place it blocks the entry module, its split chunks and the model
+      // injection — while the hashed pre-paint scripts still run, so the page
+      // renders styled and empty rather than failing loudly.
+      .replace(CSP_META, '')
       // root-absolute asset URLs → webview URIs
       .replace(/(src|href)="\//g, `$1="${webRootUri}/`)
       // every script — the bundle's module and its inline pre-paint blocks —
