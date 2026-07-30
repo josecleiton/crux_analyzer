@@ -6,11 +6,18 @@
  * state nodes — unless the core has a single machine, which renders flat.
  * Geometry (positions and routes) is computed later by the LayoutEngine;
  * this layer provides the node dimensions the engine needs.
+ *
+ * Reader-hidden states (`domain/visibility.ts`) are dropped here rather than
+ * further down: what the reader deselected never reaches the layout engine, so
+ * the remaining graph is laid out as if those states did not exist instead of
+ * keeping a gap where they were.
  */
 
 import type { Edge, Node } from '@xyflow/react';
 import type { DomainCore, DomainMachine } from '../domain/types';
 import { wildcardStateId } from '../domain/types';
+import { families, familyId, machineTree } from '../domain/hierarchy';
+import { NOTHING_HIDDEN } from '../domain/visibility';
 import { entryState, stateRole } from '../domain/stateRole';
 
 export interface FlowModel {
@@ -63,12 +70,40 @@ const INITIAL_MARKER_WIDTH = 14;
  */
 export const DOC_MARK_WIDTH = 17;
 
-export function toFlowModel(core: DomainCore, labels: FlowLabels): FlowModel {
+export function toFlowModel(
+  core: DomainCore,
+  labels: FlowLabels,
+  hidden: ReadonlySet<string> = NOTHING_HIDDEN,
+): FlowModel {
+  // Sections come from what the core *declares*, not from what survives the
+  // reader's filter: hiding one machine entirely must not re-flatten another.
   const grouped = core.machines.length > 1;
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
   for (const machine of core.machines) {
+    // A machine with no state left leaves the canvas altogether — including its
+    // wildcards. "Any state" stands for the machine's visible states, so with
+    // none of them on screen it stands for nothing: a `* → *` transition would
+    // otherwise keep a section alive with an edge between two pseudo-nodes.
+    if (machine.states.every((state) => hidden.has(state.id))) continue;
+
+    const machineEdgeList = machineEdges(machine, hidden);
+    const wildcard = wildcardStateId(machine.id);
+    // The pseudo-node exists to carry wildcard edges; with none left to draw
+    // (their real endpoints hidden) it has nothing to say.
+    const wildcardUsed =
+      machine.hasWildcard &&
+      machineEdgeList.some((edge) => edge.source === wildcard || edge.target === wildcard);
+    const stateNodes = machineNodes(
+      machine,
+      grouped ? machine.id : undefined,
+      labels,
+      hidden,
+      wildcardUsed,
+    );
+    if (stateNodes.length === 0) continue;
+
     if (grouped) {
       nodes.push({
         id: machine.id,
@@ -82,8 +117,8 @@ export function toFlowModel(core: DomainCore, labels: FlowLabels): FlowModel {
         position: { x: 0, y: 0 },
       });
     }
-    nodes.push(...machineNodes(machine, grouped ? machine.id : undefined, labels));
-    edges.push(...machineEdges(machine));
+    nodes.push(...stateNodes);
+    edges.push(...machineEdgeList);
   }
 
   return { nodes, edges };
@@ -93,48 +128,32 @@ function machineNodes(
   machine: DomainMachine,
   parentId: string | undefined,
   labels: FlowLabels,
+  hidden: ReadonlySet<string>,
+  wildcardUsed: boolean,
 ): Node[] {
   const base = { parentId, position: { x: 0, y: 0 } };
 
   // Composite parents ("Active" in "Active/Loading") become containers, the
-  // same nesting Mermaid renders. A parent is never a state of its own — the
-  // parser fans wildcard patterns out over the children — but guard against
-  // a name collision anyway: a machine that somehow declares a plain state
-  // with a parent's name keeps that family flat rather than nesting a state
-  // inside a state.
-  const plainNames = new Set(
-    machine.states.filter((s) => !s.name.includes('/')).map((s) => s.name),
-  );
-  const compositeParents: string[] = [];
-  for (const state of machine.states) {
-    const parent = state.name.split('/', 1)[0];
-    if (
-      state.name.includes('/') &&
-      !plainNames.has(parent) &&
-      !compositeParents.includes(parent)
-    ) {
-      compositeParents.push(parent);
-    }
-  }
-  const compositeId = (parent: string) => `${machine.id}/${parent}`;
+  // same nesting Mermaid renders — and the same reading the sidebar outline
+  // gives them, which is why it is `domain/hierarchy.ts` that decides it.
+  const tree = machineTree(machine);
 
   // containers first: React Flow requires a parent before its children
-  const nodes: Node[] = compositeParents.map((parent) => ({
-    ...base,
-    id: compositeId(parent),
-    type: 'compositeGroup',
-    data: { label: parent },
-  }));
+  const nodes: Node[] = families(tree)
+    // a family whose every leaf is hidden has nothing left to contain
+    .filter((family) => family.children.some((leaf) => !hidden.has(leaf.state.id)))
+    .map((family) => ({
+      ...base,
+      id: familyId(machine.id, family.name),
+      type: 'compositeGroup',
+      data: { label: family.name },
+    }));
 
   for (const state of machine.states) {
-    const parent = state.name.split('/', 1)[0];
-    const nested = state.name.includes('/') && !plainNames.has(parent);
+    if (hidden.has(state.id)) continue;
     // Inside a container the parent's name is the container's title, so the
     // node keeps only the leaf; spaced separators either way ("A / B").
-    const label = (nested ? state.name.slice(parent.length + 1) : state.name).replace(
-      /\//g,
-      ' / ',
-    );
+    const { label, family } = tree.placement.get(state.id)!;
     const role = stateRole(machine, state);
     const data: StateNodeData = {
       label,
@@ -146,7 +165,7 @@ function machineNodes(
     };
     nodes.push({
       ...base,
-      ...(nested ? { parentId: compositeId(parent) } : {}),
+      ...(family ? { parentId: familyId(machine.id, family) } : {}),
       id: state.id,
       type: 'state',
       data,
@@ -160,7 +179,7 @@ function machineNodes(
     });
   }
 
-  if (machine.hasWildcard) {
+  if (wildcardUsed) {
     nodes.push({
       ...base,
       id: wildcardStateId(machine.id),
@@ -174,21 +193,28 @@ function machineNodes(
   return nodes;
 }
 
-function machineEdges(machine: DomainMachine): Edge[] {
-  return machine.transitions.map((transition) => ({
-    id: transition.id,
-    type: 'routed',
-    source: transition.from,
-    target: transition.to,
-    label: transition.event,
-    // The arrowhead color is theme-dependent and applied by the renderer:
-    // SVG marker attributes cannot read CSS variables.
-    markerEnd: {
-      type: 'arrowclosed' as const,
-      width: 14,
-      height: 14,
-    },
-  }));
+/**
+ * A transition needs both of its ends drawn. The wildcard pseudo-state is never
+ * hidden — "any state" is not a state the reader can deselect — so only the real
+ * endpoint of a wildcard edge decides whether it survives.
+ */
+function machineEdges(machine: DomainMachine, hidden: ReadonlySet<string>): Edge[] {
+  return machine.transitions
+    .filter((transition) => !hidden.has(transition.from) && !hidden.has(transition.to))
+    .map((transition) => ({
+      id: transition.id,
+      type: 'routed',
+      source: transition.from,
+      target: transition.to,
+      label: transition.event,
+      // The arrowhead color is theme-dependent and applied by the renderer:
+      // SVG marker attributes cannot read CSS variables.
+      markerEnd: {
+        type: 'arrowclosed' as const,
+        width: 14,
+        height: 14,
+      },
+    }));
 }
 
 function nodeWidth(label: string): number {

@@ -172,6 +172,95 @@ describe('toFlowModel', () => {
     expect(nodes.map((n) => n.data.label)).toContain('Active / Loading');
   });
 
+  it('leaves out hidden states and the transitions that touch them', () => {
+    const machine = syncCore.machines[0];
+    const syncing = machine.states.find((s) => s.name === 'Syncing')!;
+    const { nodes, edges } = toFlowModel(syncCore, labels, new Set([syncing.id]));
+
+    expect(nodes.some((n) => n.id === syncing.id)).toBe(false);
+    expect(nodes.map((n) => n.data.label)).toEqual(['Idle', 'Conflict', 'Done']);
+    // an edge with a missing end cannot be drawn at all
+    expect(edges.some((e) => e.source === syncing.id || e.target === syncing.id)).toBe(false);
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    for (const edge of edges) {
+      expect(nodeIds.has(edge.source)).toBe(true);
+      expect(nodeIds.has(edge.target)).toBe(true);
+    }
+  });
+
+  it('drops a composite container once its every leaf is hidden', () => {
+    const composite = compositeCore();
+    const leaves = composite.machines[0].states.filter((s) => s.name.startsWith('Active/'));
+
+    const partly = toFlowModel(composite, labels, new Set([leaves[0].id]));
+    expect(partly.nodes.some((n) => n.type === 'compositeGroup')).toBe(true);
+
+    const whole = toFlowModel(composite, labels, new Set(leaves.map((s) => s.id)));
+    // An empty container is a box around nothing.
+    expect(whole.nodes.some((n) => n.type === 'compositeGroup')).toBe(false);
+    expect(whole.nodes.map((n) => n.data.label)).toEqual(['Idle']);
+  });
+
+  it('drops a machine section when the whole machine is hidden, keeping the others sectioned', () => {
+    const [first, second] = recorderCore.machines;
+    const { nodes, edges } = toFlowModel(
+      recorderCore,
+      labels,
+      new Set(first.states.map((s) => s.id)),
+    );
+
+    const groups = nodes.filter((n) => n.type === 'machineGroup');
+    // The remaining machine keeps its section: sections come from what the core
+    // declares, not from what survived the filter.
+    expect(groups.map((g) => g.data.label)).toEqual([second.name]);
+    expect(nodes.every((n) => !n.id.startsWith(`${first.id}/`))).toBe(true);
+    expect(edges.every((e) => e.id.startsWith(`${second.id}/`))).toBe(true);
+  });
+
+  it('drops a machine whose every state is hidden, wildcards included', () => {
+    // A `* → *` transition (wildcard source, runtime target) touches no real
+    // state, so nothing but this rule takes it off the canvas: "any state" has
+    // to stand for at least one state the reader can see.
+    const runtime = fromParserJson(
+      parseProjectJson({
+        project: 'Runtime',
+        cores: [
+          {
+            name: 'C',
+            machines: [
+              {
+                name: 'State',
+                states: ['Idle', 'Busy'],
+                transitions: [
+                  { from: 'Idle', event: 'Start', to: 'Busy' },
+                  { from: '*', event: 'Restored', to: '*' },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    ).cores[0];
+
+    const all = runtime.machines[0].states.map((state) => state.id);
+    expect(toFlowModel(runtime, labels, new Set([all[0]])).nodes).not.toHaveLength(0);
+
+    const { nodes, edges } = toFlowModel(runtime, labels, new Set(all));
+    expect(nodes).toEqual([]);
+    expect(edges).toEqual([]);
+  });
+
+  it('drops the wildcard pseudo-node when no wildcard edge is left to draw', () => {
+    const machine = recorderCore.machines[1]; // the one with a wildcard source
+    const wildcardTargets = machine.transitions
+      .filter((t) => t.fromName === '*')
+      .map((t) => t.to);
+
+    const { nodes } = toFlowModel(recorderCore, labels, new Set(wildcardTargets));
+    // "any state" only exists to carry those edges.
+    expect(nodes.some((n) => n.type === 'anyState')).toBe(false);
+  });
+
   it('turns each transition into an edge labeled with its event', () => {
     const machine = syncCore.machines[0];
     const { nodes, edges } = toFlowModel(syncCore, labels);
