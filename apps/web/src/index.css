@@ -369,7 +369,12 @@ body {
   overflow-y: auto;
 }
 
+/* A column, so the repository link can sit at the bottom of the panel however
+   short the core list is — and the list, not the panel, is what scrolls when it
+   is long, keeping the link in place. */
 .sidebar {
+  display: flex;
+  flex-direction: column;
   border-right: 1px solid var(--border);
 }
 
@@ -389,6 +394,32 @@ body {
 
 .sidebar ul {
   list-style: none;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Quiet by default — it is a footer, not a call to action — and it comes
+   forward on hover. */
+.sidebar-repo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.sidebar-repo:hover {
+  color: var(--text);
+}
+
+.sidebar-repo svg {
+  flex: none;
 }
 
 .core-item {

@@ -23,6 +23,7 @@ export const ptBR: Catalog = {
   'localeToggle.switchTo': 'Mudar para {language}',
 
   'sidebar.cores': 'Núcleos',
+  'sidebar.sourceCode': 'Código-fonte no GitHub',
 
   'inspector.title': 'Inspetor',
   'inspector.empty': 'Selecione um estado ou uma transição.',

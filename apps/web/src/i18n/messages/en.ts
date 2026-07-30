@@ -31,6 +31,9 @@ export const en = {
   'localeToggle.switchTo': 'Switch to {language}',
 
   'sidebar.cores': 'Cores',
+  // "GitHub" is a proper name and stays as it is; only the description of
+  // where the link goes is translated.
+  'sidebar.sourceCode': 'Source code on GitHub',
 
   'inspector.title': 'Inspector',
   'inspector.empty': 'Select a state or a transition.',

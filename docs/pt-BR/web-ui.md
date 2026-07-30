@@ -10,6 +10,8 @@
 Três áreas, no estilo LangGraph Studio:
 
 - **Barra lateral** — os Cores do projeto. Selecionar um renderiza suas máquinas.
+  Seu rodapé aponta para o repositório deste projeto — uma URL fixa no código,
+  nunca uma lida da fonte analisada.
 - **Canvas** — as máquinas de estado. Um core com várias máquinas (regiões
   ortogonais) renderiza cada uma como uma **seção titulada**; um core de máquina
   única renderiza plano. Todo estado é um nó, toda transição é uma aresta

@@ -9,7 +9,9 @@
 
 Three areas, LangGraph-Studio style:
 
-- **Sidebar** — the project's Cores. Selecting one renders its machines.
+- **Sidebar** — the project's Cores. Selecting one renders its machines. Its
+  footer links to this project's repository — a hardcoded URL, never one read
+  out of the analyzed source.
 - **Canvas** — the state machines. A core with several machines (orthogonal
   regions) renders each as a **titled section**; a single-machine core
   renders flat. Every state is a node, every transition an edge labeled with
