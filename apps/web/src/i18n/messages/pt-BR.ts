@@ -23,6 +23,11 @@ export const ptBR: Catalog = {
   'localeToggle.switchTo': 'Mudar para {language}',
 
   'sidebar.cores': 'Núcleos',
+  'sidebar.expand': 'Expandir',
+  'sidebar.collapse': 'Recolher',
+  'sidebar.hideFromCanvas': 'Ocultar {name} do diagrama',
+  'sidebar.showOnCanvas': 'Mostrar {name} no diagrama',
+  'sidebar.showAll': 'Mostrar todos os estados',
   'sidebar.sourceCode': 'Código-fonte no GitHub',
 
   'inspector.title': 'Inspetor',

@@ -3,6 +3,7 @@ import { loadProject } from './data/loadProject';
 import type { DomainProject } from './domain/types';
 import { machineOf } from './domain/fromParserJson';
 import { declaredTags, focusFor } from './domain/focus';
+import { NOTHING_HIDDEN, isOnCanvas, machineStateIds, withHidden } from './domain/visibility';
 import { toFlowModel } from './flow/toFlowModel';
 import type { LayoutEngine, LayoutResult } from './layout/LayoutEngine';
 import { ElkLayoutEngine } from './layout/ElkLayoutEngine';
@@ -28,6 +29,18 @@ import { useTheme } from './theme/useTheme';
 
 const layoutEngine: LayoutEngine = new ElkLayoutEngine();
 
+/** A set with one more member — the immutable update React state wants. */
+function union(set: ReadonlySet<string>, member: string): ReadonlySet<string> {
+  return new Set(set).add(member);
+}
+
+/** The same set with `member` added if it was absent, removed if it was there. */
+function toggled(set: ReadonlySet<string>, member: string): ReadonlySet<string> {
+  const next = new Set(set);
+  if (!next.delete(member)) next.add(member);
+  return next;
+}
+
 export default function App() {
   const [project, setProject] = useState<DomainProject | null>(null);
   const [activeCoreId, setActiveCoreId] = useState<string | null>(null);
@@ -35,6 +48,21 @@ export default function App() {
   const [simulation, setSimulation] = useState<Simulation | null>(null);
   const [tagQuery, setTagQuery] = useState('');
   const [undocumentedOnly, setUndocumentedOnly] = useState(false);
+  // Reader-hidden states, by id. Held for the whole project rather than per
+  // core: the ids are absolute, so what the reader trimmed in one core is still
+  // trimmed when they come back to it.
+  const [hiddenStateIds, setHiddenStateIds] = useState<ReadonlySet<string>>(NOTHING_HIDDEN);
+  // Cores whose outline is open. Selecting a core opens it, so the panel starts
+  // showing the states of the core on screen.
+  const [expandedCoreIds, setExpandedCoreIds] = useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
+  // Machines and composite families the reader folded shut. Open is the default,
+  // so this holds the exceptions — and it is presentation only: a folded machine
+  // keeps every one of its states on the canvas.
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [layouted, setLayouted] = useState<LayoutResult>({ nodes: [], edges: [] });
   // Bumped when an explicit Re-layout lands, so the Graph re-frames: the
@@ -53,8 +81,12 @@ export default function App() {
       // a deep link (#state=Core/Machine/Name) lands selected; a stale or
       // foreign one falls back to the first core, nothing selected
       const initial = resolveUrlState(loaded, fromHash(window.location.hash));
-      setActiveCoreId(initial.coreId ?? loaded.cores[0]?.id ?? null);
+      const coreId = initial.coreId ?? loaded.cores[0]?.id ?? null;
+      setActiveCoreId(coreId);
       setSelection(initial.selection);
+      // The core on screen opens its outline; the others stay collapsed, so a
+      // project with many cores still shows its list at a glance.
+      if (coreId) setExpandedCoreIds(new Set([coreId]));
     });
     return () => {
       cancelled = true;
@@ -102,9 +134,9 @@ export default function App() {
   const flowModel = useMemo(
     () =>
       activeCore
-        ? toFlowModel(activeCore, { anyState: t('state.anyState') })
+        ? toFlowModel(activeCore, { anyState: t('state.anyState') }, hiddenStateIds)
         : { nodes: [], edges: [] },
-    [activeCore, t],
+    [activeCore, t, hiddenStateIds],
   );
 
   useEffect(() => {
@@ -165,12 +197,41 @@ export default function App() {
   }, [simulation, simulatedMachine, activeCore, tagQuery, undocumentedOnly]);
 
   function selectCore(coreId: string) {
+    // Its own outline is what the panel shows for the core on screen.
+    setExpandedCoreIds((expanded) => (expanded.has(coreId) ? expanded : union(expanded, coreId)));
+    if (coreId === activeCoreId) return;
     setActiveCoreId(coreId);
     setSelection(null);
     setSimulation(null);
     // each core declares its own tags, so a filter does not survive the switch
     setTagQuery('');
     setUndocumentedOnly(false);
+  }
+
+  function toggleCoreExpanded(coreId: string) {
+    setExpandedCoreIds((expanded) => toggled(expanded, coreId));
+  }
+
+  /** Folds a machine or a composite family in the outline, or opens it again. */
+  function toggleGroup(groupId: string) {
+    setCollapsedGroupIds((collapsed) => toggled(collapsed, groupId));
+  }
+
+  /**
+   * Takes states off the canvas, or puts them back. A selection that loses what
+   * it pointed at goes with them: an inspector describing a state nobody can see
+   * is worse than an empty one.
+   */
+  function setStatesHidden(stateIds: string[], hidden: boolean) {
+    const next = withHidden(hiddenStateIds, stateIds, hidden);
+    if (next === hiddenStateIds) return;
+    setHiddenStateIds(next);
+    // The graph changes size, so the frame has to follow: this bump makes the
+    // viewport re-fit once the new layout lands, the same way Re-layout does.
+    setLayoutVersion((version) => version + 1);
+    if (activeCore && selection && !isOnCanvas(activeCore, selection.kind, selection.id, next)) {
+      setSelection(null);
+    }
   }
 
   function toggleSimulation() {
@@ -186,6 +247,9 @@ export default function App() {
       activeCore.machines[0];
     const initialState = selection?.kind === 'state' ? selection.id : undefined;
     setSelection(null);
+    // A run needs its machine whole: replaying through states the reader trimmed
+    // away would highlight nothing. Trimming again mid-run stays allowed.
+    setStatesHidden(machineStateIds(machine), false);
     setSimulation(startSimulation(machine, initialState));
   }
 
@@ -224,7 +288,15 @@ export default function App() {
         <Sidebar
           cores={project.cores}
           activeCoreId={activeCoreId}
+          expandedCoreIds={expandedCoreIds}
+          collapsedGroupIds={collapsedGroupIds}
+          hiddenStateIds={hiddenStateIds}
+          selection={selection}
           onSelectCore={selectCore}
+          onToggleCore={toggleCoreExpanded}
+          onToggleGroup={toggleGroup}
+          onSelect={setSelection}
+          onSetStatesHidden={setStatesHidden}
         />
         <main className="graph-area">
           <Graph

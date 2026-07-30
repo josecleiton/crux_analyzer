@@ -460,6 +460,11 @@ body {
 
 .sidebar ul {
   list-style: none;
+}
+
+/* Only the outer list scrolls: nested outlines grow it instead of getting a
+   scrollbar of their own, which keeps the footer link in place. */
+.sidebar > .core-list {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -488,12 +493,62 @@ body {
   flex: none;
 }
 
-.core-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 8px 10px;
+.core-entry {
   margin-bottom: 4px;
+}
+
+/* The disclosure arrow and the core name share a row: one hit area selects the
+   core, the other only opens or closes its outline. */
+.core-row {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+}
+
+.core-row:hover {
+  background: var(--bg-hover);
+}
+
+.core-row.active {
+  background: var(--accent-soft);
+}
+
+.core-row.active .core-item {
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.core-twisty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.core-twisty:hover {
+  color: var(--text);
+}
+
+.chevron {
+  transition: transform 120ms ease;
+}
+
+.chevron.open {
+  transform: rotate(90deg);
+}
+
+.core-item {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 8px 10px 8px 2px;
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -502,14 +557,111 @@ body {
   cursor: pointer;
 }
 
-.core-item:hover {
+/* The core's outline: machines, composite families, states. Indentation is the
+   hierarchy, and the guide line follows it. */
+.core-tree {
+  padding: 2px 0 6px 10px;
+}
+
+.tree-machine + .tree-machine {
+  margin-top: 6px;
+}
+
+.tree-label.machine {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.tree-states,
+.tree-children {
+  margin-left: 7px;
+  padding-left: 6px;
+  border-left: 1px solid var(--border);
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 5px;
+}
+
+/* A row that folds has an arrow; a leaf keeps the space, so the checkboxes of
+   a level line up either way. */
+.tree-twisty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 14px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+button.tree-twisty:hover {
+  color: var(--text);
+}
+
+.tree-row:hover {
   background: var(--bg-hover);
 }
 
-.core-item.active {
-  background: var(--accent-soft);
+.tree-check {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-left: 2px;
+  accent-color: var(--accent-strong);
+  cursor: pointer;
+}
+
+.tree-label {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 4px 4px 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* A composite parent labels its children and selects nothing — clicking it
+   folds them. */
+.tree-label.container {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.tree-label.selected {
   color: var(--accent-strong);
   font-weight: 600;
+}
+
+/* Only offered while something is hidden, so it doubles as the sign that the
+   canvas is showing less than the whole core. */
+.tree-reset {
+  margin: 6px 0 0 11px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 11px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.tree-reset:hover {
+  color: var(--text);
 }
 
 .graph-area {

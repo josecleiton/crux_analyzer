@@ -31,6 +31,13 @@ export const en = {
   'localeToggle.switchTo': 'Switch to {language}',
 
   'sidebar.cores': 'Cores',
+  'sidebar.expand': 'Expand',
+  'sidebar.collapse': 'Collapse',
+  // `name` is a machine, family or state name read out of the analyzed
+  // application — a proper name, substituted untranslated.
+  'sidebar.hideFromCanvas': 'Hide {name} from the canvas',
+  'sidebar.showOnCanvas': 'Show {name} on the canvas',
+  'sidebar.showAll': 'Show all states',
   // "GitHub" is a proper name and stays as it is; only the description of
   // where the link goes is translated.
   'sidebar.sourceCode': 'Source code on GitHub',
