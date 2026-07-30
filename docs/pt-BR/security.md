@@ -65,7 +65,11 @@ publicado. Eles nunca podem se tornar marcação.
   `evento / efeito, efeito`, então **nomes de efeito** também estão nesse caminho —
   o rótulo composto inteiro é escapado, não suas partes.
 - **Em células de tabela**: a barra invertida é escapada *antes* do pipe, ou
-  prosa contendo `\|` reabre uma coluna. Backticks também são escapados.
+  prosa contendo `\|` reabre uma coluna. Backticks *não* são escapados — uma
+  linha é dividida nos seus pipes não escapados antes de suas células serem
+  interpretadas como conteúdo inline, então um backtick não pode transbordar
+  para a coluna seguinte, e os code spans do autor são uma funcionalidade aqui
+  exatamente como num bloco de prosa.
 
 Fixado por [`hostile_output.rs`](../../crates/docgen/tests/hostile_output.rs).
 

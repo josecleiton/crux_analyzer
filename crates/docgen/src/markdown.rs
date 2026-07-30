@@ -307,8 +307,15 @@ fn paragraphs(doc: &str) -> Vec<&str> {
 ///
 /// The backslash goes first, or prose containing a literal `\|` would become
 /// `\\|` — a rendered backslash followed by an *unescaped* pipe, which opens a
-/// column anyway. Backticks are escaped too: one stray backtick spills code
-/// formatting across the rest of the row.
+/// column anyway.
+///
+/// Backticks are deliberately *not* escaped. A cell holds the same author
+/// Markdown a `prose_block` does, where backticks are a feature, and a row
+/// cannot be spilled by one: a table row is split on its unescaped pipes
+/// before its cells are parsed as inline content, so a backtick never crosses
+/// into the next column, and an unpaired one is already literal where it
+/// stands. Escaping them turned every documented `field` into a visible
+/// `` \`field\` ``. See `docs/security.md`.
 fn table_cell(text: &str) -> String {
     let flat: String = text
         .split_whitespace()
@@ -322,8 +329,7 @@ fn table_cell(text: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('\\', "\\\\")
-        .replace('|', "\\|")
-        .replace('`', "\\`");
+        .replace('|', "\\|");
     // A cell holds the same author Markdown a prose block does, links included.
     // Last, so the `&#58;` it may emit is not re-escaped by the `&` pass above.
     neutralize_unsafe_urls(&escaped)

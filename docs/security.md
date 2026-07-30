@@ -61,7 +61,10 @@ document. They may never become markup.
   transition label is `event / effect, effect`, so **effect names** are on that
   path too — the whole composed label is escaped, not its parts.
 - **In table cells**: the backslash is escaped *before* the pipe, or prose
-  containing `\|` re-opens a column. Backticks are escaped too.
+  containing `\|` re-opens a column. Backticks are *not* escaped — a row is
+  split on its unescaped pipes before its cells are parsed as inline content,
+  so a backtick cannot spill into the next column, and author code spans are a
+  feature here exactly as they are in a prose block.
 
 Pinned by [`hostile_output.rs`](../crates/docgen/tests/hostile_output.rs).
 

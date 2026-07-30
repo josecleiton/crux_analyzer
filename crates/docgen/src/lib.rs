@@ -638,6 +638,31 @@ mod tests {
         assert!(doc.contains("| Playing | Either a \\| or a wrapped line. |"), "{doc}");
     }
 
+    /// A cell is prose, not a literal: the same backticks that render as code
+    /// in a documentation block have to render as code in the table too.
+    #[test]
+    fn markdown_keeps_author_backticks_live_in_a_description() {
+        let mut project = sample();
+        project.cores[0].machines[0].states[1].doc =
+            Some("`progress` is how far along the bar it is.".into());
+        let doc = markdown(&project, Locale::En);
+        assert!(
+            doc.contains("| Playing | `progress` is how far along the bar it is. |"),
+            "{doc}"
+        );
+        assert!(!doc.contains("\\`"), "backtick escaped into the reader's view: {doc}");
+    }
+
+    /// A cell is one row: the pipe still has to be escaped inside a code span,
+    /// or the code span opens a column.
+    #[test]
+    fn markdown_escapes_a_pipe_inside_an_author_code_span() {
+        let mut project = sample();
+        project.cores[0].machines[0].states[1].doc = Some("Either `a | b` or nothing.".into());
+        let doc = markdown(&project, Locale::En);
+        assert!(doc.contains("| Playing | Either `a \\| b` or nothing. |"), "{doc}");
+    }
+
     #[test]
     fn markdown_localizes_the_states_table_but_not_the_authors_text() {
         let doc = markdown(&documented_sample(), Locale::PtBr);

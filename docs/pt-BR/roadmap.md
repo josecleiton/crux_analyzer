@@ -174,6 +174,39 @@ Deliberadamente *não* feito: fuzzing do parser (`cargo-fuzz` sobre
 
 ---
 
+## 4c. Escape que vai além da conta
+
+Encontrado lendo o documento gerado de uma aplicação real, não por um teste: a
+passagem de codificação da §4b está certa sobre *sair* do Markdown e um pouco
+errada sobre *permanecer* nele. As duas metades são o mesmo erro — escape
+aplicado onde a marcação do autor deveria sobreviver — e o contrato que elas
+violam já está escrito: o Markdown do autor é uma funcionalidade, só a
+capacidade de sair dele é removida.
+
+- **Backticks numa célula de tabela ✅ feito.** `table_cell` os escapava, então um
+  `` `campo` `` documentado chegava ao leitor como um `` \`campo\` `` visível — 13
+  células numa única aplicação alvo. A razão declarada ("um backtick solto
+  derrama formatação de código pelo resto da linha") não se sustenta: uma linha
+  de tabela é dividida nos seus pipes não escapados *antes* de suas células
+  serem interpretadas como conteúdo inline, então um backtick não pode atravessar
+  uma coluna, e um backtick ímpar já é literal. O escape saiu; o escape do pipe,
+  que precisa sobreviver dentro de um code span, está fixado por um teste próprio.
+- **Entidades dentro de um code span — aberto.** `<`, `>` e `&` são escapados na
+  string inteira, code spans incluídos, e o CommonMark não decodifica
+  referências de entidade dentro de um code span. Então um doc comment escrito
+  como `` `Option<String>` `` é publicado como um `Option&lt;String&gt;` literal.
+  Afeta `prose_block` e `table_cell` igualmente, e não é hipotético para uma base
+  de código Rust — só precisa de uma aplicação que documente um tipo genérico, o
+  que nenhuma fixture e nenhuma aplicação alvo faz ainda. A correção é escapar *em
+  volta* dos code spans em vez de através deles, o que significa que `prose_block`
+  tem que reconhecer um span como já reconhece uma linha em forma de cerca:
+  procurar sequências de backticks e deixar em paz o que está entre um par
+  casado. Barato, mas é parsing inline de verdade, então quer testes de entrada
+  hostil próprios (sequências não casadas, sequências de tamanhos diferentes, um
+  span contendo um `<script>` literal) antes de substituir um `replace` cego.
+
+---
+
 ## 5. Distribuição — colocar na mão de outras pessoas
 
 Ninguém fora deste checkout consegue instalar a ferramenta. `cargo run` e `just`

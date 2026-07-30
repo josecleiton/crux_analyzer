@@ -165,6 +165,38 @@ would be the natural next step and is listed in §7.
 
 ---
 
+## 4c. Escaping that over-reaches
+
+Found by reading a real app's generated document rather than by a test: §4b's
+encoding pass is correct about *leaving* Markdown and slightly wrong about
+*staying* in it. Both halves are the same mistake — escaping applied where the
+author's markup was supposed to survive — and the contract they violate is
+already written down: author Markdown is a feature, only the ability to leave it
+is removed.
+
+- **Backticks in a table cell ✅ done.** `table_cell` escaped them, so a
+  documented `` `field` `` reached the reader as a visible `` \`field\` `` — 13
+  cells in one target app. The stated reason ("one stray backtick spills code
+  formatting across the rest of the row") does not hold: a table row is split on
+  its unescaped pipes *before* its cells are parsed as inline content, so a
+  backtick cannot cross a column, and an unpaired one is already literal. The
+  escape is gone; the pipe escape, which does have to survive inside a code
+  span, is pinned by its own test.
+- **Entities inside a code span — open.** `<`, `>` and `&` are escaped over the
+  whole string, code spans included, and CommonMark does not decode entity
+  references inside a code span. So a doc comment reading `` `Option<String>` ``
+  publishes as a literal `Option&lt;String&gt;`. It affects `prose_block` and
+  `table_cell` equally, and it is not hypothetical for a Rust codebase — it just
+  needs an app that documents a generic type, which no fixture and no target app
+  does yet. The fix is to escape *around* code spans instead of through them,
+  which means `prose_block` has to recognize a span the way it already
+  recognizes a fence-shaped line: scan for backtick runs, leave what is between
+  a matched pair alone. Cheap, but it is real inline parsing, so it wants
+  hostile-input tests of its own (unmatched runs, runs of different lengths, a
+  span holding a literal `<script>`) before it replaces a blanket `replace`.
+
+---
+
 ## 5. Distribution — getting it into other people's hands
 
 Nobody outside this checkout can install the tool. `cargo run` and `just` are a
