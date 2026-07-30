@@ -68,11 +68,12 @@ Roles are painted on the canvas at all times, simulation or not
 
 The Inspector and the simulation panel repeat the roles as badges.
 
-A role that carries a color of its own — failure, final, deprecated, in that
-precedence (`roleColor`) — keeps it wherever the UI talks about **arriving** at
-that state: the box on the canvas at every tier of the simulation's emphasis,
-an event that would take you there, the step of the trail that already did.
-Ordinary states have no such color and the simulation paints them in its own
+A role that carries a color of its own — failure, final, deprecated, initial, in
+that precedence (`roleColor`, the same one the static node styles resolve to when
+a state carries more than one) — keeps it wherever the UI talks about **arriving**
+at that state: the box on the canvas at every tier of the simulation's emphasis,
+an event that would take you there, the step of the trail that already did. A
+state with no role of its own is the only one the simulation paints in its own
 green. The colors reach all of those through one set of tokens (`--role-*` in
 `index.css`, defaulting to the simulation's green), so a role gains a color by
 adding a `role-*` block and no rule anywhere else changes.
@@ -230,8 +231,9 @@ Select a state (optional) and hit **Simulate**:
   then breathes, and the new trail entry slides in;
 - a box the run touches keeps its own color, so a colored state never reads as
   healthy: standing on a **failure** paints that box red whole — border, wash,
-  label and ring — a **final** one violet, and one the run only passed through
-  keeps its color under the traveled tier's bold. What is fireable from here is
+  label and ring — a **final** one violet, the **entry state** the run starts
+  from blue, and one the run only passed through keeps its color under the
+  traveled tier's bold. What is fireable from here is
   outlined in the color of where it lands, and so is the event offered in the
   panel. The transitions stay green throughout: the arrow is the run moving, and
   the box is what says where it arrived;

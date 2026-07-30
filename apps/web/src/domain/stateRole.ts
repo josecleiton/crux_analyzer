@@ -120,11 +120,12 @@ export function stateRole(machine: DomainMachine, state: DomainState): StateRole
  * instead of by each of those clients. The precedence mirrors what the static
  * node styles already do to a state carrying more than one role.
  */
-export type RoleColor = 'failure' | 'final' | 'deprecated';
+export type RoleColor = 'failure' | 'final' | 'deprecated' | 'initial';
 
 export function roleColor(role: StateRole): RoleColor | null {
   if (role.failure) return 'failure';
   if (role.final) return 'final';
   if (role.deprecated) return 'deprecated';
+  if (role.initial) return 'initial';
   return null;
 }

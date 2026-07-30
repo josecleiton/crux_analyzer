@@ -66,6 +66,8 @@
   --state-initial: #0284c7;
   --state-initial-text: #0369a1;
   --state-initial-bg: #f0f9ff;
+  --state-initial-border: #bae6fd;
+  --state-initial-ring: rgba(2, 132, 199, 0.18);
 }
 
 :root[data-theme='dark'] {
@@ -125,6 +127,8 @@
   --state-initial: #38bdf8;
   --state-initial-text: #7dd3fc;
   --state-initial-bg: #10222e;
+  --state-initial-border: #1c3b52;
+  --state-initial-ring: rgba(56, 189, 248, 0.22);
 }
 
 /* --- The color a state's role gives it ---------------------------------- */
@@ -169,6 +173,14 @@
   --role-bg: var(--state-deprecated-bg);
   --role-border: var(--state-deprecated-border);
   --role-ring: var(--state-deprecated-ring);
+}
+
+.role-initial {
+  --role: var(--state-initial);
+  --role-text: var(--state-initial-text);
+  --role-bg: var(--state-initial-bg);
+  --role-border: var(--state-initial-border);
+  --role-ring: var(--state-initial-ring);
 }
 
 * {

@@ -73,11 +73,13 @@ Os papéis são pintados no canvas o tempo todo, com ou sem simulação
 
 O Inspetor e o painel de simulação repetem os papéis como selos.
 
-Um papel que tem cor própria — falha, terminal, obsoleto, nessa precedência
-(`roleColor`) — a mantém em todo lugar onde a UI fala sobre **chegar** naquele
-estado: a box no canvas em todos os níveis de ênfase da simulação, um evento que
-levaria você até lá, o passo do histórico que já levou. Estados comuns não têm
-essa cor e a simulação os pinta no seu próprio verde. As cores chegam a tudo isso
+Um papel que tem cor própria — falha, terminal, obsoleto, inicial, nessa
+precedência (`roleColor`, a mesma para a qual os estilos estáticos do nó
+convergem quando um estado carrega mais de um papel) — a mantém em todo lugar onde
+a UI fala sobre **chegar** naquele estado: a box no canvas em todos os níveis de
+ênfase da simulação, um evento que levaria você até lá, o passo do histórico que já
+levou. Um estado sem papel próprio é o único que a simulação pinta no seu próprio
+verde. As cores chegam a tudo isso
 por um único conjunto de tokens (`--role-*` no `index.css`, com o verde da
 simulação como padrão), então um papel ganha cor adicionando um bloco `role-*` e
 nenhuma regra em nenhum outro lugar muda.
@@ -244,8 +246,9 @@ Selecione um estado (opcional) e clique em **Simular**:
   a nova entrada do histórico desliza para dentro;
 - uma box que a corrida toca mantém a cor dela, então um estado colorido nunca se
   lê como saudável: parar em uma **falha** pinta aquela box inteira de vermelho —
-  borda, fundo, rótulo e anel —, uma **terminal** de violeta, e uma por onde a
-  corrida só passou mantém sua cor sob o negrito do nível percorrido. O que é
+  borda, fundo, rótulo e anel —, uma **terminal** de violeta, o **estado de
+  entrada** de onde a corrida parte de azul, e uma por onde a corrida só passou
+  mantém sua cor sob o negrito do nível percorrido. O que é
   disparável daqui fica contornado na cor de onde aterrissa, e o evento oferecido
   no painel também. As transições seguem verdes em todos os casos: a seta é a
   corrida se movendo, e a box é o que diz onde ela chegou;

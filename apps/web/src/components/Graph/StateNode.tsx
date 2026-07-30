@@ -28,6 +28,7 @@ function roleClass(data: Node['data']): string {
   if (data.failure) return 'role-failure';
   if (data.final) return 'role-final';
   if (data.deprecated) return 'role-deprecated';
+  if (data.initial) return 'role-initial';
   return '';
 }
 
