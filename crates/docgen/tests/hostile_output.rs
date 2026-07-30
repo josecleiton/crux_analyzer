@@ -25,6 +25,7 @@ fn hostile(doc: &str) -> Project {
                     doc: Some(doc.to_string()),
                     markers: vec![],
                     tags: vec![],
+                    ..Default::default()
                 }],
                 transitions: vec![Transition {
                     from: State("Idle".into()),
@@ -102,12 +103,12 @@ fn table_cells_keep_their_column_count() {
         .lines()
         .find(|l| l.starts_with("| Idle |"))
         .expect("the states row");
-    // Unescaped pipes only: four columns means five delimiters.
+    // Unescaped pipes only: five columns means six delimiters.
     let unescaped = row
         .char_indices()
         .filter(|(i, c)| *c == '|' && (*i == 0 || row.as_bytes()[i - 1] != b'\\'))
         .count();
-    assert_eq!(unescaped, 5, "column count changed in {row:?}");
+    assert_eq!(unescaped, 6, "column count changed in {row:?}");
 }
 
 /// Control characters must not reach the document: a newline in a table cell
@@ -199,7 +200,12 @@ fn hostile_effect_names_cannot_escape_a_transition_label() {
         }],
     );
 
-    let transitions: Vec<&str> = body.lines().filter(|l| l.contains("-->")).collect();
+    // `[*]` arrows state the derived roles — they carry no name from the
+    // analyzed application, so only the labelled lines are under test here.
+    let transitions: Vec<&str> = body
+        .lines()
+        .filter(|l| l.contains("-->") && !l.contains("[*]"))
+        .collect();
     assert_eq!(transitions.len(), 1, "a statement was injected:\n{body}");
     let label = transitions[0];
     assert!(!label.contains('"'), "unescaped quote in {label:?}");
@@ -246,6 +252,7 @@ fn notes_cannot_inject_diagram_lines() {
             doc: Some("first\nstate Injected\n%% commented".into()),
             markers: vec![],
             tags: vec![],
+            ..Default::default()
         }],
         vec![],
     );
@@ -269,6 +276,7 @@ fn quotes_in_prose_cannot_close_a_label() {
             doc: Some("says \"hello\" loudly".into()),
             markers: vec![],
             tags: vec![],
+            ..Default::default()
         }],
         vec![],
     );

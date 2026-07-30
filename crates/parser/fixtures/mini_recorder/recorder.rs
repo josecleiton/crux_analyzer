@@ -15,8 +15,10 @@ pub enum RecorderEvent {
 
 /// Where one recording session lives, from arming the microphone to a
 /// finished upload.
+#[derive(Default)]
 pub enum RecorderState {
     /// Nothing is being recorded yet. Every session starts and ends here.
+    #[default]
     Idle,
     /// Capturing audio from the microphone.
     Recording,

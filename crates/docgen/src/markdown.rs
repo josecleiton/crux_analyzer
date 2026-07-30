@@ -8,6 +8,7 @@ use crux_analyzer_model::{DocumentedName, Machine, Project, State, StateDecl};
 
 use crate::{
     effects_cell, has_documented_states, machine_diagram, marker_label, one_line, Labels,
+    MachineRoles,
 };
 
 pub fn markdown(project: &Project, locale: Locale) -> String {
@@ -227,23 +228,25 @@ fn push_states(out: &mut String, machine: &Machine, labels: &Labels) {
         return;
     }
 
+    let roles = MachineRoles::of(machine);
     push_line(out, "");
     push_line(out, &format!("#### {}", labels.states));
     push_line(out, "");
     push_line(
         out,
         &format!(
-            "| {} | {} | {} | {} |",
-            labels.state, labels.description, labels.markers, labels.tags
+            "| {} | {} | {} | {} | {} |",
+            labels.state, labels.role, labels.description, labels.markers, labels.tags
         ),
     );
-    push_line(out, "| --- | --- | --- | --- |");
+    push_line(out, "| --- | --- | --- | --- | --- |");
     for state in &machine.states {
         push_line(
             out,
             &format!(
-                "| {} | {} | {} | {} |",
+                "| {} | {} | {} | {} | {} |",
                 state.name,
+                role_cell(&roles, &state.name, labels),
                 description_cell(state, labels),
                 markers_cell(state, labels),
                 tags_cell(state, labels),
@@ -270,6 +273,23 @@ fn description_cell(state: &StateDecl, labels: &Labels) -> String {
         Some(doc) => table_cell(paragraphs(doc).first().copied().unwrap_or_default()),
         None => labels.no_value.to_string(),
     }
+}
+
+/// The derived roles as localized words, in the order a reader walks a machine:
+/// where it starts, where it ends. Kept out of the markers cell on purpose —
+/// that column is what the *author* declared, this one is what the graph says.
+fn role_cell(roles: &MachineRoles, state: &str, labels: &Labels) -> String {
+    let mut words = Vec::new();
+    if roles.is_initial(state) {
+        words.push(labels.role_initial);
+    }
+    if roles.is_final(state) {
+        words.push(labels.role_final);
+    }
+    if words.is_empty() {
+        return labels.no_value.to_string();
+    }
+    words.join(", ")
 }
 
 /// Markers as localized words — this is crux_analyzer's own vocabulary.

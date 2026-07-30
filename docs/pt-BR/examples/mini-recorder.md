@@ -20,6 +20,8 @@ stateDiagram-v2
     Recording --> Failed: Failed
     Paused --> Failed: Failed
     Uploading --> Failed: Failed
+    [*] --> Idle
+    Completed --> [*]
     note right of Idle : Nothing is being recorded yet. Every session starts and ends here.
     note right of Recording : Capturing audio from the microphone.
     note right of Paused : Capture is suspended and the buffer is kept.
@@ -30,14 +32,14 @@ stateDiagram-v2
 
 #### Estados
 
-| Estado | Descrição | Marcadores | Etiquetas |
-| --- | --- | --- | --- |
-| Idle | Nothing is being recorded yet. Every session starts and ends here. | — | — |
-| Recording | Capturing audio from the microphone. | — | — |
-| Paused | Capture is suspended and the buffer is kept. | — | — |
-| Uploading | The finished take is on its way to the server. | — | — |
-| Completed | The take is stored and the session is done. | — | — |
-| Failed | The upload gave up. The session is kept so it can be sent again. | falha | `retryable` |
+| Estado | Papel | Descrição | Marcadores | Etiquetas |
+| --- | --- | --- | --- | --- |
+| Idle | inicial | Nothing is being recorded yet. Every session starts and ends here. | — | — |
+| Recording | — | Capturing audio from the microphone. | — | — |
+| Paused | — | Capture is suspended and the buffer is kept. | — | — |
+| Uploading | — | The finished take is on its way to the server. | — | — |
+| Completed | final | The take is stored and the session is done. | — | — |
+| Failed | — | The upload gave up. The session is kept so it can be sent again. | falha | `retryable` |
 
 ##### Paused
 
@@ -72,6 +74,8 @@ Being folded into `RecorderState`, which already tracks the upload.
 stateDiagram-v2
     Empty --> Uploading: StopPressed
     Uploading --> Synced: UploadFinished
+    [*] --> Empty
+    Synced --> [*]
 ```
 
 | De | Evento | Para | Efeitos |

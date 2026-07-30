@@ -52,6 +52,16 @@ pub struct Labels {
     pub effect: &'static str,
     /// States table column: the state's name.
     pub state: &'static str,
+    /// States table column: the roles derived from the machine's shape and its
+    /// `#[default]` declaration. Separate from `markers`, which is what the
+    /// author declared.
+    pub role: &'static str,
+    /// Rendered name of the derived `initial` role — the machine's entry point.
+    /// Not a [`Marker`](crux_analyzer_model::Marker) value: no model field
+    /// carries this word, so it exists only as prose in a document.
+    pub role_initial: &'static str,
+    /// Rendered name of the derived `final` role — a state nothing leaves.
+    pub role_final: &'static str,
     /// States table column: the description authored in the analyzed source.
     pub description: &'static str,
     /// States table column: markers declared in the source.
@@ -90,6 +100,9 @@ impl Labels {
         events: "Events",
         effect: "Effect",
         state: "State",
+        role: "Role",
+        role_initial: "initial",
+        role_final: "final",
         description: "Description",
         markers: "Markers",
         tags: "Tags",
@@ -121,11 +134,15 @@ impl Labels {
         events: "Eventos",
         effect: "Efeito",
         state: "Estado",
+        role: "Papel",
+        role_initial: "inicial",
+        role_final: "final",
         description: "Descrição",
         markers: "Marcadores",
         tags: "Etiquetas",
-        // These match the web UI's `badge.failure` / `badge.deprecated`, so a
-        // generated document and the app read the same way.
+        // These match the web UI's `badge.failure` / `badge.deprecated` — and
+        // the roles above its `badge.initial` / `badge.final` — so a generated
+        // document and the app read the same way.
         marker_failure: "falha",
         marker_deprecated: "descontinuado",
         no_value: "—",

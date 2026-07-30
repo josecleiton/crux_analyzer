@@ -16,11 +16,13 @@ mod coverage;
 mod labels;
 mod markdown;
 mod mermaid;
+mod roles;
 
 pub use coverage::{coverage, Coverage, MachineCoverage, ProjectCoverage};
 pub use labels::Labels;
 pub use markdown::markdown;
 pub use mermaid::{mermaid_diagrams, Diagram};
+pub use roles::MachineRoles;
 
 /// Words Mermaid's state-diagram grammar claims for itself. A state named after
 /// one of these cannot be a bare node id — `enum State { end }` is legal Rust,
@@ -253,6 +255,23 @@ fn machine_diagram(machine: &Machine, labels: &Labels) -> String {
         ));
     }
 
+    // The two derived roles, as the pseudo-state the state-diagram grammar has
+    // for exactly this. `[*]` needs no id and no label, so it is the one part of
+    // a diagram that carries no data from the analyzed application. A composite
+    // child that is an entry point gets its arrow here, in the outer region, the
+    // same way a transition into it is drawn at this level.
+    let roles = MachineRoles::of(machine);
+    for state in &machine.states {
+        if roles.is_initial(&state.name) {
+            lines.push(format!("    [*] --> {}", ids.id(&state.name)));
+        }
+    }
+    for state in &machine.states {
+        if roles.is_final(&state.name) {
+            lines.push(format!("    {} --> [*]", ids.id(&state.name)));
+        }
+    }
+
     // Notes last: by now every id the diagram uses has been declared, whether
     // by a transition line, the orphan guard or a composite block — so this
     // needs no declaration line of its own and the orphan shortcut above
@@ -441,14 +460,50 @@ mod tests {
             doc: Some("Nothing is playing.\n\nThe track stays loaded, so\nplay resumes it.".into()),
             markers: vec![],
             tags: vec!["idle-ish".into()],
+            ..Default::default()
         };
         machine.states[1] = StateDecl {
             name: "Playing".into(),
             doc: Some("Audio is reaching the speakers.".into()),
             markers: vec![Marker::Failure, Marker::Deprecated],
             tags: vec![],
+            ..Default::default()
         };
         project
+    }
+
+    /// The diagram states both derived roles. Before this, `[*]` appeared in no
+    /// generated document at all: the web painted an entry and a dead end that
+    /// the Mermaid and the Markdown never mentioned.
+    #[test]
+    fn mermaid_marks_the_entry_point_and_the_dead_ends() {
+        let body = &mermaid_diagrams(&sample(), Locale::En)[0].mermaid;
+        // `Stopped` is where the wildcard transition arrives, so the entry point
+        // is the state nothing reaches.
+        assert!(body.contains("\n    [*] --> Orphan"), "{body}");
+        assert!(!body.contains("[*] --> Stopped"), "{body}");
+        assert!(body.contains("\n    Playing --> [*]"), "{body}");
+        assert!(body.contains("\n    Orphan --> [*]"), "{body}");
+        assert!(!body.contains("Stopped --> [*]"), "{body}");
+    }
+
+    /// A `#[default]` variant is the entry point even when the machine is a
+    /// cycle, which is the case declaration order cannot answer.
+    #[test]
+    fn mermaid_takes_the_entry_point_from_the_declared_default() {
+        let mut project = sample();
+        let machine = &mut project.cores[0].machines[0];
+        machine.transitions.push(Transition {
+            from: State("Playing".into()),
+            event: Event("Stop".into()),
+            to: State("Orphan".into()),
+            effects: vec![],
+        });
+        machine.states[1].is_default = true;
+
+        let body = &mermaid_diagrams(&project, Locale::En)[0].mermaid;
+        assert!(body.contains("\n    [*] --> Playing"), "{body}");
+        assert_eq!(body.matches("[*] -->").count(), 1, "{body}");
     }
 
     #[test]
@@ -541,16 +596,21 @@ mod tests {
         let doc = markdown(&documented_sample(), Locale::En);
         assert!(doc.contains("#### States"), "{doc}");
         assert!(
-            doc.contains("| State | Description | Markers | Tags |"),
+            doc.contains("| State | Role | Description | Markers | Tags |"),
             "{doc}"
         );
         assert!(
-            doc.contains("| Playing | Audio is reaching the speakers. | failure, deprecated | — |"),
+            doc.contains(
+                "| Playing | final | Audio is reaching the speakers. | failure, deprecated | — |"
+            ),
             "{doc}"
         );
-        assert!(doc.contains("| Stopped | Nothing is playing. | — | `idle-ish` |"), "{doc}");
+        assert!(
+            doc.contains("| Stopped | — | Nothing is playing. | — | `idle-ish` |"),
+            "{doc}"
+        );
         // An undocumented state still has a row, so the table is the state list.
-        assert!(doc.contains("| Orphan | — | — | — |"), "{doc}");
+        assert!(doc.contains("| Orphan | initial, final | — | — | — |"), "{doc}");
     }
 
     #[test]
@@ -635,7 +695,7 @@ mod tests {
         project.cores[0].machines[0].states[1].doc =
             Some("Either a | or a\nwrapped line.".into());
         let doc = markdown(&project, Locale::En);
-        assert!(doc.contains("| Playing | Either a \\| or a wrapped line. |"), "{doc}");
+        assert!(doc.contains("| Playing | final | Either a \\| or a wrapped line. |"), "{doc}");
     }
 
     /// A cell is prose, not a literal: the same backticks that render as code
@@ -647,7 +707,7 @@ mod tests {
             Some("`progress` is how far along the bar it is.".into());
         let doc = markdown(&project, Locale::En);
         assert!(
-            doc.contains("| Playing | `progress` is how far along the bar it is. |"),
+            doc.contains("| Playing | final | `progress` is how far along the bar it is. |"),
             "{doc}"
         );
         assert!(!doc.contains("\\`"), "backtick escaped into the reader's view: {doc}");
@@ -660,7 +720,7 @@ mod tests {
         let mut project = sample();
         project.cores[0].machines[0].states[1].doc = Some("Either `a | b` or nothing.".into());
         let doc = markdown(&project, Locale::En);
-        assert!(doc.contains("| Playing | Either `a \\| b` or nothing. |"), "{doc}");
+        assert!(doc.contains("| Playing | final | Either `a \\| b` or nothing. |"), "{doc}");
     }
 
     #[test]
@@ -668,9 +728,11 @@ mod tests {
         let doc = markdown(&documented_sample(), Locale::PtBr);
         assert!(doc.contains("#### Estados"), "{doc}");
         assert!(
-            doc.contains("| Estado | Descrição | Marcadores | Etiquetas |"),
+            doc.contains("| Estado | Papel | Descrição | Marcadores | Etiquetas |"),
             "{doc}"
         );
+        // The derived roles are our vocabulary too, so they translate.
+        assert!(doc.contains("| Orphan | inicial, final |"), "{doc}");
         assert!(doc.contains("falha, descontinuado"), "{doc}");
         // The author's prose and their tag names are data, not prose of ours.
         assert!(doc.contains("Audio is reaching the speakers."), "{doc}");
