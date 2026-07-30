@@ -552,6 +552,56 @@ diagrama ausente é lacuna do parser só quando a fonte de fato declara os estad
 
 ---
 
+## 6b. A entrada e o beco sem saída, em toda saída ✅ **feito**
+
+Duas lacunas encontradas lendo um documento gerado ao lado do app: o analyzer
+pintava `initial` e `final` no canvas e não mencionava nenhum dos dois em documento
+gerado algum — `[*]` não aparecia em **lugar nenhum** do repositório — e a derivação
+de `initial` não fazia o que o próprio comentário do modelo prometia.
+
+**As saídas discordavam.** `Marker` é um vocabulário fechado (`failure`,
+`deprecated`) e corretamente, mas isso deixava a tabela de estados do Markdown sem
+coluna para os dois papéis derivados e o Mermaid sem pseudo-estado de início ou de
+fim. "Não tem estado final na documentação" era verdade para *toda* máquina,
+inclusive as que têm um.
+
+**A derivação prometia demais.** O comentário do `Marker` e o schema diziam que
+`initial` era derivado da forma do grafo *e* de `#[default]`, enquanto `StateDecl`
+não carregava `#[default]` nenhum — o parser conhecia a variante default (é com ela
+que resolve resets `T::default()`) e nunca a repassava. Então uma máquina cíclica
+caía na ordem de declaração, e um `#[default]` numa variante posterior pintava a
+entrada errada. Acertava por coincidência sempre que o default também era a primeira
+variante, que é o caso comum e é por isso que passou despercebido.
+
+Fechadas como um incremento só, porque têm uma causa: faltava a evidência no modelo.
+`StateDecl.is_default` (`default` no wire) agora carrega o que a fonte declara; os
+clientes derivam o papel a partir dela. As duas derivações —
+`crates/docgen/src/roles.rs` para os geradores, `apps/web/src/domain/stateRole.ts`
+para a UI — leem os mesmos três passos: default declarado, depois um estado para o
+qual nada transiciona, depois o primeiro estado declarado. O Markdown ganhou uma
+coluna `Papel` ao lado de `Marcadores` (declarado e derivado ficam em colunas
+separadas de propósito) e o Mermaid ganhou `[*] --> Entrada` / `Beco sem saída --> [*]`.
+
+Invariantes fáceis de achatar por acidente:
+
+- **`default` é evidência, não documentação.** `is_documented()` a ignora
+  deliberadamente, então derivar `Default` nunca melhora um número de cobertura nem
+  faz a tabela de estados aparecer para uma máquina sem documentação. Voltar a
+  dobrá-la em `is_bare()`-como-`!is_documented()` — eram a mesma função antes disto —
+  infla a cobertura em silêncio.
+- **Só uma folha é marcada.** `#[derive(Default)]` aceita `#[default]` apenas em
+  variante unitária, então um composto nunca pode ser o default declarado. O parser
+  ainda checa pertinência antes de marcar, então uma entrada hostil ou que não
+  compila não marca nada em vez de nomear um `Active` que o modelo não declara.
+- **As duas derivações têm de continuar idênticas.** São os mesmos três passos em
+  duas linguagens; mudar uma sem a outra põe o canvas e o documento gerado em
+  desacordo, que é exatamente a lacuna que isto fechou.
+- **A ordem de declaração continua por último.** Ela é a evidência mais fraca, não o
+  primeiro fallback: num ciclo não significa nada, que é toda a razão de `default`
+  estar no contrato.
+
+---
+
 ## 7. Deliberadamente ainda não
 
 - **Gerador PlantUML.** Listado no `init.md`, mas o Mermaid já renderiza

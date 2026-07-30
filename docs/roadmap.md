@@ -537,6 +537,56 @@ diagram is a parser gap only when the source actually declares the states.**
 
 ---
 
+## 6b. The entry and the dead end, in every output ✅ **done**
+
+Two gaps found by reading a generated document next to the app: the analyzer
+painted `initial` and `final` on the canvas and mentioned neither in any generated
+document — `[*]` appeared **nowhere** in the repository — and the `initial`
+derivation did not do what the model's own doc comment promised.
+
+**The outputs disagreed.** `Marker` is a closed vocabulary (`failure`,
+`deprecated`) and correctly so, but that left the Markdown states table with no
+column for the two derived roles and the Mermaid with no start or end pseudo-state.
+"There is no final state in the documentation" was true of *every* machine,
+including the ones that have one.
+
+**The derivation over-promised.** `Marker`'s doc comment and the schema both said
+`initial` was derived from graph shape *and* `#[default]`, while `StateDecl`
+carried no `#[default]` at all — the parser knew the default variant (it resolves
+`T::default()` resets with it) and never passed it on. So a cyclic machine fell
+back to declaration order, and a `#[default]` on a later variant painted the wrong
+entry. It happened to be right whenever the default was also the first variant,
+which is the common case and is why it went unnoticed.
+
+Closed as one increment, because they have one cause: the evidence was missing from
+the model. `StateDecl.is_default` (wire `default`) now carries what the source
+declares; the clients derive the role from it. Both derivations —
+`crates/docgen/src/roles.rs` for the generators, `apps/web/src/domain/stateRole.ts`
+for the UI — read the same three steps: declared default, then a state nothing
+transitions into, then the first declared state. Markdown gained a `Role` column
+next to `Markers` (declared and derived stay separate columns on purpose) and the
+Mermaid gained `[*] --> Entry` / `Dead end --> [*]`.
+
+Invariants that are easy to flatten by accident:
+
+- **`default` is evidence, not documentation.** `is_documented()` deliberately
+  ignores it, so deriving `Default` never improves a coverage score and never makes
+  the states table appear for an undocumented machine. Folding it back into
+  `is_bare()`-as-`!is_documented()` — they were the same function before this —
+  silently inflates coverage.
+- **Only a leaf is ever marked.** `#[derive(Default)]` accepts `#[default]` on a
+  unit variant only, so a composite can never be the declared default. The parser
+  still checks membership before marking, so hostile or non-compiling input marks
+  nothing instead of naming an `Active` the model does not declare.
+- **The two derivations must stay identical.** They are the same three steps in two
+  languages; a change to one that skips the other puts the canvas and the generated
+  document in disagreement, which is the gap this closed.
+- **Declaration order stays last.** It is the weakest evidence, not the first
+  fallback: in a cycle it means nothing, which is the whole reason `default` is in
+  the contract.
+
+---
+
 ## 7. Deliberately not doing yet
 
 - **PlantUML generator.** Listed in `init.md`, but Mermaid already renders

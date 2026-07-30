@@ -75,13 +75,21 @@ it.
 ### Markdown (default)
 
 One document: per machine, its description, a ` ```mermaid ` block, a states
-table and a transition table (From / Event / To / Effects). GitHub, GitLab and
+table (State / Role / Description / Markers / Tags) and a transition table
+(From / Event / To / Effects). GitHub, GitLab and
 most Markdown viewers render the embedded diagrams natively — commit the file
 and the docs are readable in the repo:
 
 ```sh
 crux-analyzer docs --src path/to/app/src --name MyApp --out STATE_MACHINES.md
 ```
+
+The `Role` column carries the two *derived* roles — `initial` for the machine's
+entry point, `final` for a state nothing leaves — kept separate from `Markers`,
+which is what the author declared. The diagram states the same two as Mermaid's
+`[*]` pseudo-state, so it says where a machine starts and ends even for a machine
+with no documentation at all. How the entry point is decided is in
+[schema.md](schema.md#where-a-machine-starts).
 
 The description and states table appear only when the analyzed source
 documents something — see [annotations](parser.md#documentation-and-annotations)
@@ -105,6 +113,8 @@ crux-analyzer docs --src path/to/app/src --format mermaid --out machines.mmd
 stateDiagram-v2
     Idle --> Recording: RecordPressed
     ...
+    [*] --> Idle
+    Completed --> [*]
 
 %% Recorder / InputState
 stateDiagram-v2

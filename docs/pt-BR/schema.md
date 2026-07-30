@@ -75,6 +75,7 @@ ele.
 | `states[].doc` | Opcional. Documentação escrita na variante do enum, sem as linhas de anotação. |
 | `states[].markers[]` | Opcional. Marcadores declarados, na ordem em que aparecem: `"failure"`, `"deprecated"`. |
 | `states[].tags[]` | Opcional. Nomes de etiqueta livres declarados com `@tag <nome>`, na ordem em que aparecem. |
+| `states[].default` | Opcional (`false`). A fonte declara este estado como a variante `#[default]` do seu enum. Evidência de onde a máquina começa, e **não** um papel — os clientes derivam `initial` a partir dela e da forma das transições. |
 | `transitions[].from` | Estado de origem, ou `"*"` — a transição dispara a partir de **qualquer** estado (estaticamente sem guarda). |
 | `transitions[].event` | Nome da variante de evento folha que dispara a transição. |
 | `transitions[].to` | Estado de destino, ou `"*"` — o destino é decidido em **tempo de execução** (por exemplo, carregado pelo payload do evento). |
@@ -127,10 +128,36 @@ adiante ramifique conforme a forma escrita.
 `markers` é um **vocabulário fechado** — o vocabulário do próprio crux_analyzer,
 e é por isso que os clientes renderizam um rótulo localizado para cada valor
 enquanto o valor em si permanece um identificador estável. `initial` e `final`
-deliberadamente **não** são marcadores: são derivados da forma do grafo (e de
-`#[default]`), então declará-los permitiria que uma fonte contradissesse as
-transições que ela também declara. Veja
+deliberadamente **não** são marcadores: são *derivados*, então declará-los
+permitiria que uma fonte contradissesse as transições que ela também declara. Veja
 [parser.md](parser.md#documentação-e-anotações) para como uma fonte escreve isso.
+
+## Onde uma máquina começa
+
+`default` é a única chave de um objeto de estado que não é documentação: ela diz
+que a fonte escreveu `#[default]` naquela variante. É também a única chave que faz
+um estado sem mais nada assumir a forma de objeto, então uma aplicação cujos enums
+de estado derivam `Default` emite um objeto de estado por máquina onde um modelo
+anterior ao `default` escrevia um nome simples.
+
+```json
+"states": [{ "name": "Idle", "default": true }, "Recording"]
+```
+
+O modelo para aí, no que a fonte declara. Transformar isso no papel `initial` é
+trabalho do cliente, e todo cliente deve ler da mesma forma:
+
+1. o estado cujo `default` é verdadeiro;
+2. senão, todo estado onde nenhuma transição chega;
+3. senão — uma máquina totalmente **cíclica**, onde nenhum dos dois tipos de
+   evidência existe — o primeiro estado de `states[]`.
+
+A ordem de declaração vem por último de propósito: num ciclo ela não significa
+nada, e é exatamente por isso que `default` está no contrato. As duas
+implementações são `crates/docgen/src/roles.rs` e
+`apps/web/src/domain/stateRole.ts`; `final` não precisa de evidência própria,
+sendo um estado do qual nenhuma transição sai (uma origem `"*"` de máquina inteira
+não conta — essa fuga pertence ao pseudo-nó curinga).
 
 O schema fixa esse vocabulário, então um erro de digitação em um modelo escrito à
 mão é um erro de validação — mas **clientes devem ignorar um marcador que não

@@ -44,10 +44,15 @@ Three areas, LangGraph-Studio style:
 Roles are painted on the canvas at all times, simulation or not
 (`src/domain/stateRole.ts`):
 
-- **initial** (blue, filled dot before the label) — the machine's entry
-  point: a state nothing transitions into. In a fully cyclic machine the
-  first state carries the role, which is where the simulation starts. The
-  first state with this role is the machine's entry state (`entryState`).
+- **initial** (blue, filled dot before the label) — the machine's entry point,
+  in order of evidence: the state the source declares as its enum's `#[default]`
+  variant (`default` in the model); otherwise a state nothing transitions into;
+  otherwise — a fully cyclic machine, where neither exists — the first state,
+  which is where the simulation starts. Declaration order is the weakest of the
+  three, because in a cycle it says nothing. The first state with this role is
+  the machine's entry state (`entryState`). The CLI generators derive it the same
+  way (`crates/docgen/src/roles.rs`), so the canvas and a generated document
+  never disagree.
 - **final** (violet, double border) — a dead end: no outgoing transition of
   its own. A machine-wide wildcard (`from: "*"`) may still leave it; that
   escape stays visible as an edge from the **any state** node.

@@ -47,9 +47,14 @@ Os papéis são pintados no canvas o tempo todo, com ou sem simulação
 (`src/domain/stateRole.ts`):
 
 - **inicial** (azul, ponto preenchido antes do rótulo) — o ponto de entrada da
-  máquina: um estado para o qual nada transiciona. Em uma máquina totalmente
-  cíclica, o primeiro estado carrega o papel, que é onde a simulação começa. O
-  primeiro estado com esse papel é o estado de entrada da máquina (`entryState`).
+  máquina, em ordem de evidência: o estado que a fonte declara como a variante
+  `#[default]` do seu enum (`default` no modelo); senão, um estado para o qual nada
+  transiciona; senão — uma máquina totalmente cíclica, onde nenhum dos dois existe
+  — o primeiro estado, que é onde a simulação começa. A ordem de declaração é a
+  mais fraca das três, porque num ciclo ela não diz nada. O primeiro estado com
+  esse papel é o estado de entrada da máquina (`entryState`). Os geradores da CLI
+  derivam o papel da mesma forma (`crates/docgen/src/roles.rs`), então o canvas e
+  um documento gerado nunca discordam.
 - **final** (violeta, borda dupla) — um beco sem saída: nenhuma transição de saída
   própria. Um curinga que valha para toda a máquina (`from: "*"`) ainda pode
   deixá-lo; essa fuga permanece visível como uma aresta partindo do nó **qualquer

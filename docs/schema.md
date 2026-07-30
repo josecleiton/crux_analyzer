@@ -74,6 +74,7 @@ and a round-trip test in `crates/model` keeps the Rust structs aligned with it.
 | `states[].doc` | Optional. Documentation authored on the enum variant, annotation lines removed. |
 | `states[].markers[]` | Optional. Declared markers, in first-seen order: `"failure"`, `"deprecated"`. |
 | `states[].tags[]` | Optional. Free-form tag names declared with `@tag <name>`, in first-seen order. |
+| `states[].default` | Optional (`false`). The source declares this state as its enum's `#[default]` variant. Evidence about where the machine starts, **not** a role — clients derive `initial` from it plus the shape of the transitions. |
 | `transitions[].from` | Source state, or `"*"` — the transition fires from **any** state (statically unguarded). |
 | `transitions[].event` | Leaf event variant name that triggers the transition. |
 | `transitions[].to` | Target state, or `"*"` — the target is decided at **runtime** (e.g. carried by the event payload). |
@@ -126,10 +127,35 @@ branches on the authored shape.
 `markers` is a **closed vocabulary** — crux_analyzer's own, which is why clients
 render a localized label for each value while the value itself stays a stable
 identifier. `initial` and `final` are deliberately *not* markers: they are
-derived from graph shape (and `#[default]`), so declaring them would let a source
-contradict the transitions it also declares. See
-[parser.md](parser.md#documentation-and-annotations) for how a source authors
-these.
+*derived*, so declaring them would let a source contradict the transitions it
+also declares. See [parser.md](parser.md#documentation-and-annotations) for how a
+source authors these.
+
+## Where a machine starts
+
+`default` is the one key of a state object that is not documentation: it says the
+source wrote `#[default]` on that variant. It is also the only key that makes an
+otherwise plain state take the object form, so an app whose state enums derive
+`Default` emits one state object per machine that a pre-`default` model wrote as a
+bare string.
+
+```json
+"states": [{ "name": "Idle", "default": true }, "Recording"]
+```
+
+The model stops there, at what the source declares. Turning it into the `initial`
+role is the client's job, and every client should read it the same way:
+
+1. the state whose `default` is true;
+2. otherwise every state no transition arrives at;
+3. otherwise — a fully **cyclic** machine, where neither kind of evidence
+   exists — the first state in `states[]`.
+
+Declaration order is last on purpose: in a cycle it carries no meaning, which is
+exactly why `default` is in the contract. The two implementations are
+`crates/docgen/src/roles.rs` and `apps/web/src/domain/stateRole.ts`; `final` needs
+no evidence of its own, being a state no transition leaves (a machine-wide `"*"`
+source does not count — that escape belongs to the wildcard pseudo-node).
 
 The schema pins that vocabulary, so a typo in a hand-written model is a
 validation error — but **clients should ignore a marker they do not know** rather

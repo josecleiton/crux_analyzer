@@ -282,9 +282,10 @@ bare unknown one would not compile.
 | `@tag <name>` | A free-form label (`retryable`, `offline`). Several names may share one line, separated by spaces or commas. |
 
 Markers are a **closed vocabulary**; `@tag` is the open-ended escape hatch.
-There is deliberately no `@initial` or `@final`: those are derived from graph
-shape and `#[default]`, so declaring them would let a source contradict the
-transitions it also declares.
+There is deliberately no `@initial` or `@final`: those are *derived*, so
+declaring them would let a source contradict the transitions it also declares.
+What the source already says about the entry point is read from the language
+instead of from a doc comment — see below.
 
 Recognized lines are removed from the description, and runs of blank lines are
 then collapsed — so an annotation written between two paragraphs produces
@@ -318,6 +319,27 @@ A composite parent has no node of its own in the model — only its
 documentation: markers and tags union (parent first), and the parent's prose is
 placed above the child's rather than being replaced by it. Nothing the author
 wrote is dropped.
+
+### Where the machine starts
+
+A state enum's `#[default]` variant is read from the *language*, not from a doc
+comment, and reaches the model as `states[].default: true`. It is declared
+evidence like any annotation — the source says where the machine starts, so
+nothing is being guessed — and it is the one thing a state object carries that is
+not documentation, which is why it does not count towards coverage.
+
+Only a **leaf** is ever marked. `#[derive(Default)]` accepts `#[default]` on a
+unit variant only, so a composite variant can never be the declared default;
+input that says otherwise marks nothing rather than naming an `Active` the model
+does not declare. A `#[default]` on the *child* enum of a composite is not read
+either: it says which sub-state `Active` starts in, not where the machine starts.
+
+The parser stops at reporting the declaration. The `initial` role itself is
+derived by the clients, in this order: the declared default; otherwise a state no
+transition arrives at; otherwise the first declared state. That last step is a
+reading of a graph, not of the source — which is why it lives in
+`crates/docgen/src/roles.rs` and `apps/web/src/domain/stateRole.ts` instead of
+here. See [schema.md](schema.md#where-a-machine-starts).
 
 ## Warnings reference
 

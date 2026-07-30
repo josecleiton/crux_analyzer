@@ -76,7 +76,8 @@ porque as linhas de transição se referem a ele.
 ### Markdown (padrão)
 
 Um documento: por máquina, sua descrição, um bloco ` ```mermaid `, uma tabela de
-estados e uma tabela de transições (De / Evento / Para / Efeitos). GitHub, GitLab
+estados (Estado / Papel / Descrição / Marcadores / Etiquetas) e uma tabela de
+transições (De / Evento / Para / Efeitos). GitHub, GitLab
 e a maioria dos visualizadores de Markdown renderizam os diagramas embutidos
 nativamente — faça commit do arquivo e a documentação fica legível no
 repositório:
@@ -84,6 +85,13 @@ repositório:
 ```sh
 crux-analyzer docs --src caminho/para/app/src --name MeuApp --out MAQUINAS_DE_ESTADO.md
 ```
+
+A coluna `Papel` carrega os dois papéis *derivados* — `inicial` para o ponto de
+entrada da máquina, `final` para um estado do qual nada sai — mantidos separados de
+`Marcadores`, que é o que o autor declarou. O diagrama afirma os mesmos dois pelo
+pseudo-estado `[*]` do Mermaid, então ele diz onde uma máquina começa e termina até
+para uma máquina sem documentação alguma. Como o ponto de entrada é decidido está
+em [schema.md](schema.md#onde-uma-máquina-começa).
 
 A descrição e a tabela de estados aparecem apenas quando a fonte analisada
 documenta algo — veja [anotações](parser.md#documentação-e-anotações) para como
@@ -107,6 +115,8 @@ crux-analyzer docs --src caminho/para/app/src --format mermaid --out maquinas.mm
 stateDiagram-v2
     Idle --> Recording: RecordPressed
     ...
+    [*] --> Idle
+    Completed --> [*]
 
 %% Recorder / InputState
 stateDiagram-v2

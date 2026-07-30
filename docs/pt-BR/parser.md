@@ -285,9 +285,10 @@ atributo real está fora de questão e um atributo desconhecido não compilaria.
 | `@tag <nome>` | Um rótulo livre (`retryable`, `offline`). Vários nomes podem dividir uma linha, separados por espaços ou vírgulas. |
 
 Marcadores são um **vocabulário fechado**; `@tag` é a saída de emergência
-aberta. Deliberadamente não existe `@initial` nem `@final`: esses são derivados
-da forma do grafo e de `#[default]`, então declará-los permitiria que uma fonte
-contradissesse as transições que ela também declara.
+aberta. Deliberadamente não existe `@initial` nem `@final`: esses são *derivados*,
+então declará-los permitiria que uma fonte contradissesse as transições que ela
+também declara. O que a fonte já diz sobre o ponto de entrada é lido da linguagem,
+não de um comentário de documentação — veja abaixo.
 
 Linhas reconhecidas são removidas da descrição, e sequências de linhas em branco
 são então colapsadas — assim uma anotação escrita entre dois parágrafos produz
@@ -322,6 +323,27 @@ Um pai composto não tem nó próprio no modelo — apenas suas folhas
 marcadores e etiquetas se unem (o pai primeiro), e a prosa do pai é colocada
 acima da do filho em vez de ser substituída por ela. Nada do que o autor
 escreveu é descartado.
+
+### Onde a máquina começa
+
+A variante `#[default]` de um enum de estado é lida da *linguagem*, não de um
+comentário de documentação, e chega ao modelo como `states[].default: true`. É
+evidência declarada como qualquer anotação — a fonte diz onde a máquina começa,
+então nada está sendo adivinhado — e é a única coisa que um objeto de estado
+carrega que não é documentação, razão pela qual não conta para a cobertura.
+
+Só uma **folha** é marcada. `#[derive(Default)]` aceita `#[default]` apenas em uma
+variante unitária, então uma variante composta nunca pode ser o default declarado;
+uma entrada que diga o contrário não marca nada em vez de nomear um `Active` que o
+modelo não declara. Um `#[default]` no enum *filho* de um composto também não é
+lido: ele diz em qual sub-estado `Active` começa, não onde a máquina começa.
+
+O parser para em relatar a declaração. O papel `initial` em si é derivado pelos
+clientes, nesta ordem: o default declarado; senão, um estado onde nenhuma
+transição chega; senão, o primeiro estado declarado. Esse último passo é uma
+leitura de um grafo, não da fonte — por isso ele vive em
+`crates/docgen/src/roles.rs` e `apps/web/src/domain/stateRole.ts`, e não aqui. Veja
+[schema.md](schema.md#onde-uma-máquina-começa).
 
 ## Referência de avisos
 
