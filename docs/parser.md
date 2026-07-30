@@ -104,15 +104,40 @@ sides), `!` (complement). A concrete constraint wins over an unresolvable
 conjunct — the emitted set may then be a superset of the truth, which is the
 right bias for documentation.
 
-**Source evidence is keyed by field name, not by object.** A guard on
-`other.status` therefore constrains a machine on `field: status` even when
-`other` is a *different* record of the same type — the value mirror used for
-targets is keyed by exact path, but this one is not. Where such a guard is
-conjoined with one on the record being written (`this.status == Pending &&
-matches!(other.status, Done | Deferred)`), the two sets intersect to nothing.
-That contradiction cannot describe a real branch, so rather than dropping the
-transition in silence it is reported as `unresolvable-source`. Resolving the
-aliasing is planned — [roadmap.md §6](roadmap.md).
+### Whose state? — the subject
+
+Evidence is matched by field name **and by object**. Each assignment carries a
+*subject* — the thing whose state field it writes — and a guard only counts as
+evidence when its receiver can be the same object:
+
+```rust
+if this.status == Pending && matches!(other.status, Done | Deferred) {
+    this.status = other.status.clone();
+}
+```
+
+Both guards name a field called `status`, so on field name alone both would
+constrain the source and intersect to nothing, losing the transition. Keyed by
+subject, the first is evidence (`from = Pending`) and the second is not — it
+describes the record being *read*, and the value mirror uses it for the target
+instead. The result is `Pending → Done` and `Pending → Unavailable`.
+
+Receivers are compared permissively, because the same object is reachable by more
+than one path: a receiver equal to the subject counts, and so does one that is a
+dotted suffix of it (a helper taking `&mut CaptureSession` writes `session.state`
+under a guard its caller wrote on `model.recording.session.state`). Where either
+receiver cannot be spelled as a path, the guard is *accepted* — the rule exists to
+reject a known mismatch, not to demand proof of identity.
+
+The subject is not always the receiver. Writing the field directly
+(`model.session.state = …`) makes the subject `model.session`; resetting the
+struct that *holds* the field (`model.session = T::default()`) makes it the
+left-hand side itself. `match`-on-state facts carry the matched expression's
+receiver for the same reason.
+
+Should constraints still intersect to nothing, no state satisfies them and no
+real branch can be described — that is reported as `unresolvable-source` rather
+than dropping the transition in silence.
 
 ## Targets (`to`) and value-flow
 
@@ -307,16 +332,15 @@ localized ([i18n.md](i18n.md)). The English rendering is shown below.
 | Code | Message (`en`) | Meaning |
 | --- | --- | --- |
 | `unknown-event` | `could not infer the triggering event` | a state assignment was reached with no event label in scope (e.g. under a catch-all arm with unknown context) |
-| `unresolvable-source` | `source-state condition could not be resolved statically` | the guard references the state but defeats analysis: an unresolvable predicate, or guards that intersect to nothing because two objects' same-named fields were read as one (see below) |
+| `unresolvable-source` | `source-state condition could not be resolved statically` | the guard references the state but defeats analysis (e.g. an unresolvable predicate), or the constraints in force intersect to nothing so no source state can satisfy them |
 | `dynamic-target` | `target state is dynamic (assigned from a runtime value)` | the assigned value has no payload typing and no resolvable constraints |
 | `no-update-method` | `core X: no update method found` | an `impl App` block without an `update` fn |
 | `unknown-annotation` | `unrecognized annotation X: not one of @failure, @deprecated, @tag <name>` | a doc line looked like an annotation but is not one: a typo, a marker given an argument, or a `@tag` with no usable name |
 | `unresolved-effect-callback` | `effect callback not resolved: the event this request is answered with is not named at the call site` | a `then_send` whose argument builds no event (a function, or a value computed elsewhere). The request is recorded; its answer is not |
 
-The `mini_recorder` fixture extracts with **zero** warnings, which `just check`
-enforces with `--deny-warnings`. A real target app currently reports the
-field-name aliasing described under [Source states](#source-states-from); that is
-a known gap with a planned fix, not a property of the app.
+A clean run against a real target app extracts with **zero** warnings, and
+`just check` enforces that for the `mini_recorder` fixture with
+`--deny-warnings`.
 
 ### Resource warnings
 

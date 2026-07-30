@@ -23,7 +23,8 @@ use syn::spanned::Spanned;
 
 use crate::ast_util::{
     arm_pattern_and_guard, as_matches_macro, enum_variant_of_expr, enum_variant_path,
-    expr_path_string, is_catch_all, last_field_name, pattern_variants,
+    expr_path_string, is_catch_all, last_field_name, pattern_variants, receiver_path,
+    receivers_may_alias,
 };
 use crate::core_finder::CoreInfo;
 use crate::index::CrateIndex;
@@ -148,14 +149,42 @@ enum GuardEval {
     Unresolved,
 }
 
+/// What a `match`-on-state arm establishes: for this machine, on *this* object,
+/// the state is one of these.
+#[derive(Clone)]
+struct Fact {
+    machine: String,
+    field: String,
+    /// Receiver of the matched expression — `model.session` for
+    /// `match model.session.state`. `None` for a bare binding.
+    receiver: Option<String>,
+    states: Vec<String>,
+}
+
+/// What a source-state evaluation is *about*.
+///
+/// Source evidence used to be keyed by field name alone, which made a guard on
+/// one record's `status` speak for every other record's `status`. Carrying the
+/// subject is what lets a guard be recognised as being about a different object
+/// and so as no evidence at all.
+#[derive(Clone, Copy)]
+struct SourceScope<'s> {
+    /// Receiver of the assignment being explained (`draft` for
+    /// `draft.status = …`). `None` = unknown, which stays permissive.
+    subject: Option<&'s str>,
+    /// Extra field spellings accepted as the state field — `"self"` inside
+    /// predicate methods on the state enum.
+    self_fields: &'s [&'s str],
+}
+
 #[derive(Clone)]
 struct Ctx<'a> {
     /// Event labels currently in scope. `None` = not statically known.
     events: Option<Vec<String>>,
     /// Guard / `if` conditions currently in force.
     conditions: Vec<&'a syn::Expr>,
-    /// Facts from `match`-on-state arms: (machine enum, field, possible states).
-    facts: Vec<(String, String, Vec<String>)>,
+    /// Facts from `match`-on-state arms.
+    facts: Vec<Fact>,
     /// Bindings introduced by the current event arm's pattern:
     /// binding name → payload type (`Event::Updated { status }` → status:
     /// JobStatus). Valid within the arm body only.
@@ -618,9 +647,14 @@ impl<'w, 'a> Walker<'w, 'a> {
 
             let mut arm_ctx = self.enter_branch(ctx);
             if !states.is_empty() {
-                arm_ctx
-                    .facts
-                    .push((machine.enum_name.clone(), machine.field_name.clone(), states));
+                arm_ctx.facts.push(Fact {
+                    machine: machine.enum_name.clone(),
+                    field: machine.field_name.clone(),
+                    // Which object was matched: `match other.state` narrows
+                    // `other`, not whatever this arm goes on to assign.
+                    receiver: receiver_path(&expr_match.expr),
+                    states,
+                });
             }
             if let Some(guard) = arm_guard {
                 arm_ctx.conditions.push(guard);
@@ -1078,24 +1112,55 @@ impl<'w, 'a> Walker<'w, 'a> {
 
     /// Resolves the source states for `machine` from the context: facts from
     /// match-on-state arms first, then every condition in force.
-    fn source_states(&self, ctx: &Ctx<'a>, machine: &StateMachine) -> GuardEval {
+    /// The states the machine can be in where `subject` is written.
+    ///
+    /// `subject` is the receiver of the assignment being explained, and it is
+    /// what keeps a guard about *another* record from constraining this one.
+    fn source_states(
+        &self,
+        ctx: &Ctx<'a>,
+        machine: &StateMachine,
+        subject: Option<&str>,
+    ) -> GuardEval {
         let mut result = GuardEval::NoConstraint;
+        let scope = SourceScope {
+            subject,
+            self_fields: &["self"],
+        };
 
-        for (fact_machine, fact_field, states) in &ctx.facts {
-            if fact_machine == &machine.enum_name && fact_field == &machine.field_name {
-                result = and(result, GuardEval::Known(states.clone()));
+        for fact in &ctx.facts {
+            if fact.machine == machine.enum_name
+                && fact.field == machine.field_name
+                && receivers_may_alias(subject, fact.receiver.as_deref())
+            {
+                result = and(result, GuardEval::Known(fact.states.clone()));
             }
         }
         for condition in &ctx.conditions {
-            result = and(result, self.eval_condition(condition, machine, &["self"], 0));
+            result = and(result, self.eval_condition(condition, machine, scope, 0));
         }
         result
     }
 
-    /// What `condition` says about `machine`'s current state.
+    /// Whether `expr` denotes this machine's state field **on the subject
+    /// object** — the test that used to be a bare field-name comparison.
+    fn is_subject_state_field(
+        &self,
+        expr: &syn::Expr,
+        machine: &StateMachine,
+        scope: SourceScope,
+    ) -> bool {
+        let Some(field) = last_field_name(expr) else {
+            return false;
+        };
+        if field != machine.field_name && !scope.self_fields.contains(&field.as_str()) {
+            return false;
+        }
+        receivers_may_alias(scope.subject, receiver_path(expr).as_deref())
+    }
+
+    /// What `condition` says about `machine`'s current state on `scope.subject`.
     ///
-    /// `self_fields` are extra field spellings accepted as the state field —
-    /// `"self"` inside predicate methods on the state enum.
     /// Charged and depth-guarded: `&&`/`||` chains and `!` nest arbitrarily in
     /// hostile input. Being cut off reports `Unresolved` — there *is* a
     /// condition here and we could not resolve it — which drops the transition
@@ -1104,13 +1169,13 @@ impl<'w, 'a> Walker<'w, 'a> {
         &self,
         condition: &syn::Expr,
         machine: &StateMachine,
-        self_fields: &[&str],
+        scope: SourceScope,
         depth: usize,
     ) -> GuardEval {
         if !self.budget.enter() {
             return GuardEval::Unresolved;
         }
-        let result = self.eval_condition_inner(condition, machine, self_fields, depth);
+        let result = self.eval_condition_inner(condition, machine, scope, depth);
         self.budget.leave();
         result
     }
@@ -1119,7 +1184,7 @@ impl<'w, 'a> Walker<'w, 'a> {
         &self,
         condition: &syn::Expr,
         machine: &StateMachine,
-        self_fields: &[&str],
+        scope: SourceScope,
         depth: usize,
     ) -> GuardEval {
         match condition {
@@ -1127,10 +1192,7 @@ impl<'w, 'a> Walker<'w, 'a> {
                 let Some(args) = as_matches_macro(&expr_macro.mac) else {
                     return GuardEval::NoConstraint;
                 };
-                let Some(field) = last_field_name(&args.expr) else {
-                    return GuardEval::NoConstraint;
-                };
-                if field != machine.field_name && !self_fields.contains(&field.as_str()) {
+                if !self.is_subject_state_field(&args.expr, machine, scope) {
                     return GuardEval::NoConstraint;
                 }
                 let states = self.state_leaves_of_pattern(&args.pat, machine);
@@ -1141,27 +1203,24 @@ impl<'w, 'a> Walker<'w, 'a> {
                 }
             }
             syn::Expr::MethodCall(call) => {
-                let Some(field) = last_field_name(&call.receiver) else {
-                    return GuardEval::NoConstraint;
-                };
-                if field != machine.field_name && !self_fields.contains(&field.as_str()) {
+                if !self.is_subject_state_field(&call.receiver, machine, scope) {
                     return GuardEval::NoConstraint;
                 }
                 self.eval_predicate(&call.method.to_string(), machine, depth)
             }
             syn::Expr::Binary(binary) => match binary.op {
                 syn::BinOp::And(_) => and(
-                    self.eval_condition(&binary.left, machine, self_fields, depth),
-                    self.eval_condition(&binary.right, machine, self_fields, depth),
+                    self.eval_condition(&binary.left, machine, scope, depth),
+                    self.eval_condition(&binary.right, machine, scope, depth),
                 ),
                 syn::BinOp::Or(_) => or(
-                    self.eval_condition(&binary.left, machine, self_fields, depth),
-                    self.eval_condition(&binary.right, machine, self_fields, depth),
+                    self.eval_condition(&binary.left, machine, scope, depth),
+                    self.eval_condition(&binary.right, machine, scope, depth),
                 ),
                 // `state == State::X` and `state != State::X` comparisons.
                 syn::BinOp::Eq(_) | syn::BinOp::Ne(_) => {
                     let Some(variant) =
-                        self.comparison_variant(&binary.left, &binary.right, machine, self_fields)
+                        self.comparison_variant(&binary.left, &binary.right, machine, scope)
                     else {
                         return GuardEval::NoConstraint;
                     };
@@ -1185,10 +1244,10 @@ impl<'w, 'a> Walker<'w, 'a> {
             syn::Expr::Let(let_expr) => closure_bodies(&let_expr.expr)
                 .into_iter()
                 .fold(GuardEval::NoConstraint, |acc, body| {
-                    and(acc, self.eval_condition(body, machine, self_fields, depth))
+                    and(acc, self.eval_condition(body, machine, scope, depth))
                 }),
             syn::Expr::Unary(unary) if matches!(unary.op, syn::UnOp::Not(_)) => {
-                match self.eval_condition(&unary.expr, machine, self_fields, depth) {
+                match self.eval_condition(&unary.expr, machine, scope, depth) {
                     GuardEval::Known(states) => GuardEval::Known(
                         machine
                             .variants
@@ -1201,15 +1260,15 @@ impl<'w, 'a> Walker<'w, 'a> {
                 }
             }
             syn::Expr::Paren(paren) => {
-                self.eval_condition(&paren.expr, machine, self_fields, depth)
+                self.eval_condition(&paren.expr, machine, scope, depth)
             }
             syn::Expr::Group(group) => {
-                self.eval_condition(&group.expr, machine, self_fields, depth)
+                self.eval_condition(&group.expr, machine, scope, depth)
             }
             // A block condition (e.g. a closure body) is its trailing expression.
             syn::Expr::Block(block) => match block.block.stmts.last() {
                 Some(syn::Stmt::Expr(trailing, None)) => {
-                    self.eval_condition(trailing, machine, self_fields, depth)
+                    self.eval_condition(trailing, machine, scope, depth)
                 }
                 _ => GuardEval::NoConstraint,
             },
@@ -1218,19 +1277,15 @@ impl<'w, 'a> Walker<'w, 'a> {
     }
 
     /// `state == State::X` (either side order) → the state leaf, when the
-    /// other side is the machine's state field.
+    /// other side is the subject's state field.
     fn comparison_variant(
         &self,
         left: &syn::Expr,
         right: &syn::Expr,
         machine: &StateMachine,
-        self_fields: &[&str],
+        scope: SourceScope,
     ) -> Option<String> {
-        let is_state_field = |expr: &syn::Expr| {
-            last_field_name(expr).is_some_and(|field| {
-                field == machine.field_name || self_fields.contains(&field.as_str())
-            })
-        };
+        let is_state_field = |expr: &syn::Expr| self.is_subject_state_field(expr, machine, scope);
 
         if is_state_field(left) {
             self.state_leaf_of_expr(right, machine)
@@ -1360,8 +1415,14 @@ impl<'w, 'a> Walker<'w, 'a> {
         let Some(syn::Stmt::Expr(trailing, None)) = function.block.stmts.last() else {
             return GuardEval::Unresolved;
         };
-        match self.eval_condition(trailing, machine, &["self", machine.field_name.as_str()], depth + 1)
-        {
+        // Inside the body the subject is the predicate's own receiver, which the
+        // call site already checked — so no subject to discriminate against here.
+        let self_fields = ["self", machine.field_name.as_str()];
+        let scope = SourceScope {
+            subject: None,
+            self_fields: &self_fields,
+        };
+        match self.eval_condition(trailing, machine, scope, depth + 1) {
             GuardEval::NoConstraint => GuardEval::Unresolved,
             resolved => resolved,
         }
@@ -1376,7 +1437,8 @@ impl<'w, 'a> Walker<'w, 'a> {
             if let Some(machine) = self.machine_for_field(&field) {
                 let machine = machine.clone();
                 if let Some(to) = self.state_leaf_of_expr(&assign.right, &machine) {
-                    self.emit(&machine, to, ctx, assign, file);
+                    let subject = receiver_path(&assign.left);
+                    self.emit(&machine, to, ctx, assign, subject.as_deref(), file);
                     return;
                 }
                 // Not a literal construction: try value-flow before warning.
@@ -1390,8 +1452,11 @@ impl<'w, 'a> Walker<'w, 'a> {
         // `*.anything = T::default()` — a struct reset that implies every
         // state field inside T lands on its enum's #[default] variant.
         if let Some(reset_targets) = self.default_reset_targets(&assign.right) {
+            // The reset struct is itself the object holding the state field, so
+            // the whole left-hand side is the subject rather than its receiver.
+            let subject = expr_path_string(&assign.left);
             for (machine, to) in reset_targets {
-                self.emit(&machine, to, ctx, assign, file);
+                self.emit(&machine, to, ctx, assign, subject.as_deref(), file);
             }
         }
     }
@@ -1410,12 +1475,14 @@ impl<'w, 'a> Walker<'w, 'a> {
         ctx: &Ctx<'a>,
         file: &Path,
     ) {
+        // A direct write to the state field: the object is the receiver.
+        let subject = receiver_path(&assign.left);
         if let Some(path) = expr_path_string(&assign.right) {
             // Event payload binding of the machine's enum type.
             if !path.contains('.')
                 && ctx.payload_bindings.get(&path) == Some(&machine.enum_name)
             {
-                self.emit(machine, ANY_STATE.to_string(), ctx, assign, file);
+                self.emit(machine, ANY_STATE.to_string(), ctx, assign, subject.as_deref(), file);
                 return;
             }
 
@@ -1426,7 +1493,7 @@ impl<'w, 'a> Walker<'w, 'a> {
             }
             if let GuardEval::Known(targets) = eval {
                 for to in targets {
-                    self.emit(machine, to, ctx, assign, file);
+                    self.emit(machine, to, ctx, assign, subject.as_deref(), file);
                 }
                 return;
             }
@@ -1616,12 +1683,19 @@ impl<'w, 'a> Walker<'w, 'a> {
         (!targets.is_empty()).then_some(targets)
     }
 
+    /// `subject` names the object whose state field this assignment writes, so
+    /// that guards about a different record are not read as evidence. It is not
+    /// derivable from `assign` alone: writing the field directly
+    /// (`model.session.state = …`) makes it the receiver, while resetting the
+    /// struct that *holds* the field (`model.session = T::default()`) makes it
+    /// the left-hand side itself.
     fn emit(
         &mut self,
         machine: &StateMachine,
         to: String,
         ctx: &Ctx<'a>,
         assign: &syn::ExprAssign,
+        subject: Option<&str>,
         file: &Path,
     ) {
         let line = assign.span().start().line;
@@ -1635,7 +1709,7 @@ impl<'w, 'a> Walker<'w, 'a> {
             return;
         };
 
-        match self.source_states(ctx, machine) {
+        match self.source_states(ctx, machine, subject) {
             GuardEval::NoConstraint => {
                 // No state evidence: the transition fires from any state.
                 for event in events {

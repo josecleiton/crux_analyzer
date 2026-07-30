@@ -87,11 +87,11 @@ wildcard-target notes, Markdown rendering). The open front is **§5
 distribution**: nothing outside this checkout can install the tool, so the plan
 there covers crates.io, prebuilt binaries and the Marketplace, in that order —
 plus two license obligations (§5.5) that are already overdue rather than
-planned. **§6** is the one open *parsing* front. Its first half is done —
-value-flow assignment into a model-reachable field is now machine evidence, so a
-status the shell drives is extracted instead of silently missing. What remains is
-the gap that widening exposed: source constraints are keyed by field name, so a
-guard on another record's same-named field can intersect the real one to nothing;
-that now warns instead of vanishing, and making the keying path-aware is the next
-increment. After that, the deliberate "not yet" list (§7) and whatever adoption
-teaches next.
+planned. **§6** closed the one *parsing* gap adoption found: value-flow assignment
+into a model-reachable field is now machine evidence (a status the shell drives is
+extracted instead of silently missing), and source evidence carries a **subject**
+so a guard about one record no longer constrains another. Two invariants there are
+easy to flatten by accident — receiver comparison must stay permissive (suffix
+matching, not equality, or aliased guards narrow silently) and the subject differs
+between a direct field write and a `T::default()` reset. After that, the deliberate
+"not yet" list (§7) and whatever adoption teaches next.

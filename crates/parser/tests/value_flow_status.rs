@@ -47,8 +47,14 @@ fn a_view_mirror_enum_is_not_a_machine() {
     );
 }
 
+/// The carry-over write is a clone guarded by two conditions on *different*
+/// records: `this.status == Pending` (the record being written) and
+/// `matches!(other.status, …)` (the record being read). Source evidence is
+/// discriminated by receiver, so only the first constrains the source, while the
+/// second supplies the target — the same shape the predicate-guarded form has
+/// always produced.
 #[test]
-fn a_payload_write_yields_a_wildcard_target() {
+fn guards_on_two_records_split_into_source_and_target() {
     let outcome = parse();
     let machine = &outcome.project.cores[0].machines[0];
     let triples: Vec<(&str, &str, &str)> = machine
@@ -56,17 +62,28 @@ fn a_payload_write_yields_a_wildcard_target() {
         .iter()
         .map(|t| (t.from.0.as_str(), t.event.0.as_str(), t.to.0.as_str()))
         .collect();
-    assert_eq!(triples, [("*", "StatusReported", "*")]);
+    assert_eq!(
+        triples,
+        [
+            // carry-over: source from the written record's guard, targets from
+            // the read record's.
+            ("Pending", "Loaded", "Deferred"),
+            ("Pending", "Loaded", "Unavailable"),
+            // payload write: the arriving state is the shell's choice.
+            ("*", "StatusReported", "*"),
+        ]
+    );
 }
 
-/// The carry-over write is a clone guarded by a `matches!` on *another* entry's
-/// same-named field. Source constraints are keyed by field name, so the two
-/// guards intersect to nothing and the target cannot be placed. It must be
-/// reported rather than dropped in silence — resolving the aliasing is the next
-/// increment, and this is the test that should change when it lands.
+/// Nothing here defeats analysis, so nothing is reported. Before source evidence
+/// carried a receiver, the two guards above were read as constraining one record
+/// and intersected to nothing — which lost the carry-over transition entirely.
 #[test]
-fn a_contradictory_source_constraint_warns_instead_of_vanishing() {
+fn a_resolvable_carry_over_reports_nothing() {
     let outcome = parse();
-    let codes: Vec<&str> = outcome.warnings.iter().map(|w| w.kind.code()).collect();
-    assert_eq!(codes, ["unresolvable-source", "unresolvable-source"]);
+    assert!(
+        outcome.warnings.is_empty(),
+        "expected a clean extraction, got: {:#?}",
+        outcome.warnings
+    );
 }

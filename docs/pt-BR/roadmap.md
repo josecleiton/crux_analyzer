@@ -5,9 +5,9 @@
 A especificação original (`init.md`) está totalmente implementada, então a maior
 parte do que vem a seguir é sobre **adoção** e sobre **impedir que a documentação
 apodreça**, não sobre mais parsing. Uma exceção, e foi preciso um app real para
-encontrá-la: a §6 é uma máquina de estados que o parser lê o suficiente para saber
-que existe e ainda assim não extrai — a primeira lacuna genuína de parsing desde
-que a especificação foi cumprida.
+encontrá-la: a §6 era uma máquina de estados que o parser lia o suficiente para
+saber que existia e ainda assim não extraía — a primeira lacuna genuína de parsing
+desde que a especificação foi cumprida, agora fechada.
 
 Este documento é a fonte única do trabalho planejado; o `CLAUDE.md` aponta para
 cá em vez de manter a própria lista.
@@ -378,7 +378,7 @@ primeiro, como as etiquetas quiseram.
 
 ---
 
-## 6. Máquinas atribuídas só por value flow — detecção feita, aliasing de origem aberto
+## 6. Máquinas atribuídas só por value flow ✅ **feito**
 
 Encontrada rodando contra um app alvo, e reproduzível só pela forma. Dois enums de
 status de forma deliberadamente idêntica, ambos guardados por entidade em uma
@@ -459,14 +459,14 @@ para reportar, e inventar um warning para um enum que o parser agora extrai seri
 ruído. E um silêncio *diferente* apareceu no lugar dele, que é sobre o que trata o
 resto desta seção.
 
-### Ainda aberto: constraints de origem fazem aliasing de campos homônimos
+### Constraints de origem agora carregam um sujeito ✅
 
 Alargar a detecção expôs uma segunda lacuna, pré-existente e pior que a primeira
-porque ela derruba uma transição de uma máquina que o leitor *vê*. A evidência de
-origem é chaveada por nome de campo; o espelho de valor que resolve alvos é
-chaveado por caminho exato. Então um guard em `other.status` restringe uma máquina
-em `field: status` mesmo quando `other` é outro registro. Em uma escrita de
-carry-over os dois conjuntos então se intersectam em nada:
+porque ela derrubava uma transição de uma máquina que o leitor *vê*. A evidência de
+origem era chaveada por nome de campo, enquanto o espelho de valor que resolve alvos
+é chaveado por caminho exato. Então um guard em `other.status` restringia uma
+máquina em `field: status` mesmo quando `other` era outro registro, e numa escrita
+de carry-over os dois conjuntos se intersectavam em nada:
 
 ```rust
 if this.status == Pending && matches!(other.status, Done | Deferred) {
@@ -475,23 +475,35 @@ if this.status == Pending && matches!(other.status, Done | Deferred) {
 ```
 
 Um conjunto de origem vazio fazia o laço de emissão iterar zero vezes — nenhuma
-transição, nenhum warning. Isso agora é reportado como `unresolvable-source`, que é
-o paliativo honesto e não a correção: a transição é real e sua origem *é*
-derivável.
+transição, nenhum warning.
 
-A correção é fazer a avaliação de origem ciente de caminho, como o espelho de valor
-já é. O que faz disso mais que uma linha: chavear por nome de campo é estrutural,
-porque `model.session.state` e um `session.state` local são o mesmo objeto alcançado
-de dois jeitos, e só a chave grosseira enxerga isso. Então a discriminação tem que
-ser no *receiver* — um guard cujo receiver é um binding diferente do receiver da
-atribuição não é evidência sobre o objeto atribuído — e receivers não estão
-disponíveis onde as condições são registradas hoje, só onde a atribuição é tratada.
-Isso é um refactor pequeno do `Ctx`, não um patch.
+Corrigido dando a toda avaliação de origem um **sujeito**: o objeto cujo campo de
+estado a atribuição escreve. Um guard só conta como evidência quando seu receiver
+pode ser aquele objeto, então o primeiro conjunto acima resolve a origem e o segundo
+fica corretamente para o espelho de alvos. Contradição continua sendo reportada em
+vez de derrubada, como rede de segurança para constraints que de fato não podem
+valer.
 
-Até isso entrar, `parse_project` sobre um app real reporta esses warnings em vez de
-extrair limpo, então o `--deny-warnings` ainda não pode ser apontado para um.
-O `crates/parser/tests/value_flow_status.rs` fixa o comportamento atual, incluindo
-o warning — aquele teste é feito para mudar quando a correção chegar.
+O que impediu isso de ser uma linha, e vale lembrar antes de "simplificar":
+
+- **A comparação de receiver precisa continuar permissiva.** Chavear por nome de
+  campo era estrutural porque um objeto é alcançável por vários caminhos — um helper
+  escreve `session.state` sob um guard que quem chamou escreveu em
+  `model.recording.session.state`. Igualdade mais casamento por sufixo pontuado
+  cobre isso; um receiver irresolvível é aceito, não rejeitado. Apertar para
+  igualdade estrita estreita em silêncio todo guard escrito através de um alias
+  local.
+- **O sujeito não é derivável só da atribuição.** Escrever o campo direto o torna o
+  receiver; resetar a struct que *guarda* o campo (`model.session = T::default()`)
+  o torna o lado esquerdo inteiro. Colapsar os dois — a primeira coisa que parece
+  duplicação aqui — transforma todo reset `default()` de volta em origem curinga.
+  Essa regressão é pega pelo `default_reset_lands_on_default_variant`.
+
+Verificado como aditivo e não meramente verde: sobre um app alvo real as três
+máquinas que já extraíam mantiveram conjuntos de transição byte-idênticos (7, 6 e
+30), incluindo o caso de alias, e a recém-detectada foi de ausente para três
+transições. O `crates/parser/tests/value_flow_status.rs` cobre as duas metades em um
+fixture versionado.
 
 **A outra metade daquela investigação, e explicitamente não é trabalho de parser.**
 O mesmo app documentava uma segunda máquina que o analyzer também não pegou — mas

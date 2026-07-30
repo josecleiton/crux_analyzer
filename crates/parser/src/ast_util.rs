@@ -80,6 +80,47 @@ pub(crate) fn expr_path_string(expr: &syn::Expr) -> Option<String> {
     }
 }
 
+/// The *receiver* of a field access: `draft.status` → `"draft"`,
+/// `model.session.state` → `"model.session"`. `None` when there is no receiver
+/// to speak of — a bare binding (`status`), or a base this walker cannot spell
+/// as a path (`entries[0].status`).
+///
+/// The companion to [`last_field_name`], which answers *which* field and
+/// deliberately forgets *whose*. Source-state evidence needs both.
+pub(crate) fn receiver_path(expr: &syn::Expr) -> Option<String> {
+    match expr {
+        syn::Expr::Field(field) => expr_path_string(&field.base),
+        syn::Expr::Reference(reference) => receiver_path(&reference.expr),
+        syn::Expr::Paren(paren) => receiver_path(&paren.expr),
+        syn::Expr::Unary(unary) => receiver_path(&unary.expr),
+        syn::Expr::MethodCall(call)
+            if call.args.is_empty() && is_identity_method(&call.method.to_string()) =>
+        {
+            receiver_path(&call.receiver)
+        }
+        _ => None,
+    }
+}
+
+/// Whether two receiver paths can denote the same object.
+///
+/// Exact match, or one a dotted suffix of the other: `session` and
+/// `model.recording.session` are one object reached two ways, which is why this
+/// cannot be string equality — a helper taking `&mut CaptureSession` writes
+/// `session.state` under a guard its caller wrote on the long path.
+///
+/// `None` on either side means "could not tell", and stays permissive. The rule
+/// exists to reject a *known* mismatch (a guard about a different record), not to
+/// demand proof of identity before believing a guard.
+pub(crate) fn receivers_may_alias(subject: Option<&str>, other: Option<&str>) -> bool {
+    let (Some(subject), Some(other)) = (subject, other) else {
+        return true;
+    };
+    subject == other
+        || subject.ends_with(&format!(".{other}"))
+        || other.ends_with(&format!(".{subject}"))
+}
+
 fn is_identity_method(name: &str) -> bool {
     matches!(
         name,

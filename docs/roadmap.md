@@ -4,9 +4,9 @@
 
 The original spec (`init.md`) is fully implemented, so most of what follows is
 about **adoption** and about **keeping the documentation from rotting** rather
-than about more parsing. One exception, and it took a real app to find it: §6 is
-a state machine the parser reads enough of to know it exists and still does not
-extract — the first genuine parsing gap since the spec was met.
+than about more parsing. One exception, and it took a real app to find it: §6 was
+a state machine the parser read enough of to know it existed and still did not
+extract — the first genuine parsing gap since the spec was met, now closed.
 
 This document is the single source for planned work; `CLAUDE.md` points here
 rather than keeping its own list.
@@ -365,7 +365,7 @@ adoption first, like tags got.
 
 ---
 
-## 6. Value-flow-only state machines — detection done, source aliasing open
+## 6. Value-flow-only state machines ✅ **done**
 
 Found by running against a target app, and reproducible from the shape alone. Two
 status enums of deliberately identical shape, both held per-entity in a
@@ -446,14 +446,14 @@ absence to report, and inventing a warning for an enum the parser now extracts
 would be noise. And a *different* silent drop turned up in its place, which is
 what the rest of this section is now about.
 
-### Still open: source constraints alias same-named fields
+### Source constraints now carry a subject ✅
 
 Widening detection exposed a second gap, pre-existing and worse than the first
-because it drops a transition from a machine the reader can *see*. Source
-evidence is keyed by field name; the value mirror that resolves targets is keyed
-by exact path. So a guard on `other.status` constrains a machine on
-`field: status` even when `other` is a different record. In a carry-over write the
-two conjuncts then intersect to nothing:
+because it dropped a transition from a machine the reader can *see*. Source
+evidence was keyed by field name while the value mirror that resolves targets is
+keyed by exact path. So a guard on `other.status` constrained a machine on
+`field: status` even when `other` was a different record, and in a carry-over
+write the two conjuncts intersected to nothing:
 
 ```rust
 if this.status == Pending && matches!(other.status, Done | Deferred) {
@@ -462,22 +462,35 @@ if this.status == Pending && matches!(other.status, Done | Deferred) {
 ```
 
 An empty source set made the emit loop iterate zero times — no transition, no
-warning. That is now reported as `unresolvable-source`, which is the honest
-stopgap and not the fix: the transition is real and its source *is* derivable.
+warning at all.
 
-The fix is to make source evaluation path-aware, as the value mirror already is.
-What makes it more than a one-liner: field-name keying is load-bearing, because
-`model.session.state` and a local `session.state` are the same object reached two
-ways, and only the coarse key sees that. So the discrimination has to be on the
-*receiver* — a guard whose receiver is a different binding from the assignment's
-receiver is not evidence about the assigned object — and receivers are not
-available where conditions are recorded today, only where the assignment is
-handled. That is a small refactor of `Ctx`, not a patch.
+Fixed by giving every source evaluation a **subject**: the object whose state
+field the assignment writes. A guard counts as evidence only when its receiver can
+be that object, so the first conjunct above resolves the source and the second is
+correctly left to the target mirror. Contradiction is still reported rather than
+dropped, as a safety net for constraints that genuinely cannot hold.
 
-Until it lands, `parse_project` over a real app reports these warnings rather
-than extracting cleanly, so `--deny-warnings` cannot be pointed at one yet.
-`crates/parser/tests/value_flow_status.rs` pins the current behaviour, including
-the warning — that test is meant to change when the fix lands.
+What kept this from being a one-liner, and is worth remembering before
+"simplifying" it:
+
+- **Receiver comparison must stay permissive.** Field-name keying was load-bearing
+  because one object is reachable by several paths — a helper writes
+  `session.state` under a guard the caller wrote on
+  `model.recording.session.state`. Equality plus dotted-suffix matching covers
+  that; an unresolvable receiver is accepted rather than rejected. Tightening this
+  to strict equality silently narrows every guard written through a local alias.
+- **The subject is not derivable from the assignment alone.** Writing the field
+  directly makes it the receiver; resetting the struct that *holds* the field
+  (`model.session = T::default()`) makes it the whole left-hand side. Collapsing
+  the two — the first thing that looks like duplication here — turns every
+  `default()` reset back into a wildcard source. That regression is caught by
+  `default_reset_lands_on_default_variant`.
+
+Verified additive rather than merely green: over a real target app the three
+machines that already extracted kept byte-identical transition sets (7, 6 and 30),
+including the alias case, and the newly detected one went from absent to three
+transitions. `crates/parser/tests/value_flow_status.rs` covers both halves on a
+tracked fixture.
 
 **The other half of that investigation, and explicitly not parser work.** The same
 app documented a second machine that the analyzer also missed — but there the code

@@ -106,15 +106,40 @@ Condições compõem por `&&` (interseção), `||` (união dos lados concretos) 
 emitido pode então ser um superconjunto da verdade, que é o viés correto para
 documentação.
 
-**A evidência de origem é chaveada por nome de campo, não por objeto.** Um guard em
-`other.status` portanto restringe uma máquina em `campo: status` mesmo quando
-`other` é um registro *diferente* do mesmo tipo — o espelho de valor usado para
-destinos é chaveado por caminho exato, este não. Onde um guard desses é conjugado
-com outro sobre o registro que está sendo escrito (`this.status == Pending &&
-matches!(other.status, Done | Deferred)`), os dois conjuntos se intersectam em nada.
-Essa contradição não pode descrever um branch real, então em vez de derrubar a
-transição em silêncio ela é reportada como `unresolvable-source`. Resolver o
-aliasing está planejado — [roadmap.md §6](roadmap.md).
+### De quem é o estado? — o sujeito
+
+A evidência é casada por nome de campo **e por objeto**. Cada atribuição carrega um
+*sujeito* — aquilo cujo campo de estado ela escreve — e um guard só conta como
+evidência quando seu receiver pode ser o mesmo objeto:
+
+```rust
+if this.status == Pending && matches!(other.status, Done | Deferred) {
+    this.status = other.status.clone();
+}
+```
+
+Os dois guards nomeiam um campo chamado `status`, então só por nome de campo os dois
+restringiriam a origem e se intersectariam em nada, perdendo a transição. Chaveado
+por sujeito, o primeiro é evidência (`from = Pending`) e o segundo não é — ele
+descreve o registro que está sendo *lido*, e o espelho de valor o usa para o destino.
+O resultado é `Pending → Done` e `Pending → Unavailable`.
+
+Receivers são comparados de forma permissiva, porque o mesmo objeto é alcançável por
+mais de um caminho: um receiver igual ao sujeito conta, e um que seja sufixo pontuado
+dele também (um helper que recebe `&mut CaptureSession` escreve `session.state` sob
+um guard que quem chamou escreveu em `model.recording.session.state`). Quando algum
+dos receivers não pode ser escrito como caminho, o guard é *aceito* — a regra existe
+para rejeitar uma divergência conhecida, não para exigir prova de identidade.
+
+O sujeito não é sempre o receiver. Escrever o campo direto
+(`model.session.state = …`) faz o sujeito ser `model.session`; resetar a struct que
+*guarda* o campo (`model.session = T::default()`) faz ser o lado esquerdo inteiro.
+Os fatos de `match`-no-estado carregam o receiver da expressão casada pela mesma
+razão.
+
+Se as constraints ainda assim se intersectarem em nada, nenhum estado as satisfaz e
+nenhum branch real pode ser descrito — isso é reportado como `unresolvable-source`
+em vez de derrubar a transição em silêncio.
 
 ## Destinos (`to`) e fluxo de valores
 
@@ -312,16 +337,14 @@ baseie ferramentas e documentação nele, já que o texto da mensagem é localiz
 | Código | Mensagem (`pt-BR`) | Significado |
 | --- | --- | --- |
 | `unknown-event` | `não foi possível inferir o evento que a dispara` | uma atribuição de estado foi alcançada sem rótulo de evento em escopo (por exemplo, sob um braço catch-all com contexto desconhecido) |
-| `unresolvable-source` | `a condição do estado de origem não pôde ser resolvida estaticamente` | a guarda referencia o estado mas derrota a análise: um predicado irresolvível, ou guardas que se intersectam em nada porque campos homônimos de dois objetos foram lidos como um (veja acima) |
+| `unresolvable-source` | `a condição do estado de origem não pôde ser resolvida estaticamente` | a guarda referencia o estado mas derrota a análise (por exemplo, um predicado irresolvível), ou as restrições em vigor se intersectam em nada e nenhum estado de origem as satisfaz |
 | `dynamic-target` | `o estado de destino é dinâmico (atribuído a partir de um valor definido em tempo de execução)` | o valor atribuído não tem tipagem de payload nem restrições resolvíveis |
 | `no-update-method` | `núcleo X: método update não encontrado` | um bloco `impl App` sem função `update` |
 | `unknown-annotation` | `anotação X não reconhecida: não é @failure, @deprecated nem @tag <nome>` | uma linha de documentação parecia uma anotação mas não é: um erro de digitação, um marcador com argumento, ou um `@tag` sem nome utilizável |
 | `unresolved-effect-callback` | `callback de efeito não resolvido: o evento que responde a esta solicitação não é nomeado no local da chamada` | um `then_send` cujo argumento não constrói evento algum (uma função, ou um valor calculado em outro lugar). A solicitação é registrada; a resposta dela, não |
 
-O fixture `mini_recorder` extrai com **zero** avisos, o que o `just check` garante
-com `--deny-warnings`. Uma aplicação alvo real hoje reporta o aliasing por nome de
-campo descrito em [Estados de origem](#estados-de-origem-from); isso é uma lacuna
-conhecida com correção planejada, não uma propriedade da aplicação.
+Uma execução limpa contra uma aplicação alvo real extrai com **zero** avisos, e o
+`just check` garante isso para o fixture `mini_recorder` com `--deny-warnings`.
 
 ### Avisos de recursos
 
