@@ -46,6 +46,18 @@ pub(crate) struct StateMachine {
     pub file: PathBuf,
     /// Composite variants: (variant name, child enum name).
     pub composites: Vec<(String, String)>,
+    /// The leaf the enum declares as its `#[default]` variant, when it declares
+    /// one and that variant is a leaf of this machine.
+    ///
+    /// Always a top-level variant name in practice: `#[derive(Default)]` only
+    /// accepts `#[default]` on a *unit* variant, and a composite variant holds a
+    /// child enum, so a composite can never be the declared default. The
+    /// membership check keeps that an observation rather than an assumption —
+    /// input that says otherwise leaves this `None` instead of naming a state
+    /// the model does not declare. A `#[default]` on the *child* enum of a
+    /// composite is not read: it says which sub-state `Active` starts in, not
+    /// where the machine starts.
+    pub default_state: Option<String>,
 }
 
 impl StateMachine {
@@ -122,9 +134,12 @@ pub(crate) fn find_state_machines(index: &CrateIndex) -> Detection {
                 .cloned();
             let docs = decl.as_ref().map(|decl| decl.docs.clone()).unwrap_or_default();
             let file = decl.as_ref().map(|decl| decl.file.clone()).unwrap_or_default();
+            let declared_default = decl.as_ref().and_then(|decl| decl.default_variant.clone());
             let leaves = decl
                 .map(|decl| expand_leaves(&enum_name, &decl, index, &nested_patterns))
                 .unwrap_or_default();
+            let default_state =
+                declared_default.filter(|variant| leaves.names.iter().any(|leaf| leaf == variant));
             StateMachine {
                 enum_name,
                 field_name,
@@ -133,6 +148,7 @@ pub(crate) fn find_state_machines(index: &CrateIndex) -> Detection {
                 docs,
                 file,
                 composites: leaves.composites,
+                default_state,
             }
         })
         .collect();

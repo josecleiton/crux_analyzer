@@ -62,7 +62,9 @@ pub(crate) fn to_core(core: &CoreInfo, machines: &[StateMachine], raw: Vec<RawTr
                     .variants
                     .iter()
                     .zip(&machine.variant_docs)
-                    .map(|(name, docs)| state_decl(name, docs))
+                    .map(|(name, docs)| {
+                        state_decl(name, docs, machine.default_state.as_deref() == Some(name))
+                    })
                     .collect(),
                 transitions,
             })
@@ -174,12 +176,18 @@ fn to_documented_names(entries: BTreeMap<&str, &str>) -> Vec<DocumentedName> {
 
 /// The model's view of one leaf state. The parser-to-model conversion belongs
 /// here, the single place state values are constructed.
-fn state_decl(name: &str, docs: &DocBlock) -> StateDecl {
+///
+/// `is_default` comes from the enum's `#[default]` variant — declared evidence
+/// about where the machine starts, which clients derive the `initial` role from.
+/// The parser stops at reporting it: which state a *cyclic* machine enters is a
+/// reading of the graph, and that belongs to whoever draws it.
+fn state_decl(name: &str, docs: &DocBlock, is_default: bool) -> StateDecl {
     StateDecl {
         name: name.to_string(),
         doc: docs.doc.clone(),
         markers: docs.markers.clone(),
         tags: docs.tags.clone(),
+        is_default,
     }
 }
 

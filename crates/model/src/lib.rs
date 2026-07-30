@@ -115,9 +115,10 @@ impl Marker {
 ///
 /// # Serialization
 ///
-/// Serializes as a **bare string** when it carries no documentation, and as an
-/// object otherwise; both forms deserialize. An app without doc comments
-/// therefore produces exactly the JSON it produced before this type existed.
+/// Serializes as a **bare string** when it carries nothing but its name, and as
+/// an object otherwise; both forms deserialize. An app without doc comments
+/// whose state enums do not derive `Default` therefore produces exactly the JSON
+/// it produced before this type existed.
 ///
 /// Two deliberate asymmetries with the JSON Schema: the schema sets
 /// `additionalProperties: false`, but this reader is lenient and **ignores**
@@ -135,11 +136,19 @@ pub struct StateDecl {
     /// Free-form `@tag` names, in first-seen order, deduplicated. Identifiers
     /// from the analyzed app — never translated.
     pub tags: Vec<String>,
+    /// Whether the source declares this state as its enum's `#[default]`
+    /// variant. Evidence, not a role: it is what a client's `initial` is
+    /// derived *from*, together with the shape of the transitions — which is
+    /// why it is not a [`Marker`], and why the model says `default` (what the
+    /// source wrote) rather than `initial` (what a client concludes).
+    ///
+    /// Serializes as `"default"`, and only when true.
+    pub is_default: bool,
 }
 
 impl StateDecl {
-    /// A state with a name and no documentation — the form that serializes as
-    /// a bare string.
+    /// A state with a name and nothing else — the form that serializes as a
+    /// bare string.
     pub fn bare(name: impl Into<String>) -> Self {
         StateDecl {
             name: name.into(),
@@ -149,12 +158,17 @@ impl StateDecl {
 
     /// Whether this declaration is nothing but a name.
     pub fn is_bare(&self) -> bool {
-        self.doc.is_none() && self.markers.is_empty() && self.tags.is_empty()
+        !self.is_documented() && !self.is_default
     }
 
     /// Whether the source documented this state in any way.
+    ///
+    /// `#[default]` deliberately does not count: it says where the machine
+    /// starts, not what the state means, so deriving `Default` must not make an
+    /// undocumented state look documented to [`crate`] consumers — coverage
+    /// included.
     pub fn is_documented(&self) -> bool {
-        !self.is_bare()
+        self.doc.is_some() || !self.markers.is_empty() || !self.tags.is_empty()
     }
 
     pub fn has_marker(&self, marker: Marker) -> bool {
@@ -182,7 +196,8 @@ impl Serialize for StateDecl {
         let fields = 1
             + usize::from(self.doc.is_some())
             + usize::from(!self.markers.is_empty())
-            + usize::from(!self.tags.is_empty());
+            + usize::from(!self.tags.is_empty())
+            + usize::from(self.is_default);
         let mut state = serializer.serialize_struct("StateDecl", fields)?;
         state.serialize_field("name", &self.name)?;
         if let Some(doc) = &self.doc {
@@ -193,6 +208,9 @@ impl Serialize for StateDecl {
         }
         if !self.tags.is_empty() {
             state.serialize_field("tags", &self.tags)?;
+        }
+        if self.is_default {
+            state.serialize_field("default", &true)?;
         }
         state.end()
     }
@@ -213,6 +231,9 @@ impl<'de> Deserialize<'de> for StateDecl {
                 markers: Vec<Marker>,
                 #[serde(default)]
                 tags: Vec<String>,
+                /// The wire name of [`StateDecl::is_default`].
+                #[serde(default)]
+                default: bool,
             },
         }
 
@@ -223,11 +244,13 @@ impl<'de> Deserialize<'de> for StateDecl {
                 doc,
                 markers,
                 tags,
+                default,
             } => StateDecl {
                 name,
                 doc,
                 markers,
                 tags,
+                is_default: default,
             },
         })
     }
@@ -487,9 +510,11 @@ mod tests {
         assert!(failed.doc.as_deref().unwrap().contains("refused"));
         assert!(auth.states[0].is_bare(), "SignedOut must stay bare");
 
-        // SyncState documents the machine itself.
+        // SyncState documents the machine itself, and declares where it starts.
         let sync = &project.cores[2].machines[0];
         assert!(sync.doc.as_deref().unwrap().contains("device"));
+        assert!(sync.states[0].is_default, "the example carries `default`");
+        assert!(!sync.states[1].is_default);
         let done = sync.states.iter().find(|s| s.name == "Done").unwrap();
         assert_eq!(done.markers, [Marker::Deprecated]);
         assert!(done.doc.is_none(), "a marker alone needs no prose");
@@ -510,11 +535,43 @@ mod tests {
             doc: Some("It broke.".into()),
             markers: vec![Marker::Failure],
             tags: vec!["retryable".into()],
+            ..Default::default()
         };
         assert_eq!(
             serde_json::to_string(&documented).unwrap(),
             r#"{"name":"Failed","doc":"It broke.","markers":["failure"],"tags":["retryable"]}"#
         );
+    }
+
+    /// `#[default]` is evidence about the machine, so it travels even on a state
+    /// the source says nothing else about — which is exactly the state that used
+    /// to be a bare string.
+    #[test]
+    fn the_default_variant_travels_as_a_state_object() {
+        let declared = StateDecl {
+            name: "Idle".into(),
+            is_default: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            serde_json::to_string(&declared).unwrap(),
+            r#"{"name":"Idle","default":true}"#
+        );
+
+        let round_tripped: StateDecl =
+            serde_json::from_str(r#"{"name":"Idle","default":true}"#).unwrap();
+        assert_eq!(round_tripped, declared);
+        assert!(!round_tripped.is_bare(), "the flag needs the object form");
+        assert!(
+            !round_tripped.is_documented(),
+            "being the default is not documentation — coverage must not count it"
+        );
+
+        // False is the absence: a producer never writes `"default": false`.
+        let absent: StateDecl = serde_json::from_str(r#"{"name":"Idle","doc":"Nothing yet."}"#)
+            .unwrap();
+        assert!(!absent.is_default);
+        assert!(!serde_json::to_string(&absent).unwrap().contains("default"));
     }
 
     /// The same two forms, for effects: a plain operation label stays a string,

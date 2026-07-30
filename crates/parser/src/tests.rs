@@ -1224,6 +1224,87 @@ fn composite_children_inherit_the_parent_documentation() {
     assert_eq!(ready.markers, [crux_analyzer_model::Marker::Deprecated]);
 }
 
+/// `#[default]` is where the machine starts, and the source says so. The
+/// declaration is read even when it is not the first variant and every state
+/// has an incoming transition — the shape a client cannot conclude it from.
+#[test]
+fn the_declared_default_variant_reaches_the_state() {
+    let machine = machine_of(
+        r#"
+        #[derive(Default)]
+        pub enum State { Idle, #[default] Running, Done }
+        pub struct Model { state: State }
+        pub struct App1;
+        pub enum Event { Go, Back }
+        impl App for App1 {
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {
+                match event {
+                    Event::Go if matches!(model.state, State::Running) => {
+                        model.state = State::Done;
+                    }
+                    Event::Back if matches!(model.state, State::Done) => {
+                        model.state = State::Running;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        "#,
+    );
+    assert!(state_of(&machine, "Running").is_default);
+    assert!(
+        !state_of(&machine, "Running").is_documented(),
+        "the flag is evidence about the machine, not documentation"
+    );
+    assert!(
+        machine.states.iter().filter(|state| state.is_default).count() == 1,
+        "{:?}",
+        machine.states
+    );
+}
+
+/// No `#[default]`, no flag: the model states what the source declares, and a
+/// client falls back to the shape of the graph.
+#[test]
+fn a_state_enum_without_a_default_marks_nothing() {
+    let machine = machine_of(&format!("{PREAMBLE}{UPDATE_GO}"));
+    assert!(machine.states.iter().all(|state| !state.is_default));
+    assert!(machine.states.iter().all(|state| state.is_bare()));
+}
+
+/// A composite variant cannot be the declared default — `#[derive(Default)]`
+/// only accepts `#[default]` on a unit variant — so input that says otherwise
+/// marks nothing rather than naming `Active`, which is not a state of the model.
+#[test]
+fn a_composite_default_variant_marks_no_leaf() {
+    let machine = machine_of(
+        r#"
+        pub enum State { Idle, #[default] Active(Phase) }
+        pub enum Phase { Loading, Ready }
+        pub struct Model { state: State }
+        pub struct App1;
+        pub enum Event { Go }
+        impl App for App1 {
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {
+                match event {
+                    Event::Go if matches!(model.state, State::Active(Phase::Loading)) => {
+                        model.state = State::Idle;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        "#,
+    );
+    assert_eq!(
+        machine.states.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+        ["Idle", "Active/Loading", "Active/Ready"]
+    );
+    assert!(machine.states.iter().all(|state| !state.is_default));
+}
+
 #[test]
 fn ordinary_documentation_never_warns() {
     let (_, warnings) = transitions_of(&format!(

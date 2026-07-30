@@ -65,7 +65,7 @@
           "name": "SyncState",
           "doc": "Mirrors finished recordings to the server, one device at a time.",
           "states": [
-            "Idle",
+            { "name": "Idle", "default": true },
             "Syncing",
             {
               "name": "Conflict",

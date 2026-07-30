@@ -117,6 +117,10 @@
               "type": "array",
               "items": { "type": "string" },
               "description": "Free-form tag names declared with `@tag <name>`. Identifiers from the analyzed application — never translated."
+            },
+            "default": {
+              "type": "boolean",
+              "description": "True when the source declares this state as its enum's `#[default]` variant. Evidence about where the machine starts, not a role: a client derives `initial` from this together with the shape of the transitions, which is why the key says what the source wrote rather than what the client concludes. Absent (false) means the source declares no default, and a client falls back to the graph. This is the one key that makes an otherwise plain state use the object form."
             }
           }
         }
@@ -153,7 +157,7 @@
       ]
     },
     "marker": {
-      "description": "A semantic marker declared in the analyzed source, as an `@` line inside a `///` doc comment. Declared evidence, not inference — which is why `initial` and `final` are deliberately absent: those are derived from graph shape and `#[default]`. A stable identifier, never prose: clients render their own localized label for it, and a client that meets an unknown value should ignore it rather than reject the model.",
+      "description": "A semantic marker declared in the analyzed source, as an `@` line inside a `///` doc comment. Declared evidence, not inference — which is why `initial` and `final` are deliberately absent: a client derives those from the shape of the transitions plus the state's `default` flag. A stable identifier, never prose: clients render their own localized label for it, and a client that meets an unknown value should ignore it rather than reject the model.",
       "enum": ["failure", "deprecated"]
     },
     "transition": {
