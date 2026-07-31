@@ -36,6 +36,8 @@ export class CruxPanel {
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
   private rendered = false;
   private disposed = false;
+  private isDirty = false;
+  private currentTitle = 'Crux Analyzer';
 
   private constructor(
     private readonly context: vscode.ExtensionContext,
@@ -53,8 +55,19 @@ export class CruxPanel {
         localResourceRoots: [this.webRoot()],
       },
     );
+    this.panel.webview.onDidReceiveMessage((msg: { command?: string; isDirty?: boolean }) => {
+      if (msg.command === 'setDirty') {
+        this.isDirty = Boolean(msg.isDirty);
+        this.updateTitle();
+      }
+    });
     this.panel.onDidDispose(() => this.dispose());
     void this.refresh();
+  }
+
+  private updateTitle(): void {
+    const prefix = this.isDirty ? '● ' : '';
+    this.panel.title = `${prefix}${this.currentTitle}`;
   }
 
   async refresh(): Promise<void> {
@@ -79,7 +92,8 @@ export class CruxPanel {
     }
 
     const name = config.get('projectName', '').trim() || workspace.name;
-    this.panel.title = `${name} — Crux Analyzer`;
+    this.currentTitle = `${name} — Crux Analyzer`;
+    this.updateTitle();
     if (!this.rendered) {
       this.showMessage(vscode.l10n.t('Analyzing…'));
     }
@@ -166,6 +180,13 @@ export class CruxPanel {
   }
 
   private dispose(): void {
+    if (this.isDirty) {
+      void vscode.window.showInformationMessage(
+        vscode.l10n.t(
+          'Crux Analyzer: Proposed changes auto-saved to local draft storage. Reopen panel to continue editing.',
+        ),
+      );
+    }
     this.disposed = true;
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
     this.watcher?.dispose();

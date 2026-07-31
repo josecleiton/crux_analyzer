@@ -5,6 +5,33 @@ import { computeChangeSet } from './diff';
 import { computeCoreHash, discardProposal, loadProposal, saveProposal } from './storage';
 import type { ChangeSet, Proposal, ProposalOp } from './types';
 
+declare global {
+  interface Window {
+    acquireVsCodeApi?: () => {
+      postMessage: (msg: unknown) => void;
+      setState: (state: unknown) => void;
+      getState: () => unknown;
+    };
+  }
+}
+
+let vscodeApiInstance: ReturnType<NonNullable<typeof window.acquireVsCodeApi>> | null | undefined;
+
+function getVsCodeApi() {
+  if (vscodeApiInstance === undefined) {
+    if (typeof window !== 'undefined' && typeof window.acquireVsCodeApi === 'function') {
+      try {
+        vscodeApiInstance = window.acquireVsCodeApi();
+      } catch {
+        vscodeApiInstance = null;
+      }
+    } else {
+      vscodeApiInstance = null;
+    }
+  }
+  return vscodeApiInstance;
+}
+
 const MAX_UNDO_DEPTH = 50;
 
 export interface UseProposalReturn {
@@ -197,6 +224,14 @@ export function useProposal(baseCore: DomainCore | null): UseProposalReturn {
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isProposing, isDirty]);
+
+  // Notify VS Code host when dirty state changes to update tab indicator (●)
+  useEffect(() => {
+    const api = getVsCodeApi();
+    if (api) {
+      api.postMessage({ command: 'setDirty', isDirty: isProposing && isDirty });
+    }
   }, [isProposing, isDirty]);
 
   return {
