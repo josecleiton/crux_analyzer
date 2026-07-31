@@ -129,6 +129,7 @@ export default function App() {
     undo,
     redo,
     setNote,
+    discard,
   } = useProposal(activeCore);
 
   const handleTogglePropose = () => {
@@ -137,6 +138,12 @@ export default function App() {
       if (!confirmExit) return;
     }
     toggleProposalMode();
+  };
+
+  const handleDiscardProposal = () => {
+    if (window.confirm(t('proposal.confirmDiscard'))) {
+      discard();
+    }
   };
 
   const displayedCore = useMemo(() => {
@@ -293,6 +300,7 @@ export default function App() {
         onOpenReview={() => setShowReviewPanel(true)}
         onUndo={undo}
         onRedo={redo}
+        onDiscard={handleDiscardProposal}
       />
       <div className="app-body">
         <Sidebar

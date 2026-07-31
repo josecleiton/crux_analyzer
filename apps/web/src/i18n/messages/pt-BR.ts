@@ -110,4 +110,7 @@ export const ptBR: Catalog = {
   'proposal.copied': 'Copiado para a área de transferência!',
   'proposal.close': 'Fechar',
   'proposal.confirmExit': 'Você tem alterações propostas. Tem certeza de que deseja sair do modo proposta?',
+  'proposal.discard': 'Resetar',
+  'proposal.discardTitle': 'Descartar todas as alterações propostas',
+  'proposal.confirmDiscard': 'Tem certeza de que deseja descartar todas as alterações propostas? Esta ação não pode ser desfeita.',
 };

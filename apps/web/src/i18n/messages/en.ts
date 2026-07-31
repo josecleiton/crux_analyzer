@@ -129,6 +129,9 @@ export const en = {
   'proposal.copied': 'Copied to clipboard!',
   'proposal.close': 'Close',
   'proposal.confirmExit': 'You have proposed changes. Are you sure you want to exit proposal mode?',
+  'proposal.discard': 'Reset',
+  'proposal.discardTitle': 'Discard all proposed changes',
+  'proposal.confirmDiscard': 'Are you sure you want to discard all proposed changes? This action cannot be undone.',
 };
 
 /** Every key the UI may ask for. */

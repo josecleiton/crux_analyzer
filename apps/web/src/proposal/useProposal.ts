@@ -187,6 +187,18 @@ export function useProposal(baseCore: DomainCore | null): UseProposalReturn {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isProposing, undo, redo]);
 
+  // Prevent closing tab or window when proposal mode has unsaved changes
+  useEffect(() => {
+    if (!isProposing || !isDirty) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isProposing, isDirty]);
+
   return {
     isProposing,
     proposal,

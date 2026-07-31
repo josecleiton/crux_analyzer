@@ -28,6 +28,7 @@ interface ToolbarProps {
   onOpenReview?: () => void;
   onUndo?: () => void;
   onRedo?: () => void;
+  onDiscard?: () => void;
 }
 
 export function Toolbar({
@@ -52,6 +53,7 @@ export function Toolbar({
   onOpenReview,
   onUndo,
   onRedo,
+  onDiscard,
 }: ToolbarProps) {
   const t = useTranslate();
   return (
@@ -106,6 +108,14 @@ export function Toolbar({
               disabled={changeCount === 0}
             >
               📋 {t('proposal.review')} ({changeCount})
+            </button>
+            <button
+              className="button-secondary button-sm"
+              onClick={onDiscard}
+              disabled={changeCount === 0}
+              title={t('proposal.discardTitle')}
+            >
+              🔄 {t('proposal.discard')}
             </button>
             {isStale ? (
               <span className="badge-stale" title={t('proposal.staleHint')}>
