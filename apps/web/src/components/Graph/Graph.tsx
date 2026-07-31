@@ -13,7 +13,7 @@ import type { Selection } from '../../state/selection';
 import type { Theme } from '../../theme/theme';
 import { useTranslate } from '../../i18n/useI18n';
 import { useGraphColors } from '../../theme/useTheme';
-import { StateNode } from './StateNode';
+import { StateNode, roleClass } from './StateNode';
 import { AnyStateNode } from './AnyStateNode';
 import { MachineGroupNode } from './MachineGroupNode';
 import { CompositeGroupNode } from './CompositeGroupNode';
@@ -153,14 +153,26 @@ export function Graph({
     const highlighted = highlight?.edgeIds.includes(edge.id) ?? false;
     const classes = tier(edge.id, highlighted, visitedEdges, availableEdges, keptEdges);
     if (highlighted) classes.push('highlighted');
-    // keep the arrowhead in sync with the stroke color of its state. The step
-    // that just fired is the run moving, so it stays the simulation's color
-    // whatever role the state it landed on has.
-    const stroke = selected
-      ? colors.edgeSelected
-      : highlighted || visitedEdges.has(edge.id)
-        ? colors.edgeHighlighted
-        : colors.edge;
+    const targetNode = nodes.find(n => n.id === edge.target);
+    const targetRoleClass = targetNode ? roleClass(targetNode.data) : '';
+
+    if (highlighted || visitedEdges.has(edge.id) || availableEdges.has(edge.id)) {
+      if (targetRoleClass) classes.push(targetRoleClass);
+    }
+
+    // Keep the arrowhead in sync with the stroke color of the target state.
+    // In simulation mode, the edge and arrowhead take on the role color of the state it lands on.
+    let stroke = colors.edge;
+    if (selected) {
+      stroke = colors.edgeSelected;
+    } else if (highlighted || visitedEdges.has(edge.id) || availableEdges.has(edge.id)) {
+      if (targetRoleClass === 'role-failure') stroke = colors.roleFailure;
+      else if (targetRoleClass === 'role-final') stroke = colors.roleFinal;
+      else if (targetRoleClass === 'role-deprecated') stroke = colors.roleDeprecated;
+      else if (targetRoleClass === 'role-initial') stroke = colors.roleInitial;
+      else stroke = colors.edgeHighlighted;
+    }
+
     return {
       ...edge,
       selected,

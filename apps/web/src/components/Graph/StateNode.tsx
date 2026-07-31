@@ -24,7 +24,7 @@ import type { Node, NodeProps } from '@xyflow/react';
  * and those tokens stay green — which is why the tier rules need no per-role
  * selector of their own.
  */
-function roleClass(data: Node['data']): string {
+export function roleClass(data: Node['data']): string {
   if (data.failure) return 'role-failure';
   if (data.final) return 'role-final';
   if (data.deprecated) return 'role-deprecated';

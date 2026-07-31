@@ -51,6 +51,10 @@ export interface GraphColors {
   edge: string;
   edgeSelected: string;
   edgeHighlighted: string;
+  roleFailure: string;
+  roleFinal: string;
+  roleDeprecated: string;
+  roleInitial: string;
 }
 
 export function readGraphColors(): GraphColors {
@@ -61,5 +65,9 @@ export function readGraphColors(): GraphColors {
     edge: token('--edge-stroke', '#8792a2'),
     edgeSelected: token('--edge-stroke-selected', '#6366f1'),
     edgeHighlighted: token('--edge-stroke-highlighted', '#059669'),
+    roleFailure: token('--state-failure', '#ef4444'),
+    roleFinal: token('--state-final', '#7c3aed'),
+    roleDeprecated: token('--state-deprecated', '#b45309'),
+    roleInitial: token('--state-initial', '#0284c7'),
   };
 }

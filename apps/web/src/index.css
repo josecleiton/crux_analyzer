@@ -1200,12 +1200,12 @@ button.trail-card:hover {
 }
 
 .react-flow__edge.available .routed-edge {
-  stroke: var(--sim);
+  stroke: var(--role);
   stroke-opacity: 0.6;
 }
 
 .react-flow__edge.available .edge-label-box {
-  stroke: var(--sim);
+  stroke: var(--role);
 }
 
 /* ...and the traveled path is the boldest thing on the canvas. Bold is what
@@ -1219,17 +1219,17 @@ button.trail-card:hover {
 }
 
 .react-flow__edge.visited .routed-edge {
-  stroke: var(--edge-stroke-highlighted);
+  stroke: var(--role);
   stroke-width: 2.5;
 }
 
 .react-flow__edge.visited .edge-label-box {
-  stroke: var(--sim);
-  fill: var(--sim-soft);
+  stroke: var(--role);
+  fill: var(--role-bg);
 }
 
 .react-flow__edge.visited .edge-label-text {
-  fill: var(--sim-text);
+  fill: var(--role-text);
   font-weight: 700;
 }
 
@@ -1419,19 +1419,19 @@ button.trail-card:hover {
 
 /* The transition that just fired: thicker, flowing dashes, traveling pulse. */
 .react-flow__edge.highlighted .routed-edge {
-  stroke: var(--edge-stroke-highlighted);
+  stroke: var(--role);
   stroke-width: 2.25;
   stroke-dasharray: 9 7;
   animation: edge-flow 0.55s linear infinite;
 }
 
 .react-flow__edge.highlighted .edge-label-box {
-  stroke: var(--sim);
-  fill: var(--sim-soft);
+  stroke: var(--role);
+  fill: var(--role-bg);
 }
 
 .react-flow__edge.highlighted .edge-label-text {
-  fill: var(--sim-text);
+  fill: var(--role-text);
 }
 
 /* The step itself stays green whatever it landed on: the arrow is the run
@@ -1444,7 +1444,7 @@ button.trail-card:hover {
 }
 
 .edge-pulse {
-  fill: var(--edge-stroke-highlighted);
+  fill: var(--role);
 }
 
 /* --- Reduced motion ------------------------------------------------------ */
