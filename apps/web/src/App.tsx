@@ -24,17 +24,18 @@ import { Sidebar } from './components/Sidebar/Sidebar';
 import { Inspector } from './components/Inspector/Inspector';
 import { SimulationPanel } from './components/Simulation/SimulationPanel';
 import { Toolbar } from './components/Toolbar/Toolbar';
-import { useTranslate } from './i18n/useI18n';
+import { ReviewPanel } from './components/Proposal/ReviewPanel';
+import { useProposal } from './proposal/useProposal';
+import { annotateFlowModel } from './proposal/annotate';
+import { useI18n } from './i18n/useI18n';
 import { useTheme } from './theme/useTheme';
 
 const layoutEngine: LayoutEngine = new ElkLayoutEngine();
 
-/** A set with one more member — the immutable update React state wants. */
 function union(set: ReadonlySet<string>, member: string): ReadonlySet<string> {
   return new Set(set).add(member);
 }
 
-/** The same set with `member` added if it was absent, removed if it was there. */
 function toggled(set: ReadonlySet<string>, member: string): ReadonlySet<string> {
   const next = new Set(set);
   if (!next.delete(member)) next.add(member);
@@ -48,44 +49,31 @@ export default function App() {
   const [simulation, setSimulation] = useState<Simulation | null>(null);
   const [tagQuery, setTagQuery] = useState('');
   const [undocumentedOnly, setUndocumentedOnly] = useState(false);
-  // Reader-hidden states, by id. Held for the whole project rather than per
-  // core: the ids are absolute, so what the reader trimmed in one core is still
-  // trimmed when they come back to it.
   const [hiddenStateIds, setHiddenStateIds] = useState<ReadonlySet<string>>(NOTHING_HIDDEN);
-  // Cores whose outline is open. Selecting a core opens it, so the panel starts
-  // showing the states of the core on screen.
   const [expandedCoreIds, setExpandedCoreIds] = useState<ReadonlySet<string>>(
-    () => new Set<string>(),
+    () => new Set<string>()
   );
-  // Machines and composite families the reader folded shut. Open is the default,
-  // so this holds the exceptions — and it is presentation only: a folded machine
-  // keeps every one of its states on the canvas.
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<ReadonlySet<string>>(
-    () => new Set<string>(),
+    () => new Set<string>()
   );
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [layouted, setLayouted] = useState<LayoutResult>({ nodes: [], edges: [] });
-  // Bumped when an explicit Re-layout lands, so the Graph re-frames: the
-  // layout is deterministic, and recomputing alone would change nothing on
-  // screen — re-framing is what the click visibly does.
   const [fitSignal, setFitSignal] = useState(0);
+  const [showReviewPanel, setShowReviewPanel] = useState(false);
+
   const appliedLayoutVersion = useRef(0);
   const { theme, toggleTheme } = useTheme();
-  const t = useTranslate();
+  const { locale, t } = useI18n();
 
   useEffect(() => {
     let cancelled = false;
     loadProject().then((loaded) => {
       if (cancelled) return;
       setProject(loaded);
-      // a deep link (#state=Core/Machine/Name) lands selected; a stale or
-      // foreign one falls back to the first core, nothing selected
       const initial = resolveUrlState(loaded, fromHash(window.location.hash));
       const coreId = initial.coreId ?? loaded.cores[0]?.id ?? null;
       setActiveCoreId(coreId);
       setSelection(initial.selection);
-      // The core on screen opens its outline; the others stay collapsed, so a
-      // project with many cores still shows its list at a glance.
       if (coreId) setExpandedCoreIds(new Set([coreId]));
     });
     return () => {
@@ -93,8 +81,6 @@ export default function App() {
     };
   }, []);
 
-  // The address bar mirrors the selection — replaceState, so casual clicking
-  // does not pile up history entries. The default view keeps a clean URL.
   useEffect(() => {
     if (!project) return;
     const defaultCoreId = project.cores[0]?.id ?? null;
@@ -106,7 +92,6 @@ export default function App() {
     window.history.replaceState(null, '', hash === '' ? base : base + hash);
   }, [project, activeCoreId, selection]);
 
-  // A link pasted into the address bar applies without a reload.
   useEffect(() => {
     if (!project) return;
     const onHashChange = () => {
@@ -126,18 +111,49 @@ export default function App() {
 
   const activeCore = useMemo(
     () => project?.cores.find((core) => core.id === activeCoreId) ?? null,
-    [project, activeCoreId],
+    [project, activeCoreId]
   );
 
-  // Re-mapped when the locale changes: the wildcard node's label feeds its
-  // width estimate, so a longer translation has to be re-laid out, not restyled.
-  const flowModel = useMemo(
-    () =>
-      activeCore
-        ? toFlowModel(activeCore, { anyState: t('state.anyState') }, hiddenStateIds)
-        : { nodes: [], edges: [] },
-    [activeCore, t, hiddenStateIds],
-  );
+  // Integrate proposal hook
+  const {
+    isProposing,
+    proposal,
+    projectedCore,
+    changeSet,
+    isDirty,
+    isStale,
+    canUndo,
+    canRedo,
+    toggleProposalMode,
+    addOp,
+    undo,
+    redo,
+    setNote,
+  } = useProposal(activeCore);
+
+  const handleTogglePropose = () => {
+    if (isProposing && isDirty) {
+      const confirmExit = window.confirm(t('proposal.confirmExit'));
+      if (!confirmExit) return;
+    }
+    toggleProposalMode();
+  };
+
+  const displayedCore = useMemo(() => {
+    if (isProposing && projectedCore) {
+      return projectedCore;
+    }
+    return activeCore;
+  }, [isProposing, projectedCore, activeCore]);
+
+  const flowModel = useMemo(() => {
+    if (!displayedCore) return { nodes: [], edges: [] };
+    const rawModel = toFlowModel(displayedCore, { anyState: t('state.anyState') }, hiddenStateIds);
+    if (isProposing && changeSet) {
+      return annotateFlowModel(rawModel, changeSet);
+    }
+    return rawModel;
+  }, [displayedCore, t, hiddenStateIds, isProposing, changeSet]);
 
   useEffect(() => {
     let cancelled = false;
@@ -159,14 +175,12 @@ export default function App() {
       activeCore && simulation
         ? activeCore.machines.find((m) => m.id === simulation.machineId) ?? null
         : null,
-    [activeCore, simulation],
+    [activeCore, simulation]
   );
 
   const tagOptions = useMemo(() => (activeCore ? declaredTags(activeCore) : []), [activeCore]);
 
   const highlight: GraphHighlight | undefined = useMemo(() => {
-    // The simulation owns the emphasis while it runs; the reading filters
-    // (tag query, undocumented-only) take over when it does not.
     if (!simulation || !simulatedMachine) {
       if (!activeCore) return undefined;
       const focus = focusFor(activeCore, { tagQuery, undocumentedOnly });
@@ -186,8 +200,6 @@ export default function App() {
       edgeIds: last ? [last.transitionId] : [],
       visited: { nodeIds: traveled.stateIds, edgeIds: traveled.transitionIds },
       available: {
-        // where each fireable transition starts (the current state, or the
-        // wildcard pseudo-node) and where it lands
         nodeIds: next.flatMap((transition) => [transition.from, transition.to]),
         edgeIds: next.map((transition) => transition.id),
       },
@@ -197,13 +209,15 @@ export default function App() {
   }, [simulation, simulatedMachine, activeCore, tagQuery, undocumentedOnly]);
 
   function selectCore(coreId: string) {
-    // Its own outline is what the panel shows for the core on screen.
     setExpandedCoreIds((expanded) => (expanded.has(coreId) ? expanded : union(expanded, coreId)));
     if (coreId === activeCoreId) return;
+    if (isProposing && isDirty) {
+      const confirmExit = window.confirm(t('proposal.confirmExit'));
+      if (!confirmExit) return;
+    }
     setActiveCoreId(coreId);
     setSelection(null);
     setSimulation(null);
-    // each core declares its own tags, so a filter does not survive the switch
     setTagQuery('');
     setUndocumentedOnly(false);
   }
@@ -212,22 +226,14 @@ export default function App() {
     setExpandedCoreIds((expanded) => toggled(expanded, coreId));
   }
 
-  /** Folds a machine or a composite family in the outline, or opens it again. */
   function toggleGroup(groupId: string) {
     setCollapsedGroupIds((collapsed) => toggled(collapsed, groupId));
   }
 
-  /**
-   * Takes states off the canvas, or puts them back. A selection that loses what
-   * it pointed at goes with them: an inspector describing a state nobody can see
-   * is worse than an empty one.
-   */
   function setStatesHidden(stateIds: string[], hidden: boolean) {
     const next = withHidden(hiddenStateIds, stateIds, hidden);
     if (next === hiddenStateIds) return;
     setHiddenStateIds(next);
-    // The graph changes size, so the frame has to follow: this bump makes the
-    // viewport re-fit once the new layout lands, the same way Re-layout does.
     setLayoutVersion((version) => version + 1);
     if (activeCore && selection && !isOnCanvas(activeCore, selection.kind, selection.id, next)) {
       setSelection(null);
@@ -240,15 +246,11 @@ export default function App() {
       return;
     }
     if (!activeCore || activeCore.machines.length === 0) return;
-    // Start on the machine of the selected state (at that state), or on the
-    // core's first machine.
     const machine =
       (selection?.kind === 'state' ? machineOf(activeCore, selection.id) : null) ??
       activeCore.machines[0];
     const initialState = selection?.kind === 'state' ? selection.id : undefined;
     setSelection(null);
-    // A run needs its machine whole: replaying through states the reader trimmed
-    // away would highlight nothing. Trimming again mid-run stays allowed.
     setStatesHidden(machineStateIds(machine), false);
     setSimulation(startSimulation(machine, initialState));
   }
@@ -258,7 +260,6 @@ export default function App() {
     setSimulation(fire(simulatedMachine, simulation, transitionId));
   }
 
-  /** Stand at step `steps` of the recorded run — the trail is navigable. */
   function goTo(steps: number) {
     if (!simulation || !simulatedMachine) return;
     setSimulation(goToStep(simulatedMachine, simulation, steps));
@@ -283,6 +284,15 @@ export default function App() {
         onToggleSimulation={toggleSimulation}
         onRelayout={() => setLayoutVersion((v) => v + 1)}
         onToggleTheme={toggleTheme}
+        isProposing={isProposing}
+        changeCount={changeSet?.totalChanges || 0}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        isStale={isStale}
+        onTogglePropose={handleTogglePropose}
+        onOpenReview={() => setShowReviewPanel(true)}
+        onUndo={undo}
+        onRedo={redo}
       />
       <div className="app-body">
         <Sidebar
@@ -318,9 +328,24 @@ export default function App() {
             onRestart={() => setSimulation(startSimulation(simulatedMachine))}
           />
         ) : (
-          <Inspector core={activeCore} selection={selection} />
+          <Inspector
+            core={displayedCore}
+            selection={selection}
+            isProposing={isProposing}
+            onAddOp={addOp}
+          />
         )}
       </div>
+
+      {showReviewPanel ? (
+        <ReviewPanel
+          changeSet={changeSet}
+          note={proposal?.note || ''}
+          onNoteChange={setNote}
+          onClose={() => setShowReviewPanel(false)}
+          locale={locale === 'pt-BR' ? 'pt-BR' : 'en'}
+        />
+      ) : null}
     </div>
   );
 }

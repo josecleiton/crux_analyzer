@@ -10,7 +10,6 @@ interface ToolbarProps {
   coreName: string | null;
   simulating: boolean;
   theme: Theme;
-  /** Tag filter — `tagOptions` are the analyzed app's own tag names (data). */
   tagQuery: string;
   tagOptions: string[];
   undocumentedOnly: boolean;
@@ -19,6 +18,16 @@ interface ToolbarProps {
   onToggleSimulation: () => void;
   onRelayout: () => void;
   onToggleTheme: () => void;
+  // Proposal mode props
+  isProposing?: boolean;
+  changeCount?: number;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  isStale?: boolean;
+  onTogglePropose?: () => void;
+  onOpenReview?: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 export function Toolbar({
@@ -34,6 +43,15 @@ export function Toolbar({
   onToggleSimulation,
   onRelayout,
   onToggleTheme,
+  isProposing = false,
+  changeCount = 0,
+  canUndo = false,
+  canRedo = false,
+  isStale = false,
+  onTogglePropose,
+  onOpenReview,
+  onUndo,
+  onRedo,
 }: ToolbarProps) {
   const t = useTranslate();
   return (
@@ -43,29 +61,71 @@ export function Toolbar({
           {projectName}
           {coreName ? <span className="toolbar-core"> / {coreName}</span> : null}
         </span>
-        {/* The tag filter reads, the buttons act — so it sits on the left
-            with the title, out of the action cluster, wide enough for its
-            whole label. Disabled (not hidden) while a simulation owns the
-            emphasis; a core with no declared tags gets no filter at all. */}
         {tagOptions.length > 0 ? (
           <TagFilter
             query={tagQuery}
             options={tagOptions}
-            disabled={simulating}
+            disabled={simulating || isProposing}
             onChange={onTagQueryChange}
           />
         ) : null}
       </div>
+
       <div className="toolbar-actions">
-        {/* Simulate leads: it is the primary action of the toolbar. While a
-            simulation runs the icon is a stop square, not a pause — stopping
-            discards the run, and an icon must not promise a resume. */}
-        <button className={simulating ? 'active' : ''} onClick={onToggleSimulation}>
+        {/* Propose Changes Toggle */}
+        <button
+          className={`proposal-toggle${isProposing ? ' active' : ''}`}
+          onClick={onTogglePropose}
+          disabled={simulating}
+          title={simulating ? t('proposal.disabledInSimulation') : t('proposal.proposeChangesHint')}
+        >
+          ✏️ {t('proposal.proposeChanges')}
+        </button>
+
+        {isProposing ? (
+          <>
+            <button
+              className="icon-button-toolbar"
+              onClick={onUndo}
+              disabled={!canUndo}
+              title="Undo (Ctrl+Z)"
+            >
+              ↩️
+            </button>
+            <button
+              className="icon-button-toolbar"
+              onClick={onRedo}
+              disabled={!canRedo}
+              title="Redo (Ctrl+Y)"
+            >
+              ↪️
+            </button>
+            <button
+              className="proposal-review-button"
+              onClick={onOpenReview}
+              disabled={changeCount === 0}
+            >
+              📋 {t('proposal.review')} ({changeCount})
+            </button>
+            {isStale ? (
+              <span className="badge-stale" title={t('proposal.staleHint')}>
+                ⚠️ {t('proposal.stale')}
+              </span>
+            ) : null}
+          </>
+        ) : null}
+
+        {/* Simulate Toggle */}
+        <button
+          className={simulating ? 'active' : ''}
+          onClick={onToggleSimulation}
+          disabled={isProposing}
+          title={isProposing ? t('proposal.disabledInProposal') : undefined}
+        >
           {simulating ? <StopIcon /> : <PlayIcon />}
           {simulating ? t('toolbar.stopSimulation') : t('toolbar.simulate')}
         </button>
-        {/* The warning triangle says what this toggle is about — the states
-            a reader should not trust yet; the title explains it on hover. */}
+
         <button
           className={`undocumented-toggle${undocumentedOnly ? ' active' : ''}`}
           onClick={onToggleUndocumented}
@@ -89,6 +149,7 @@ export function Toolbar({
           </svg>
           {t('toolbar.undocumented')}
         </button>
+
         <button onClick={onRelayout}>
           <RelayoutIcon />
           {t('toolbar.relayout')}
@@ -100,13 +161,6 @@ export function Toolbar({
   );
 }
 
-/**
- * The tag filter input with its own suggestion list. Not a `<datalist>` on
- * purpose: native datalist popups are inconsistent across engines (Chrome on
- * macOS does not open one for this shape at all), and a filter whose
- * suggestions may or may not appear reads as broken. Tag names are data from
- * the analyzed app, hence monospace in the list.
- */
 function TagFilter({
   query,
   options,
@@ -154,7 +208,6 @@ function TagFilter({
                 type="button"
                 role="option"
                 aria-selected={tag === query}
-                // mousedown, so the pick lands before the input's blur closes
                 onMouseDown={(event) => {
                   event.preventDefault();
                   onChange(tag);
@@ -171,7 +224,6 @@ function TagFilter({
   );
 }
 
-/** Shared frame of the small toolbar icons (decorative, 16-unit grid). */
 function ToolbarIcon({ children, filled = false }: { children: ReactNode; filled?: boolean }) {
   return (
     <svg

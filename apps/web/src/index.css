@@ -1461,3 +1461,237 @@ button.trail-card:hover {
     display: none;
   }
 }
+
+/* --- Proposal Mode Visual Diff & UI --------------------------------------- */
+
+.proposal-badge {
+  background: #3b82f6;
+  color: #ffffff;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-left: 6px;
+}
+
+.proposal-toggle.active {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #1d4ed8 !important;
+}
+
+.proposal-review-button {
+  background: #10b981 !important;
+  color: #ffffff !important;
+  border-color: #059669 !important;
+  font-weight: 600;
+}
+
+.badge-stale {
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.icon-button-toolbar {
+  padding: 4px 8px !important;
+  font-size: 12px;
+}
+
+/* Canvas Node visual diffs */
+.react-flow__node[data-change-type="modified"] .state-node {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3) !important;
+}
+
+.react-flow__node[data-change-type="added"] .state-node {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3) !important;
+}
+
+/* Canvas Edge visual diffs */
+.react-flow__edge[data-change-type="added"] .routed-edge {
+  stroke: #10b981 !important;
+  stroke-width: 2.5 !important;
+}
+
+.react-flow__edge[data-change-type="added"] .edge-label-box {
+  stroke: #10b981 !important;
+}
+
+.react-flow__edge[data-change-type="modified"] .routed-edge {
+  stroke: #f59e0b !important;
+  stroke-width: 2.5 !important;
+}
+
+.react-flow__edge[data-change-type="modified"] .edge-label-box {
+  stroke: #f59e0b !important;
+}
+
+/* Forms & buttons in Inspector */
+.effect-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.effect-main {
+  flex: 1;
+}
+
+.effect-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.icon-button:hover {
+  background: var(--bg-hover);
+}
+
+.proposal-edit-box {
+  margin: 8px 0;
+  padding: 8px;
+  background: var(--bg-subtle);
+  border-radius: 6px;
+  border: 1px dashed var(--border-strong);
+}
+
+.proposal-section {
+  margin-top: 12px;
+}
+
+.button-full {
+  width: 100%;
+  text-align: center;
+}
+
+.button-primary {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.button-primary:hover {
+  background: #1d4ed8;
+}
+
+.button-secondary {
+  background: var(--bg-panel);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.button-secondary:hover {
+  background: var(--bg-hover);
+}
+
+.button-danger {
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.button-danger:hover {
+  background: #dc2626;
+}
+
+.button-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.button-link {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+}
+
+.button-link:hover {
+  text-decoration: underline;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.form-group label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.form-group input[type="text"],
+.form-group select,
+.edit-doc-form textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg-panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.text-dim {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.text-dim-warning {
+  color: #f59e0b;
+  font-size: 11px;
+  font-style: italic;
+  margin: 4px 0;
+}
+
+.effects-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+

@@ -38,6 +38,7 @@ export function makeTranslate(locale: Locale): Translate {
 
 /** Replaces every `{name}` with the matching param. */
 export function interpolate(template: string, params?: MessageParams): string {
+  if (typeof template !== 'string') return String(template ?? '');
   if (!params) return template;
   return template.replace(/\{(\w+)\}/g, (whole, name: string) =>
     name in params ? String(params[name]) : whole,
