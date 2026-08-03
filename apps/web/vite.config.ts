@@ -13,6 +13,7 @@ const base = normalizeBase(process.env.CRUX_BASE)
 /** Vite requires a base with both a leading and a trailing slash. */
 function normalizeBase(raw: string | undefined): string {
   const trimmed = raw?.trim()
+  if (trimmed === './' || trimmed === '.') return './'
   if (!trimmed || trimmed === '/') return '/'
   // A full origin (https://cdn.example.com/docs/) is valid too — leave the
   // scheme alone and only guarantee the trailing slash.

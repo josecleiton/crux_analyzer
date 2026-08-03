@@ -60,10 +60,29 @@ crux-analyzer generate --src caminho/para/app/src --name MeuApp \
   --out apps/web/public/model.json
 ```
 
+## `site` — emitir site estático de documentação web
+
+```sh
+crux-analyzer site --src <dir> [--name <projeto>] [--out <diretório>] [--watch] [--locale <locale>]
+```
+
+| Flag | Significado |
+| --- | --- |
+| `--src` | Diretório com as fontes Rust a analisar. |
+| `--name` | Nome do projeto no modelo. Por padrão, o nome do diretório de `--src`. |
+| `--out` | Diretório de saída. Por padrão, `dist`. |
+| `--watch` | Continua observando `--src` e regenera `model.json` a cada mudança em `.rs`. |
+
+Exporta os arquivos da UI web interativa e insere o `model.json` analisado no diretório `--out`.
+
+```sh
+crux-analyzer site --src caminho/para/app/src --name MeuApp --out ./docs-publicos
+```
+
 ## `docs` — emitir documentação
 
 ```sh
-crux-analyzer docs --src <dir> [--name <projeto>] [--format markdown|mermaid] [--out <arquivo>] [--watch] [--locale <locale>]
+crux-analyzer docs --src <dir> [--name <projeto>] [--format markdown|mermaid|html|site] [--out <arquivo/diretório>] [--watch] [--locale <locale>]
 ```
 
 Aqui `--locale` também traduz a prosa do próprio documento gerado (rótulos de

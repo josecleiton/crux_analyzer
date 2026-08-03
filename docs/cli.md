@@ -59,10 +59,29 @@ crux-analyzer generate --src path/to/app/src --name MyApp \
   --out apps/web/public/model.json --watch
 ```
 
+## `site` — emit static web documentation site
+
+```sh
+crux-analyzer site --src <dir> [--name <project>] [--out <dir>] [--watch] [--locale <locale>]
+```
+
+| Flag | Meaning |
+| --- | --- |
+| `--src` | Directory with the Rust sources to analyze. |
+| `--name` | Project name in the model. Defaults to the `--src` directory name. |
+| `--out` | Output directory. Defaults to `dist`. |
+| `--watch` | Keep watching `--src` and regenerate `model.json` on every `.rs` change. |
+
+Exports the interactive web UI bundle and embeds the analyzed `model.json` into `--out`.
+
+```sh
+crux-analyzer site --src path/to/app/src --name MyApp --out ./public-docs
+```
+
 ## `docs` — emit documentation
 
 ```sh
-crux-analyzer docs --src <dir> [--name <project>] [--format markdown|mermaid] [--out <file>] [--watch] [--locale <locale>]
+crux-analyzer docs --src <dir> [--name <project>] [--format markdown|mermaid|html|site] [--out <file/dir>] [--watch] [--locale <locale>]
 ```
 
 Here `--locale` also translates the generated document's own prose (section

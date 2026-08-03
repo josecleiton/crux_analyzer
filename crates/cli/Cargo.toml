@@ -16,4 +16,5 @@ crux-analyzer-i18n = { path = "../i18n", version = "0.1.0" }
 crux-analyzer-model = { path = "../model", version = "0.1.0" }
 crux-analyzer-parser = { path = "../parser", version = "0.1.0" }
 notify = "8"
+rust-embed = "8.5"
 serde_json = { workspace = true }

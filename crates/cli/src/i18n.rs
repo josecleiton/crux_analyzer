@@ -57,6 +57,24 @@ impl Messages {
         }
     }
 
+    /// The post-site summary: `wrote static site to X (2 cores, 1 warning)`.
+    pub fn wrote_site_summary(&self, path: &Path, cores: usize, warnings: usize) -> String {
+        let path = path.display();
+        let cores = self.count(cores, Noun::Core);
+        let warnings = self.count(warnings, Noun::Warning);
+        match self.0 {
+            Locale::En => format!("wrote static site to {path} ({cores}, {warnings})"),
+            Locale::PtBr => format!("site estático gerado em {path} ({cores}, {warnings})"),
+        }
+    }
+
+    pub fn web_assets_missing(&self) -> &'static str {
+        match self.0 {
+            Locale::En => "web assets are missing — build the web application first (e.g. 'just web-build')",
+            Locale::PtBr => "os arquivos da web estão ausentes — construa a aplicação web primeiro (ex: 'just web-build')",
+        }
+    }
+
     /// Why `--deny-warnings` failed the run.
     ///
     /// Written out per plural branch rather than interpolating a counted noun:

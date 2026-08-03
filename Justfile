@@ -136,13 +136,10 @@ coverage src name min="0":
     cargo run -q -p crux-analyzer-cli -- coverage --src {{src}} --name "{{name}}" \
       --min {{min}} --list
 
-# Static documentation site in apps/web/dist: analyze, then build the UI with
-# the model baked in. `base` is the path the site will be served from —
-# default root, e.g. `just site ../app/src MyApp /crux-docs/` for Pages.
-site src name base="/":
-    just model "{{src}}" "{{name}}"
-    CRUX_BASE="{{base}}" pnpm --filter web build
-    @echo "Static site ready in apps/web/dist (base {{base}}) — serve it over HTTP, not file://"
+# Static documentation site: analyze and export the web UI bundle.
+site src name out="apps/web/dist": web-build
+    cargo run -q -p crux-analyzer-cli -- site --src {{src}} --name "{{name}}" --out {{out}}
+    @echo "Static site ready in {{out}} — serve it over HTTP, not file://"
 
 # Generate docs: just docs path/to/app/src MyApp [markdown|mermaid] [en|pt-BR]
 docs src name format="markdown" locale="en":

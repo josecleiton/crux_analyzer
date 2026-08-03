@@ -10,6 +10,7 @@ use crux_analyzer_i18n::Locale;
 use crux_analyzer_parser::Limits;
 
 mod i18n;
+mod site;
 mod watch;
 
 use i18n::Messages;
@@ -98,9 +99,20 @@ enum Command {
         /// Output format.
         #[arg(long, value_enum, default_value_t = DocsFormat::Markdown)]
         format: DocsFormat,
-        /// Output file (defaults to stdout).
+        /// Output file or directory (defaults to stdout for markdown/mermaid, or `dist` for html/site).
         #[arg(long)]
         out: Option<PathBuf>,
+        /// Keep watching the sources and regenerate on change.
+        #[arg(long)]
+        watch: bool,
+    },
+    /// Analyze a crate's sources and emit a static web documentation site.
+    Site {
+        #[command(flatten)]
+        input: InputArgs,
+        /// Output directory (defaults to `dist`).
+        #[arg(long, default_value = "dist")]
+        out: PathBuf,
         /// Keep watching the sources and regenerate on change.
         #[arg(long)]
         watch: bool,
@@ -133,6 +145,8 @@ struct InputArgs {
 enum DocsFormat {
     Markdown,
     Mermaid,
+    Html,
+    Site,
 }
 
 fn main() -> ExitCode {
@@ -167,6 +181,23 @@ fn run() -> ExitCode {
         );
     }
 
+    // Site / Html documentation generation emits a directory bundle rather than a single document.
+    match cli.command {
+        Command::Site { input, out, watch } => {
+            return run_site(input, out, watch, deny_warnings, &limits, &messages);
+        }
+        Command::Docs {
+            input,
+            format: DocsFormat::Html | DocsFormat::Site,
+            out,
+            watch,
+        } => {
+            let site_out = out.unwrap_or_else(|| PathBuf::from("dist"));
+            return run_site(input, site_out, watch, deny_warnings, &limits, &messages);
+        }
+        _ => {}
+    }
+
     let (input, out, watching, render): (InputArgs, Option<PathBuf>, bool, Renderer) =
         match cli.command {
             Command::Generate { input, out, watch } => (input, out, watch, render_json),
@@ -182,9 +213,10 @@ fn run() -> ExitCode {
                 match format {
                     DocsFormat::Markdown => render_markdown,
                     DocsFormat::Mermaid => render_mermaid,
+                    DocsFormat::Html | DocsFormat::Site => unreachable!("handled above"),
                 },
             ),
-            Command::Coverage { .. } => unreachable!("handled above"),
+            Command::Site { .. } | Command::Coverage { .. } => unreachable!("handled above"),
         };
 
     let project_name = input.name.clone().unwrap_or_else(|| directory_name(&input.src));
@@ -204,6 +236,54 @@ fn run() -> ExitCode {
         // The watcher ignores each run's exit code, so `--deny-warnings`
         // reports without ending the session.
         watch::watch(&input.src, out.as_deref(), &messages, run_analysis)
+    } else {
+        run_analysis()
+    }
+}
+
+fn run_site(
+    input: InputArgs,
+    out_dir: PathBuf,
+    watching: bool,
+    deny_warnings: bool,
+    limits: &Limits,
+    messages: &Messages,
+) -> ExitCode {
+    if let Err(err) = site::export_site(&out_dir) {
+        eprintln!("{}: {}: {err}", messages.error_prefix(), messages.web_assets_missing());
+        return ExitCode::FAILURE;
+    }
+
+    let project_name = input.name.clone().unwrap_or_else(|| directory_name(&input.src));
+    let model_out = out_dir.join("model.json");
+
+    let run_analysis = || {
+        let code = run_once(
+            &input.src,
+            &project_name,
+            Some(&model_out),
+            render_json,
+            deny_warnings,
+            limits,
+            messages,
+        );
+        if code == ExitCode::SUCCESS {
+            if let Ok(outcome) = crux_analyzer_parser::parse_project_with(&input.src, &project_name, limits) {
+                eprintln!(
+                    "{}",
+                    messages.wrote_site_summary(
+                        &out_dir,
+                        outcome.project.cores.len(),
+                        outcome.warnings.len()
+                    )
+                );
+            }
+        }
+        code
+    };
+
+    if watching {
+        watch::watch(&input.src, Some(&model_out), messages, run_analysis)
     } else {
         run_analysis()
     }
