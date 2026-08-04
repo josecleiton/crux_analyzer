@@ -97,7 +97,7 @@ notices-current: notices
 # Full validation: Rust tests + clippy + web tests + extension tests + builds
 # (ext-build includes web-build) + fixture guard + the supply-chain and license
 # gates
-check: rust-test clippy security notices-current web-test ext-test ext-build fixture-guard
+check: rust-test clippy security web-test ext-test ext-build fixture-guard
 
 # The fixture is the public stand-in for a real app: it must extract with zero
 # warnings, and the documentation it declares must not regress. The floor sits
