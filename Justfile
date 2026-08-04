@@ -137,7 +137,8 @@ coverage src name min="0":
       --min {{min}} --list
 
 # Static documentation site: analyze and export the web UI bundle.
-site src name out="apps/web/dist": web-build
+site src name base="/" out="apps/web/dist":
+    CRUX_BASE={{base}} pnpm --filter web build
     cargo run -q -p crux-analyzer-cli -- site --src {{src}} --name "{{name}}" --out {{out}}
     @echo "Static site ready in {{out}} — serve it over HTTP, not file://"
 
