@@ -82,7 +82,7 @@ notices: web-build
     @command -v cargo-about >/dev/null || cargo install --locked cargo-about --features cli
     @cp apps/web/dist/THIRD-PARTY-NOTICES.md THIRD-PARTY-NOTICES.md
     @printf '\n---\n\n' >> THIRD-PARTY-NOTICES.md
-    @cargo about generate about.hbs >> THIRD-PARTY-NOTICES.md
+    @cargo about generate --target x86_64-unknown-linux-gnu about.hbs >> THIRD-PARTY-NOTICES.md
     @echo "THIRD-PARTY-NOTICES.md regenerated"
 
 # The committed notices must be what the generators produce right now — the same

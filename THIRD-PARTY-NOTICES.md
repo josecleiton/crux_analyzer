@@ -1004,7 +1004,7 @@ SOFTWARE.
 
 ## Rust crates (the `crux-analyzer` binary)
 
-62 crates under MIT License.
+52 crates under MIT License.
 2 crates under ISC License.
 1 crate under Creative Commons Zero v1.0 Universal.
 1 crate under Unicode License v3.
@@ -1032,7 +1032,6 @@ SOFTWARE.
 | [anstream 1.0.0](https://github.com/rust-cli/anstyle.git) | MIT License |
 | [anstyle-parse 1.0.0](https://github.com/rust-cli/anstyle.git) | MIT License |
 | [anstyle-query 1.1.5](https://github.com/rust-cli/anstyle.git) | MIT License |
-| [anstyle-wincon 3.0.11](https://github.com/rust-cli/anstyle.git) | MIT License |
 | [anstyle 1.0.14](https://github.com/rust-cli/anstyle.git) | MIT License |
 | [clap 4.6.4](https://github.com/clap-rs/clap) | MIT License |
 | [clap_builder 4.6.2](https://github.com/clap-rs/clap) | MIT License |
@@ -1040,19 +1039,12 @@ SOFTWARE.
 | [clap_lex 1.1.0](https://github.com/clap-rs/clap) | MIT License |
 | [colorchoice 1.0.5](https://github.com/rust-cli/anstyle.git) | MIT License |
 | [is_terminal_polyfill 1.70.2](https://github.com/polyfill-rs/is_terminal_polyfill) | MIT License |
-| [once_cell_polyfill 1.70.2](https://github.com/polyfill-rs/once_cell_polyfill) | MIT License |
 | [libc 0.2.189](https://github.com/rust-lang/libc) | MIT License |
 | [crux-analyzer-cli 0.1.0](https://crates.io/crates/crux-analyzer-cli) | MIT License |
 | [crux-analyzer-docgen 0.1.0](https://crates.io/crates/crux-analyzer-docgen) | MIT License |
 | [crux-analyzer-i18n 0.1.0](https://crates.io/crates/crux-analyzer-i18n) | MIT License |
 | [crux-analyzer-model 0.1.0](https://crates.io/crates/crux-analyzer-model) | MIT License |
 | [crux-analyzer-parser 0.1.0](https://crates.io/crates/crux-analyzer-parser) | MIT License |
-| [windows-link 0.2.1](https://github.com/microsoft/windows-rs) | MIT License |
-| [windows-sys 0.60.2](https://github.com/microsoft/windows-rs) | MIT License |
-| [windows-sys 0.61.2](https://github.com/microsoft/windows-rs) | MIT License |
-| [windows-targets 0.53.5](https://github.com/microsoft/windows-rs) | MIT License |
-| [windows_x86_64_gnu 0.53.1](https://github.com/microsoft/windows-rs) | MIT License |
-| [windows_x86_64_msvc 0.53.1](https://github.com/microsoft/windows-rs) | MIT License |
 | [itoa 1.0.18](https://github.com/dtolnay/itoa) | MIT License |
 | [proc-macro2 1.0.107](https://github.com/dtolnay/proc-macro2) | MIT License |
 | [quote 1.0.47](https://github.com/dtolnay/quote) | MIT License |
@@ -1068,9 +1060,7 @@ SOFTWARE.
 | [memchr 2.8.3](https://github.com/BurntSushi/memchr) | MIT License |
 | [walkdir 2.5.0](https://github.com/BurntSushi/walkdir) | MIT License |
 | [strsim 0.11.1](https://github.com/rapidfuzz/strsim-rs) | MIT License |
-| [fsevent-sys 4.1.0](https://github.com/octplane/fsevent-rust/tree/master/fsevent-sys) | MIT License |
 | [same-file 1.0.6](https://github.com/BurntSushi/same-file) | MIT License |
-| [winapi-util 0.1.11](https://github.com/BurntSushi/winapi-util) | MIT License |
 | [rust-embed-impl 8.12.0](https://pyrossh.dev/repos/rust-embed) | MIT License |
 | [rust-embed-utils 8.12.0](https://pyrossh.dev/repos/rust-embed) | MIT License |
 | [rust-embed 8.12.0](https://pyrossh.dev/repos/rust-embed) | MIT License |
@@ -1616,7 +1606,7 @@ DEALINGS IN THE SOFTWARE.
 
 ```
 
-#### MIT License — anstream 1.0.0, anstyle-parse 1.0.0, anstyle-query 1.1.5, anstyle-wincon 3.0.11, anstyle 1.0.14, clap 4.6.4, clap_builder 4.6.2, clap_derive 4.6.4, clap_lex 1.1.0, colorchoice 1.0.5, is_terminal_polyfill 1.70.2, once_cell_polyfill 1.70.2
+#### MIT License — anstream 1.0.0, anstyle-parse 1.0.0, anstyle-query 1.1.5, anstyle 1.0.14, clap 4.6.4, clap_builder 4.6.2, clap_derive 4.6.4, clap_lex 1.1.0, colorchoice 1.0.5, is_terminal_polyfill 1.70.2
 
 ```
 Copyright (c) Individual contributors
@@ -1672,7 +1662,7 @@ DEALINGS IN THE SOFTWARE.
 
 ```
 
-#### MIT License — crux-analyzer-cli 0.1.0, crux-analyzer-docgen 0.1.0, crux-analyzer-i18n 0.1.0, crux-analyzer-model 0.1.0, crux-analyzer-parser 0.1.0, windows-link 0.2.1, windows-sys 0.60.2, windows-sys 0.61.2, windows-targets 0.53.5, windows_x86_64_gnu 0.53.1, windows_x86_64_msvc 0.53.1
+#### MIT License — crux-analyzer-cli 0.1.0, crux-analyzer-docgen 0.1.0, crux-analyzer-i18n 0.1.0, crux-analyzer-model 0.1.0, crux-analyzer-parser 0.1.0
 
 ```
 MIT License
@@ -1808,35 +1798,7 @@ SOFTWARE.
 
 ```
 
-#### MIT License — fsevent-sys 4.1.0
-
-```
-The MIT License (MIT)
-
-Copyright (c) 2015 Pierre Baillet
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the &quot;Software&quot;), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-
-```
-
-#### MIT License — same-file 1.0.6, winapi-util 0.1.11
+#### MIT License — same-file 1.0.6
 
 ```
 The MIT License (MIT)
