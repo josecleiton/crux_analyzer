@@ -843,7 +843,7 @@ impl<'w, 'a> Walker<'w, 'a> {
     /// The same, for a request whose callback is declared inside the helper it
     /// delegates to:
     ///
-    /// ```ignore
+    /// ```text
     /// Self::audio_command(AudioOperation::Start)   // <- the operation
     /// // fn audio_command(op) { Command::request_from_shell(op).then_send(…) }
     /// ```
@@ -979,7 +979,7 @@ impl<'w, 'a> Walker<'w, 'a> {
     /// the shell's result answers with a different event per outcome and all of
     /// them are real:
     ///
-    /// ```ignore
+    /// ```text
     /// Command::request_from_shell(op).then_send(move |result| match result {
     ///     AudioResult::Started { id } => RecordingEvent::RecordingStarted { id },
     ///     AudioResult::Failed(message) => RecordingEvent::RecordingFailed { message },
