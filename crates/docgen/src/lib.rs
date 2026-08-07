@@ -412,7 +412,7 @@ fn transition_label(transition: &Transition) -> String {
         })
         .collect::<Vec<_>>()
         .join(", ");
-    format!("{} / {}", transition.event.0, effects)
+    format!("{}\\n/ {}", transition.event.0, effects)
 }
 
 #[cfg(test)]
@@ -901,7 +901,7 @@ mod tests {
         // callback events stay out of the diagram.
         assert!(
             body.contains(
-                "Stopped --> Playing: Play / Render, Audio#58;#58;Start, Http#58;#58;Report?"
+                "Stopped --> Playing: Play\\n/ Render, Audio#58;#58;Start, Http#58;#58;Report?"
             ),
             "{body}"
         );

@@ -14,7 +14,7 @@
  */
 
 import type { Edge, Node } from '@xyflow/react';
-import type { DomainCore, DomainMachine } from '../domain/types';
+import type { DomainCore, DomainMachine, DomainTransition, DomainEffect } from '../domain/types';
 import { wildcardStateId } from '../domain/types';
 import { families, familyId, machineTree } from '../domain/hierarchy';
 import { NOTHING_HIDDEN } from '../domain/visibility';
@@ -74,6 +74,7 @@ export function toFlowModel(
   core: DomainCore,
   labels: FlowLabels,
   hidden: ReadonlySet<string> = NOTHING_HIDDEN,
+  showEffects: boolean = false,
 ): FlowModel {
   // Sections come from what the core *declares*, not from what survives the
   // reader's filter: hiding one machine entirely must not re-flatten another.
@@ -88,7 +89,7 @@ export function toFlowModel(
     // otherwise keep a section alive with an edge between two pseudo-nodes.
     if (machine.states.every((state) => hidden.has(state.id))) continue;
 
-    const machineEdgeList = machineEdges(machine, hidden);
+    const machineEdgeList = machineEdges(machine, hidden, showEffects);
     const wildcard = wildcardStateId(machine.id);
     // The pseudo-node exists to carry wildcard edges; with none left to draw
     // (their real endpoints hidden) it has nothing to say.
@@ -198,7 +199,7 @@ function machineNodes(
  * hidden — "any state" is not a state the reader can deselect — so only the real
  * endpoint of a wildcard edge decides whether it survives.
  */
-function machineEdges(machine: DomainMachine, hidden: ReadonlySet<string>): Edge[] {
+function machineEdges(machine: DomainMachine, hidden: ReadonlySet<string>, showEffects: boolean): Edge[] {
   return machine.transitions
     .filter((transition) => !hidden.has(transition.from) && !hidden.has(transition.to))
     .map((transition) => ({
@@ -206,7 +207,8 @@ function machineEdges(machine: DomainMachine, hidden: ReadonlySet<string>): Edge
       type: 'routed',
       source: transition.from,
       target: transition.to,
-      label: transition.event,
+      label: formatEdgeLabel(transition, showEffects),
+      data: { event: transition.event, effects: showEffects ? transition.effects : [] },
       // The arrowhead color is theme-dependent and applied by the renderer:
       // SVG marker attributes cannot read CSS variables.
       markerEnd: {
@@ -219,4 +221,14 @@ function machineEdges(machine: DomainMachine, hidden: ReadonlySet<string>): Edge
 
 function nodeWidth(label: string): number {
   return Math.max(NODE_MIN_WIDTH, Math.round(label.length * NODE_CHAR_WIDTH) + NODE_PADDING_X);
+}
+
+function formatEdgeLabel(transition: DomainTransition, showEffects: boolean): string {
+  if (!showEffects || transition.effects.length === 0) {
+    return transition.event;
+  }
+  const effectsStr = transition.effects
+    .map((e: DomainEffect) => (e.conditional ? `${e.name}?` : e.name))
+    .join(', ');
+  return `${transition.event} / ${effectsStr}`;
 }

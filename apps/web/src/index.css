@@ -1408,6 +1408,22 @@ button.trail-card:hover {
   dominant-baseline: central;
 }
 
+.edge-label-event {
+  font-weight: 600;
+}
+
+.edge-label-effects {
+  opacity: 0.85;
+}
+
+.edge-label-effect {
+  font-style: italic;
+}
+
+.edge-label-effect.conditional {
+  opacity: 0.6;
+}
+
 .edge-label.selected .edge-label-box {
   fill: var(--accent-soft);
   stroke: var(--accent);

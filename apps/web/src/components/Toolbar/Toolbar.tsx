@@ -13,8 +13,10 @@ interface ToolbarProps {
   tagQuery: string;
   tagOptions: string[];
   undocumentedOnly: boolean;
+  showEffects: boolean;
   onTagQueryChange: (query: string) => void;
   onToggleUndocumented: () => void;
+  onToggleEffects: () => void;
   onToggleSimulation: () => void;
   onRelayout: () => void;
   onToggleTheme: () => void;
@@ -39,8 +41,10 @@ export function Toolbar({
   tagQuery,
   tagOptions,
   undocumentedOnly,
+  showEffects,
   onTagQueryChange,
   onToggleUndocumented,
+  onToggleEffects,
   onToggleSimulation,
   onRelayout,
   onToggleTheme,
@@ -158,6 +162,26 @@ export function Toolbar({
             <circle cx="8" cy="11.9" r="0.4" fill="currentColor" stroke="none" />
           </svg>
           {t('toolbar.undocumented')}
+        </button>
+
+        <button
+          className={showEffects ? 'active' : ''}
+          onClick={onToggleEffects}
+          title={t('toolbar.showEffectsHint') || 'Show effects on edges'}
+        >
+          <svg
+            className="toolbar-icon"
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M8 1L3 9H7.5L7 15L13 6H8L8.5 1Z" />
+          </svg>
+          {t('toolbar.showEffects') || 'Effects'}
         </button>
 
         <button onClick={onRelayout}>

@@ -60,6 +60,7 @@ export default function App() {
   const [layouted, setLayouted] = useState<LayoutResult>({ nodes: [], edges: [] });
   const [fitSignal, setFitSignal] = useState(0);
   const [showReviewPanel, setShowReviewPanel] = useState(false);
+  const [showEffects, setShowEffects] = useState(false);
 
   const appliedLayoutVersion = useRef(0);
   const { theme, toggleTheme } = useTheme();
@@ -155,12 +156,12 @@ export default function App() {
 
   const flowModel = useMemo(() => {
     if (!displayedCore) return { nodes: [], edges: [] };
-    const rawModel = toFlowModel(displayedCore, { anyState: t('state.anyState') }, hiddenStateIds);
+    const rawModel = toFlowModel(displayedCore, { anyState: t('state.anyState') }, hiddenStateIds, showEffects);
     if (isProposing && changeSet) {
       return annotateFlowModel(rawModel, changeSet);
     }
     return rawModel;
-  }, [displayedCore, t, hiddenStateIds, isProposing, changeSet]);
+  }, [displayedCore, t, hiddenStateIds, showEffects, isProposing, changeSet]);
 
   useEffect(() => {
     let cancelled = false;
@@ -286,8 +287,10 @@ export default function App() {
         tagQuery={tagQuery}
         tagOptions={tagOptions}
         undocumentedOnly={undocumentedOnly}
+        showEffects={showEffects}
         onTagQueryChange={setTagQuery}
         onToggleUndocumented={() => setUndocumentedOnly((on) => !on)}
+        onToggleEffects={() => setShowEffects((on) => !on)}
         onToggleSimulation={toggleSimulation}
         onRelayout={() => setLayoutVersion((v) => v + 1)}
         onToggleTheme={toggleTheme}

@@ -51,7 +51,23 @@ export function RoutedEdge({ id, data, label, selected, markerEnd }: EdgeProps) 
             x={route.label.x + route.label.width / 2}
             y={route.label.y + route.label.height / 2}
           >
-            {String(label)}
+            {data?.event ? (
+              <>
+                <tspan className="edge-label-event">{String(data.event)}</tspan>
+                {data.effects && (data.effects as any[]).length > 0 ? (
+                  <tspan className="edge-label-effects">
+                    {' / '}
+                    {(data.effects as any[]).map((e, i, arr) => (
+                      <tspan key={i} className={e.conditional ? 'edge-label-effect conditional' : 'edge-label-effect'}>
+                        {e.name}{e.conditional ? '?' : ''}{i < arr.length - 1 ? ', ' : ''}
+                      </tspan>
+                    ))}
+                  </tspan>
+                ) : null}
+              </>
+            ) : (
+              String(label)
+            )}
           </text>
         </g>
       ) : null}

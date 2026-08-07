@@ -132,6 +132,8 @@ export const en = {
   'proposal.discard': 'Reset',
   'proposal.discardTitle': 'Discard all proposed changes',
   'proposal.confirmDiscard': 'Are you sure you want to discard all proposed changes? This action cannot be undone.',
+  'toolbar.showEffects': 'Effects',
+  'toolbar.showEffectsHint': 'Show effects on edges',
 };
 
 /** Every key the UI may ask for. */

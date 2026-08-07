@@ -113,4 +113,6 @@ export const ptBR: Catalog = {
   'proposal.discard': 'Resetar',
   'proposal.discardTitle': 'Descartar todas as alterações propostas',
   'proposal.confirmDiscard': 'Tem certeza de que deseja descartar todas as alterações propostas? Esta ação não pode ser desfeita.',
+  'toolbar.showEffects': 'Efeitos',
+  'toolbar.showEffectsHint': 'Mostrar efeitos nas setas',
 };
