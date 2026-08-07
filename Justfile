@@ -142,6 +142,9 @@ site src name base="/" out="apps/web/dist":
     cargo run -q -p crux-analyzer-cli -- site --src {{src}} --name "{{name}}" --out {{out}}
     @echo "Static site ready in {{out}} — serve it over HTTP, not file://"
 
+site-preview:
+    pnpm --filter web preview
+
 # Generate docs: just docs path/to/app/src MyApp [markdown|mermaid] [en|pt-BR]
 docs src name format="markdown" locale="en":
     cargo run -q -p crux-analyzer-cli -- docs --src {{src}} --name "{{name}}" \
