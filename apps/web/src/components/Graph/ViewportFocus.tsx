@@ -24,6 +24,11 @@ export interface FollowRequest {
   step: number;
 }
 
+export interface RecenterRequest {
+  nodeId?: string;
+  signal: number;
+}
+
 const DURATION = 400;
 
 /**
@@ -37,11 +42,12 @@ function animationDuration(): number {
 interface ViewportFocusProps {
   fit: FitRequest | null;
   follow: FollowRequest | null;
+  recenter: RecenterRequest | null;
   /** Padding of the framing, shared with the canvas' initial fitView. */
   padding: number;
 }
 
-export function ViewportFocus({ fit, follow, padding }: ViewportFocusProps) {
+export function ViewportFocus({ fit, follow, recenter, padding }: ViewportFocusProps) {
   const { fitView, setCenter, getZoom, getViewport, getInternalNode } = useReactFlow();
   // Read (never subscribe to) the pane size: a window resize must not pan.
   const store = useStoreApi();
@@ -74,6 +80,26 @@ export function ViewportFocus({ fit, follow, padding }: ViewportFocusProps) {
     const center = rectCenter(rect);
     void setCenter(center.x, center.y, { zoom: getZoom(), duration: animationDuration() });
   }, [follow, getInternalNode, getViewport, getZoom, setCenter, store]);
+
+  useEffect(() => {
+    if (!recenter) return;
+    if (recenter.nodeId) {
+      const node = getInternalNode(recenter.nodeId);
+      if (node) {
+        const rect = {
+          x: node.internals.positionAbsolute.x,
+          y: node.internals.positionAbsolute.y,
+          width: node.measured.width ?? 0,
+          height: node.measured.height ?? 0,
+        };
+        const center = rectCenter(rect);
+        void setCenter(center.x, center.y, { zoom: getZoom(), duration: animationDuration() });
+        return;
+      }
+    }
+    // Fallback: if no node selected, just fitView so user is not lost in space
+    void fitView({ padding, maxZoom: 1, duration: animationDuration() });
+  }, [recenter, getInternalNode, getZoom, setCenter, fitView, padding]);
 
   return null;
 }

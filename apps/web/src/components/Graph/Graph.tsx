@@ -65,6 +65,8 @@ interface GraphProps {
   highlight?: GraphHighlight;
   /** Bumped by the host to re-frame the whole graph (an explicit Re-layout). */
   fitSignal?: number;
+  /** Bumped by the host when layout changes to maintain focus on the selection. */
+  recenterSignal?: number;
   theme: Theme;
 }
 
@@ -75,6 +77,7 @@ export function Graph({
   onSelect,
   highlight,
   fitSignal = 0,
+  recenterSignal = 0,
   theme,
 }: GraphProps) {
   const colors = useGraphColors(theme);
@@ -82,11 +85,22 @@ export function Graph({
   // Framing a section is a viewport reaction to a click, not graph state: a
   // fresh request object per click re-frames even the same section.
   const [fitRequest, setFitRequest] = useState<FitRequest | null>(null);
+  const [recenterRequest, setRecenterRequest] = useState<any>(null);
 
   // An explicit Re-layout frames the whole graph: a fresh, node-less request.
   useEffect(() => {
     if (fitSignal > 0) setFitRequest({});
   }, [fitSignal]);
+
+  // When layout geometry changes (e.g. effects toggled), re-center on the selection
+  useEffect(() => {
+    if (recenterSignal > 0) {
+      setRecenterRequest({
+        nodeId: selection?.kind === 'state' ? selection.id : undefined,
+        signal: recenterSignal,
+      });
+    }
+  }, [recenterSignal, selection]);
 
   // The simulation already tells us where it is; the camera tags along.
   const currentStateId = highlight?.nodeIds[0];
@@ -215,7 +229,7 @@ export function Graph({
     >
       <Background gap={20} />
       <Controls showInteractive={false} />
-      <ViewportFocus fit={fitRequest} follow={follow} padding={FIT_PADDING} />
+      <ViewportFocus fit={fitRequest} follow={follow} recenter={recenterRequest} padding={FIT_PADDING} />
     </ReactFlow>
   );
 }

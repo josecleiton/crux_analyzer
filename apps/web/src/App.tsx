@@ -59,6 +59,7 @@ export default function App() {
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [layouted, setLayouted] = useState<LayoutResult>({ nodes: [], edges: [] });
   const [fitSignal, setFitSignal] = useState(0);
+  const [recenterSignal, setRecenterSignal] = useState(0);
   const [showReviewPanel, setShowReviewPanel] = useState(false);
   const [showEffects, setShowEffects] = useState(false);
 
@@ -171,6 +172,8 @@ export default function App() {
       if (layoutVersion !== appliedLayoutVersion.current) {
         appliedLayoutVersion.current = layoutVersion;
         setFitSignal((signal) => signal + 1);
+      } else {
+        setRecenterSignal((signal) => signal + 1);
       }
     });
     return () => {
@@ -327,6 +330,7 @@ export default function App() {
             onSelect={setSelection}
             highlight={highlight}
             fitSignal={fitSignal}
+            recenterSignal={recenterSignal}
             theme={theme}
           />
         </main>
