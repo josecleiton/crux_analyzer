@@ -42,3 +42,6 @@ engineStrict: true
 # local `pnpm approve-builds` nobody sees. A blocked script is still reported
 # (`ERR_PNPM_IGNORED_BUILDS`), never silently skipped. See `docs/security.md` §9.
 allowBuilds: {}
+
+overrides:
+  nanoid: ">=3.3.17"
