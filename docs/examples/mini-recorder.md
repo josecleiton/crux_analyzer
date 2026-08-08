@@ -9,14 +9,14 @@ finished upload.
 
 ```mermaid
 stateDiagram-v2
-    Idle --> Recording: RecordPressed / AudioOperation#58;#58;Start
+    Idle --> Recording: RecordPressed\n/ AudioOperation#58;#58;Start
     Recording --> Paused: PausePressed
     Paused --> Recording: ResumePressed
-    Recording --> Uploading: StopPressed / AudioOperation#58;#58;Stop, HttpOperation#58;#58;Upload?
-    Paused --> Uploading: StopPressed / AudioOperation#58;#58;Stop, HttpOperation#58;#58;Upload?
+    Recording --> Uploading: StopPressed\n/ AudioOperation#58;#58;Stop, HttpOperation#58;#58;Upload?
+    Paused --> Uploading: StopPressed\n/ AudioOperation#58;#58;Stop, HttpOperation#58;#58;Upload?
     Uploading --> Completed: UploadFinished
-    Failed --> Uploading: RetryPressed / HttpOperation#58;#58;Upload
-    Failed --> Idle: RetryPressed / Render
+    Failed --> Uploading: RetryPressed\n/ HttpOperation#58;#58;Upload
+    Failed --> Idle: RetryPressed\n/ Render
     Recording --> Failed: Failed
     Paused --> Failed: Failed
     Uploading --> Failed: Failed
