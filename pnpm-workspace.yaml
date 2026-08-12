@@ -23,7 +23,7 @@ packages:
 # literal version and silently unlinks that package from the catalog — so bump a
 # shared version *here*, not with `pnpm add`.
 catalog:
-  "@types/node": ^24.13.3
+  "@types/node": ^26.2.0
   typescript: ~7.0.2
   vitest: ^4.1.10
 
