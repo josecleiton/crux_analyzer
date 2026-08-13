@@ -143,14 +143,14 @@ mod tests {
         let declared = machine(states, cycle);
         let roles = MachineRoles::of(&declared);
         assert!(roles.is_initial("Running"));
-        assert!(!roles.is_initial("Idle"), "declaration order is not evidence");
+        assert!(
+            !roles.is_initial("Idle"),
+            "declaration order is not evidence"
+        );
 
         // Same machine, no declaration: the first state stands in, which is all
         // the shape offers.
-        let undeclared = machine(
-            vec!["Idle".into(), "Running".into(), "Done".into()],
-            cycle,
-        );
+        let undeclared = machine(vec!["Idle".into(), "Running".into(), "Done".into()], cycle);
         let roles = MachineRoles::of(&undeclared);
         assert!(roles.is_initial("Idle"));
         assert!(!roles.is_initial("Running"));

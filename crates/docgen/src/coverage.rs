@@ -169,7 +169,13 @@ mod tests {
         assert_eq!(entry.core, "C");
         assert_eq!(entry.machine, "M");
         assert!(entry.machine_documented);
-        assert_eq!(entry.states, Coverage { documented: 1, total: 2 });
+        assert_eq!(
+            entry.states,
+            Coverage {
+                documented: 1,
+                total: 2
+            }
+        );
         assert_eq!(entry.undocumented, ["Running"]);
     }
 
@@ -183,7 +189,13 @@ mod tests {
             ..Default::default()
         };
         let report = coverage(&project(vec![machine("M", None, vec![classified])]));
-        assert_eq!(report.states, Coverage { documented: 0, total: 1 });
+        assert_eq!(
+            report.states,
+            Coverage {
+                documented: 0,
+                total: 1
+            }
+        );
         assert_eq!(report.machines[0].undocumented, ["Failed"]);
     }
 
@@ -208,10 +220,19 @@ mod tests {
                 },
             ],
         });
-        assert_eq!(report.states, Coverage { documented: 2, total: 3 });
+        assert_eq!(
+            report.states,
+            Coverage {
+                documented: 2,
+                total: 3
+            }
+        );
         assert_eq!(
             report.machines_documented,
-            Coverage { documented: 1, total: 2 }
+            Coverage {
+                documented: 1,
+                total: 2
+            }
         );
         assert_eq!(report.machines.len(), 2);
         assert_eq!(report.machines[1].core, "B");
@@ -219,11 +240,46 @@ mod tests {
 
     #[test]
     fn percent_rounds_half_up() {
-        assert_eq!(Coverage { documented: 2, total: 3 }.percent(), 67);
-        assert_eq!(Coverage { documented: 1, total: 3 }.percent(), 33);
-        assert_eq!(Coverage { documented: 1, total: 2 }.percent(), 50);
-        assert_eq!(Coverage { documented: 3, total: 3 }.percent(), 100);
-        assert_eq!(Coverage { documented: 0, total: 4 }.percent(), 0);
+        assert_eq!(
+            Coverage {
+                documented: 2,
+                total: 3
+            }
+            .percent(),
+            67
+        );
+        assert_eq!(
+            Coverage {
+                documented: 1,
+                total: 3
+            }
+            .percent(),
+            33
+        );
+        assert_eq!(
+            Coverage {
+                documented: 1,
+                total: 2
+            }
+            .percent(),
+            50
+        );
+        assert_eq!(
+            Coverage {
+                documented: 3,
+                total: 3
+            }
+            .percent(),
+            100
+        );
+        assert_eq!(
+            Coverage {
+                documented: 0,
+                total: 4
+            }
+            .percent(),
+            0
+        );
     }
 
     /// Nothing to document is not a failure — an empty project must not fail CI.
@@ -238,10 +294,17 @@ mod tests {
     /// `meets` compares exactly, so a displayed 67% does not satisfy `--min 67`.
     #[test]
     fn meets_does_not_inherit_display_rounding() {
-        let two_of_three = Coverage { documented: 2, total: 3 };
+        let two_of_three = Coverage {
+            documented: 2,
+            total: 3,
+        };
         assert_eq!(two_of_three.percent(), 67);
         assert!(!two_of_three.meets(67));
         assert!(two_of_three.meets(66));
-        assert!(Coverage { documented: 3, total: 3 }.meets(100));
+        assert!(Coverage {
+            documented: 3,
+            total: 3
+        }
+        .meets(100));
     }
 }

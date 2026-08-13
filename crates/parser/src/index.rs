@@ -136,7 +136,10 @@ impl<'a> CrateIndex<'a> {
     /// declarations shadow same-named enums from other modules).
     pub fn resolve_enum(&self, name: &str, file: &Path) -> Option<&EnumDecl> {
         let decls = self.enum_decls(name);
-        decls.iter().find(|d| d.file == file).or_else(|| decls.first())
+        decls
+            .iter()
+            .find(|d| d.file == file)
+            .or_else(|| decls.first())
     }
 }
 
@@ -171,7 +174,11 @@ fn index_items<'a>(
                     .or_default()
                     .push(EnumDecl {
                         file: file.to_path_buf(),
-                        variants: item_enum.variants.iter().map(|v| v.ident.to_string()).collect(),
+                        variants: item_enum
+                            .variants
+                            .iter()
+                            .map(|v| v.ident.to_string())
+                            .collect(),
                         variant_fields: item_enum
                             .variants
                             .iter()
@@ -202,8 +209,7 @@ fn index_items<'a>(
                                 let syn::Type::Path(path) = &field.ty else {
                                     return None;
                                 };
-                                let declared =
-                                    path.path.segments.last()?.ident.to_string();
+                                let declared = path.path.segments.last()?.ident.to_string();
                                 Some(StructField {
                                     name,
                                     reachable: reachable_type_name(&field.ty, 0)
@@ -282,7 +288,11 @@ fn register_aliases(index: &mut CrateIndex, renames: &[UseRename]) {
             .or_else(|| decls.first())
             .cloned();
         if let Some(decl) = chosen {
-            index.enums.entry(rename.alias.clone()).or_default().push(decl);
+            index
+                .enums
+                .entry(rename.alias.clone())
+                .or_default()
+                .push(decl);
         }
     }
 }
@@ -358,15 +368,16 @@ fn unwrapped_type_name_at(ty: &syn::Type, depth: usize) -> Option<String> {
     if depth >= MAX_TYPE_DEPTH {
         return None;
     }
-    let syn::Type::Path(type_path) = ty else { return None };
+    let syn::Type::Path(type_path) = ty else {
+        return None;
+    };
     let segment = type_path.path.segments.last()?;
     match &segment.arguments {
         syn::PathArguments::None => Some(segment.ident.to_string()),
         syn::PathArguments::AngleBracketed(args)
             if matches!(segment.ident.to_string().as_str(), "Box" | "Rc" | "Arc") =>
         {
-            let [syn::GenericArgument::Type(inner)] =
-                args.args.iter().collect::<Vec<_>>()[..]
+            let [syn::GenericArgument::Type(inner)] = args.args.iter().collect::<Vec<_>>()[..]
             else {
                 return None;
             };
@@ -388,7 +399,9 @@ fn reachable_type_name(ty: &syn::Type, depth: usize) -> Option<String> {
     if depth >= MAX_TYPE_DEPTH {
         return None;
     }
-    let syn::Type::Path(type_path) = ty else { return None };
+    let syn::Type::Path(type_path) = ty else {
+        return None;
+    };
     let segment = type_path.path.segments.last()?;
     let args = match &segment.arguments {
         syn::PathArguments::None => return Some(segment.ident.to_string()),

@@ -23,8 +23,19 @@ fn extracts_all_state_machines() {
         .find(|m| m.name == "RecorderState")
         .expect("RecorderState machine");
     assert_eq!(
-        recorder.states.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
-        ["Idle", "Recording", "Paused", "Uploading", "Completed", "Failed"]
+        recorder
+            .states
+            .iter()
+            .map(|s| s.name.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "Idle",
+            "Recording",
+            "Paused",
+            "Uploading",
+            "Completed",
+            "Failed"
+        ]
     );
 
     let triples: Vec<(&str, &str, &str)> = recorder
@@ -51,9 +62,16 @@ fn extracts_all_state_machines() {
         ("Uploading", "Failed", "Failed"),
     ];
     for triple in &expected {
-        assert!(triples.contains(triple), "missing transition {triple:?} in {triples:#?}");
+        assert!(
+            triples.contains(triple),
+            "missing transition {triple:?} in {triples:#?}"
+        );
     }
-    assert_eq!(triples.len(), expected.len(), "unexpected extras: {triples:#?}");
+    assert_eq!(
+        triples.len(),
+        expected.len(),
+        "unexpected extras: {triples:#?}"
+    );
 
     // Second region: the upload machine, driven by the same events.
     let upload = core
@@ -107,7 +125,10 @@ fn extracts_all_state_machines() {
         ["AudioOperation::Stop", "HttpOperation::Upload"]
     );
     assert!(!stopping[0].conditional);
-    assert!(stopping[0].resolves_with.is_empty(), "fire-and-forget request");
+    assert!(
+        stopping[0].resolves_with.is_empty(),
+        "fire-and-forget request"
+    );
     assert!(stopping[1].conditional);
     assert_eq!(stopping[1].capability.as_deref(), Some("Http"));
     // The other half of the loop: the event the shell answers with is an event
@@ -126,8 +147,11 @@ fn extracts_all_state_machines() {
 
     // Doc comments on event and effect variants become the core's catalogs —
     // only the documented AND used names.
-    let events: Vec<(&str, &str)> =
-        core.events.iter().map(|e| (e.name.as_str(), e.doc.as_str())).collect();
+    let events: Vec<(&str, &str)> = core
+        .events
+        .iter()
+        .map(|e| (e.name.as_str(), e.doc.as_str()))
+        .collect();
     assert_eq!(
         events,
         [
@@ -141,8 +165,11 @@ fn extracts_all_state_machines() {
             ("RetryPressed", "Retry the failed upload, keeping the recorded take."),
         ]
     );
-    let effects: Vec<(&str, &str)> =
-        core.effects.iter().map(|e| (e.name.as_str(), e.doc.as_str())).collect();
+    let effects: Vec<(&str, &str)> = core
+        .effects
+        .iter()
+        .map(|e| (e.name.as_str(), e.doc.as_str()))
+        .collect();
     assert_eq!(
         effects,
         [
@@ -196,5 +223,9 @@ fn extracts_all_state_machines() {
         upload.states
     );
 
-    assert!(outcome.warnings.is_empty(), "unexpected warnings: {:#?}", outcome.warnings);
+    assert!(
+        outcome.warnings.is_empty(),
+        "unexpected warnings: {:#?}",
+        outcome.warnings
+    );
 }

@@ -219,7 +219,10 @@ fn run() -> ExitCode {
             Command::Site { .. } | Command::Coverage { .. } => unreachable!("handled above"),
         };
 
-    let project_name = input.name.clone().unwrap_or_else(|| directory_name(&input.src));
+    let project_name = input
+        .name
+        .clone()
+        .unwrap_or_else(|| directory_name(&input.src));
     let run_analysis = || {
         run_once(
             &input.src,
@@ -250,11 +253,18 @@ fn run_site(
     messages: &Messages,
 ) -> ExitCode {
     if let Err(err) = site::export_site(&out_dir) {
-        eprintln!("{}: {}: {err}", messages.error_prefix(), messages.web_assets_missing());
+        eprintln!(
+            "{}: {}: {err}",
+            messages.error_prefix(),
+            messages.web_assets_missing()
+        );
         return ExitCode::FAILURE;
     }
 
-    let project_name = input.name.clone().unwrap_or_else(|| directory_name(&input.src));
+    let project_name = input
+        .name
+        .clone()
+        .unwrap_or_else(|| directory_name(&input.src));
     let model_out = out_dir.join("model.json");
 
     let run_analysis = || {
@@ -268,7 +278,9 @@ fn run_site(
             messages,
         );
         if code == ExitCode::SUCCESS {
-            if let Ok(outcome) = crux_analyzer_parser::parse_project_with(&input.src, &project_name, limits) {
+            if let Ok(outcome) =
+                crux_analyzer_parser::parse_project_with(&input.src, &project_name, limits)
+            {
                 eprintln!(
                     "{}",
                     messages.wrote_site_summary(
@@ -346,11 +358,7 @@ fn run_once(
             }
             eprintln!(
                 "{}",
-                messages.wrote_summary(
-                    path,
-                    outcome.project.cores.len(),
-                    outcome.warnings.len()
-                )
+                messages.wrote_summary(path, outcome.project.cores.len(), outcome.warnings.len())
             );
         }
         None => print!("{rendered}"),

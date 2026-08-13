@@ -186,9 +186,8 @@ fn pattern_variants_at(pat: &syn::Pat, out: &mut Vec<(String, String)>, depth: u
     if depth >= MAX_PATTERN_DEPTH {
         return;
     }
-    let pattern_variants = |pat: &syn::Pat, out: &mut Vec<(String, String)>| {
-        pattern_variants_at(pat, out, depth + 1)
-    };
+    let pattern_variants =
+        |pat: &syn::Pat, out: &mut Vec<(String, String)>| pattern_variants_at(pat, out, depth + 1);
     match pat {
         syn::Pat::Path(path) => {
             if let Some(pair) = enum_variant_path(&path.path) {

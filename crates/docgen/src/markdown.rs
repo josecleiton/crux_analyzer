@@ -81,7 +81,13 @@ pub fn markdown(project: &Project, locale: Locale) -> String {
         // vocabulary already appears in the transition tables above, so these
         // catalogs only exist where an author explained something.
         push_catalog(&mut out, labels.events, labels.event, &core.events, &labels);
-        push_catalog(&mut out, labels.effects, labels.effect, &core.effects, &labels);
+        push_catalog(
+            &mut out,
+            labels.effects,
+            labels.effect,
+            &core.effects,
+            &labels,
+        );
     }
 
     out
@@ -170,7 +176,10 @@ fn push_catalog(
     push_line(out, "");
     push_line(out, &format!("### {heading}"));
     push_line(out, "");
-    push_line(out, &format!("| {} | {} |", name_column, labels.description));
+    push_line(
+        out,
+        &format!("| {} | {} |", name_column, labels.description),
+    );
     push_line(out, "| --- | --- |");
     for entry in entries {
         push_line(
@@ -319,7 +328,10 @@ fn tags_cell(state: &StateDecl, labels: &Labels) -> String {
 }
 
 fn paragraphs(doc: &str) -> Vec<&str> {
-    doc.split("\n\n").map(str::trim).filter(|p| !p.is_empty()).collect()
+    doc.split("\n\n")
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .collect()
 }
 
 /// Escapes author prose for a Markdown table cell: a row is one line, and a
@@ -463,11 +475,7 @@ fn defuse_scheme(target: &str) -> String {
 /// Mermaid note can — and three of them would close the fence and drop the rest
 /// of the diagram into the document as prose.
 fn fence_for(body: &str) -> String {
-    let longest_run = body
-        .split(|c| c != '`')
-        .map(str::len)
-        .max()
-        .unwrap_or(0);
+    let longest_run = body.split(|c| c != '`').map(str::len).max().unwrap_or(0);
     "`".repeat(longest_run.max(2) + 1)
 }
 

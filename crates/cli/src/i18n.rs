@@ -252,8 +252,14 @@ mod tests {
         assert!(pt.warnings_denied(1).starts_with("1 aviso reportado e"));
         assert!(pt.warnings_denied(2).starts_with("2 avisos reportados e"));
 
-        let one = Coverage { documented: 1, total: 1 };
-        let some = Coverage { documented: 1, total: 3 };
+        let one = Coverage {
+            documented: 1,
+            total: 1,
+        };
+        let some = Coverage {
+            documented: 1,
+            total: 3,
+        };
         assert_eq!(en.described_of(one), "1 of 1 state described");
         assert_eq!(en.described_of(some), "1 of 3 states described");
         assert_eq!(pt.described_of(one), "1 de 1 estado descrito");
@@ -267,17 +273,29 @@ mod tests {
                 core: "Recorder".into(),
                 machine: "RecorderState".into(),
                 machine_documented: false,
-                states: Coverage { documented: 1, total: 2 },
+                states: Coverage {
+                    documented: 1,
+                    total: 2,
+                },
                 undocumented: vec!["Running".into()],
             }],
-            states: Coverage { documented: 1, total: 2 },
-            machines_documented: Coverage { documented: 0, total: 1 },
+            states: Coverage {
+                documented: 1,
+                total: 2,
+            },
+            machines_documented: Coverage {
+                documented: 0,
+                total: 1,
+            },
         };
 
         let en = Messages::new(Locale::En).coverage_report(&report, false);
         assert!(en.contains("Recorder / RecorderState"), "{en}");
         assert!(en.contains("50%"), "{en}");
-        assert!(en.contains("the state enum itself has no description"), "{en}");
+        assert!(
+            en.contains("the state enum itself has no description"),
+            "{en}"
+        );
         assert!(en.contains("total"), "{en}");
         // Without --list the undocumented names stay out.
         assert!(!en.contains("- Running"), "{en}");

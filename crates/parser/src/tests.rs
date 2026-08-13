@@ -108,7 +108,10 @@ fn multi_pattern_guard_fans_out() {
     let (transitions, _) = transitions_of(&code);
     assert_eq!(
         transitions,
-        vec![triple("Idle", "Stop", "Done"), triple("Running", "Stop", "Done")]
+        vec![
+            triple("Idle", "Stop", "Done"),
+            triple("Running", "Stop", "Done")
+        ]
     );
 }
 
@@ -134,7 +137,10 @@ fn multi_event_arm_fans_out() {
     let (transitions, _) = transitions_of(&code);
     assert_eq!(
         transitions,
-        vec![triple("Running", "Cancel", "Idle"), triple("Running", "Fail", "Idle")]
+        vec![
+            triple("Running", "Cancel", "Idle"),
+            triple("Running", "Fail", "Idle")
+        ]
     );
 }
 
@@ -228,7 +234,10 @@ fn match_on_state_with_wildcard_complement() {
     // `_` is the complement of the arms above it: Idle and Running.
     assert_eq!(
         transitions,
-        vec![triple("Idle", "Reset", "Idle"), triple("Running", "Reset", "Idle")]
+        vec![
+            triple("Idle", "Reset", "Idle"),
+            triple("Running", "Reset", "Idle")
+        ]
     );
 }
 
@@ -257,7 +266,10 @@ fn payload_variants_normalize_to_name() {
     let (transitions, _) = transitions_of(code);
     assert_eq!(
         transitions,
-        vec![triple("Idle", "Work", "Busy"), triple("Busy", "Done", "Idle")]
+        vec![
+            triple("Idle", "Work", "Busy"),
+            triple("Busy", "Done", "Idle")
+        ]
     );
 }
 
@@ -287,7 +299,10 @@ fn unknown_source_state_warns_instead_of_emitting() {
     let (transitions, warnings) = transitions_of(&code);
     assert!(transitions.is_empty());
     assert_eq!(warnings.len(), 1);
-    assert!(warnings[0].contains("could not be resolved statically"), "{warnings:?}");
+    assert!(
+        warnings[0].contains("could not be resolved statically"),
+        "{warnings:?}"
+    );
 }
 
 #[test]
@@ -440,7 +455,11 @@ fn mirror_enum_is_not_a_state_machine() {
     let machine = &core.machines[0];
     assert_eq!(machine.name, "State");
     assert_eq!(
-        machine.states.iter().map(|s| s.name.clone()).collect::<Vec<_>>(),
+        machine
+            .states
+            .iter()
+            .map(|s| s.name.clone())
+            .collect::<Vec<_>>(),
         vec!["Idle", "Running", "Done"]
     );
     assert_eq!(machine.transitions.len(), 1);
@@ -495,7 +514,10 @@ fn cfg_test_modules_are_ignored() {
     );
     let (transitions, warnings) = transitions_of(&code);
     assert_eq!(transitions, vec![triple("Idle", "Start", "Running")]);
-    assert!(warnings.is_empty(), "test code must not produce warnings: {warnings:?}");
+    assert!(
+        warnings.is_empty(),
+        "test code must not produce warnings: {warnings:?}"
+    );
 }
 
 #[test]
@@ -527,7 +549,10 @@ fn multiple_state_machines_become_regions() {
 
     assert_eq!(core.machines.len(), 2);
     let names: Vec<&str> = core.machines.iter().map(|m| m.name.as_str()).collect();
-    assert!(names.contains(&"State") && names.contains(&"NetState"), "{names:?}");
+    assert!(
+        names.contains(&"State") && names.contains(&"NetState"),
+        "{names:?}"
+    );
     for machine in &core.machines {
         assert_eq!(machine.transitions.len(), 1, "one transition per region");
     }
@@ -684,7 +709,10 @@ fn dynamic_target_without_evidence_still_warns() {
     let (transitions, warnings) = transitions_of(&code);
     assert_eq!(transitions, vec![triple("*", "Reset", "Idle")]);
     assert_eq!(warnings.len(), 1);
-    assert!(warnings[0].contains("target state is dynamic"), "{warnings:?}");
+    assert!(
+        warnings[0].contains("target state is dynamic"),
+        "{warnings:?}"
+    );
 }
 
 #[test]
@@ -718,7 +746,11 @@ fn composite_states_expand_to_slash_paths() {
     let machine = &outcome.project.cores[0].machines[0];
 
     assert_eq!(
-        machine.states.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+        machine
+            .states
+            .iter()
+            .map(|s| s.name.as_str())
+            .collect::<Vec<_>>(),
         ["Idle", "Active/Loading", "Active/Ready"]
     );
     let triples: Vec<(String, String, String)> = machine
@@ -770,18 +802,32 @@ fn effects_attach_to_their_event_arm() {
     let outcome = parse_sources(&sources, "test").unwrap();
     let machine = &outcome.project.cores[0].machines[0];
 
-    let go = machine.transitions.iter().find(|t| t.event.0 == "Go").unwrap();
+    let go = machine
+        .transitions
+        .iter()
+        .find(|t| t.event.0 == "Go")
+        .unwrap();
     assert_eq!(
-        go.effects.iter().map(|e| e.name.as_str()).collect::<Vec<_>>(),
+        go.effects
+            .iter()
+            .map(|e| e.name.as_str())
+            .collect::<Vec<_>>(),
         ["Render", "Operation::Start"]
     );
     // `Effect::Op(Operation)` puts every `Operation` request under `Op`;
     // crux's bare `render()` goes through no capability at all.
     assert_eq!(go.effects[0].capability, None);
     assert_eq!(go.effects[1].capability.as_deref(), Some("Op"));
-    let halt = machine.transitions.iter().find(|t| t.event.0 == "Halt").unwrap();
+    let halt = machine
+        .transitions
+        .iter()
+        .find(|t| t.event.0 == "Halt")
+        .unwrap();
     assert_eq!(
-        halt.effects.iter().map(|e| e.name.as_str()).collect::<Vec<_>>(),
+        halt.effects
+            .iter()
+            .map(|e| e.name.as_str())
+            .collect::<Vec<_>>(),
         ["Operation::Stop"]
     );
 }
@@ -933,13 +979,22 @@ fn documented_events_and_effects_reach_the_core_catalogs() {
 
     // Only documented AND used names enter the catalogs: `Unused` is
     // documented but fires nothing, `Halt` fires but says nothing.
-    let events: Vec<(&str, &str)> =
-        core.events.iter().map(|e| (e.name.as_str(), e.doc.as_str())).collect();
+    let events: Vec<(&str, &str)> = core
+        .events
+        .iter()
+        .map(|e| (e.name.as_str(), e.doc.as_str()))
+        .collect();
     assert_eq!(events, [("Go", "The user pressed the record button.")]);
 
-    let effects: Vec<(&str, &str)> =
-        core.effects.iter().map(|e| (e.name.as_str(), e.doc.as_str())).collect();
-    assert_eq!(effects, [("Operation::Start", "Starts the capture pipeline.")]);
+    let effects: Vec<(&str, &str)> = core
+        .effects
+        .iter()
+        .map(|e| (e.name.as_str(), e.doc.as_str()))
+        .collect();
+    assert_eq!(
+        effects,
+        [("Operation::Start", "Starts the capture pipeline.")]
+    );
     assert!(outcome.warnings.is_empty(), "{:?}", outcome.warnings);
 }
 
@@ -976,8 +1031,16 @@ fn same_enum_in_two_fields_is_two_machines() {
         "{names:?}"
     );
     for machine in &core.machines {
-        assert_eq!(machine.transitions.len(), 1, "one transition per region: {names:?}");
-        let expected_event = if machine.name.contains("left") { "StartLeft" } else { "StartRight" };
+        assert_eq!(
+            machine.transitions.len(),
+            1,
+            "one transition per region: {names:?}"
+        );
+        let expected_event = if machine.name.contains("left") {
+            "StartLeft"
+        } else {
+            "StartRight"
+        };
         assert_eq!(machine.transitions[0].event.0, expected_event);
     }
 }
@@ -1009,7 +1072,11 @@ fn payload_data_enum_is_not_a_composite_state() {
     let machine = &outcome.project.cores[0].machines[0];
 
     assert_eq!(
-        machine.states.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+        machine
+            .states
+            .iter()
+            .map(|s| s.name.as_str())
+            .collect::<Vec<_>>(),
         ["Idle", "Failed"],
         "ErrorCode must not expand into fake sub-states"
     );
@@ -1258,7 +1325,12 @@ fn the_declared_default_variant_reaches_the_state() {
         "the flag is evidence about the machine, not documentation"
     );
     assert!(
-        machine.states.iter().filter(|state| state.is_default).count() == 1,
+        machine
+            .states
+            .iter()
+            .filter(|state| state.is_default)
+            .count()
+            == 1,
         "{:?}",
         machine.states
     );
@@ -1299,7 +1371,11 @@ fn a_composite_default_variant_marks_no_leaf() {
         "#,
     );
     assert_eq!(
-        machine.states.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+        machine
+            .states
+            .iter()
+            .map(|s| s.name.as_str())
+            .collect::<Vec<_>>(),
         ["Idle", "Active/Loading", "Active/Ready"]
     );
     assert!(machine.states.iter().all(|state| !state.is_default));
@@ -1416,7 +1492,11 @@ fn undocumented_states_carry_no_metadata() {
     assert!(machine.doc.is_none());
     assert!(machine.markers.is_empty());
     assert!(machine.tags.is_empty());
-    assert!(machine.states.iter().all(|s| s.is_bare()), "{:?}", machine.states);
+    assert!(
+        machine.states.iter().all(|s| s.is_bare()),
+        "{:?}",
+        machine.states
+    );
 }
 
 /// The `update` body shared by the documentation tests above: one transition,

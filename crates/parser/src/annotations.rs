@@ -329,7 +329,10 @@ mod tests {
     fn an_annotation_in_the_middle_reads_like_one_at_the_end() {
         let middle = doc("First paragraph.\n\n@tag retryable\n\nSecond paragraph.");
         let trailing = doc("First paragraph.\n\nSecond paragraph.\n\n@tag retryable");
-        assert_eq!(middle.doc.as_deref(), Some("First paragraph.\n\nSecond paragraph."));
+        assert_eq!(
+            middle.doc.as_deref(),
+            Some("First paragraph.\n\nSecond paragraph.")
+        );
         assert_eq!(middle.doc, trailing.doc);
         assert_eq!(middle.tags, trailing.tags);
     }
@@ -352,7 +355,10 @@ mod tests {
         assert!(block.problems.is_empty());
 
         let email = doc("Ask support@example.com for help.");
-        assert_eq!(email.doc.as_deref(), Some("Ask support@example.com for help."));
+        assert_eq!(
+            email.doc.as_deref(),
+            Some("Ask support@example.com for help.")
+        );
         assert!(email.problems.is_empty());
     }
 

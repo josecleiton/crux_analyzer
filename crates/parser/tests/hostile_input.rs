@@ -194,7 +194,10 @@ fn oversized_files_are_skipped_and_reported() {
     // Nothing is left to analyze once the only file is skipped, so this fails
     // with `NoCoreFound` — the warning is what is under test.
     let outcome = parse_project_with(&dir, "oversized", &limits);
-    assert!(outcome.is_err(), "the only source file must have been skipped");
+    assert!(
+        outcome.is_err(),
+        "the only source file must have been skipped"
+    );
 
     // With a generous cap the same tree parses, proving the cap did the skipping.
     parse_project(&dir, "oversized").expect("parses under default limits");
@@ -205,10 +208,7 @@ fn oversized_files_are_skipped_and_reported() {
 #[cfg(unix)]
 #[test]
 fn symlinked_sources_are_skipped_and_reported() {
-    let dir = source_dir(
-        "symlink",
-        &app_with_body("model.state = State::Busy;", ""),
-    );
+    let dir = source_dir("symlink", &app_with_body("model.state = State::Busy;", ""));
     let outside = Path::new(env!("CARGO_TARGET_TMPDIR")).join("outside_secret.rs");
     let mut file = std::fs::File::create(&outside).expect("outside file");
     writeln!(file, "pub enum LeakedFromOutsideTheTree {{ Secret }}").expect("write");

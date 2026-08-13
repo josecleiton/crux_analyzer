@@ -7,9 +7,7 @@
 //! changes but fail if an escape is dropped.
 
 use crux_analyzer_i18n::Locale;
-use crux_analyzer_model::{
-    Core, Effect, Event, Machine, Project, State, StateDecl, Transition,
-};
+use crux_analyzer_model::{Core, Effect, Event, Machine, Project, State, StateDecl, Transition};
 
 /// A project whose every author-controlled field is hostile.
 fn hostile(doc: &str) -> Project {
@@ -70,7 +68,10 @@ fn prose_cannot_close_the_diagram_fence() {
         Locale::En,
     );
     // Exactly one opening and one closing mermaid fence survive, so fences pair.
-    let fences = doc.lines().filter(|l| l.trim_start().starts_with("```")).count();
+    let fences = doc
+        .lines()
+        .filter(|l| l.trim_start().starts_with("```"))
+        .count();
     assert_eq!(fences, 2, "unbalanced fences in:\n{doc}");
     assert!(doc.contains("```mermaid"), "{doc}");
 }
@@ -95,10 +96,8 @@ fn backticks_in_a_note_do_not_break_out_of_the_fence() {
 /// to be escaped before the pipe or `\|` re-opens a column.
 #[test]
 fn table_cells_keep_their_column_count() {
-    let doc = crux_analyzer_docgen::markdown(
-        &hostile("a \\| b | c\nsecond line `unclosed"),
-        Locale::En,
-    );
+    let doc =
+        crux_analyzer_docgen::markdown(&hostile("a \\| b | c\nsecond line `unclosed"), Locale::En);
     let row = doc
         .lines()
         .find(|l| l.starts_with("| Idle |"))
@@ -325,7 +324,10 @@ fn markdown_link_targets_drop_unsafe_schemes() {
     );
     let markdown = outside_fences(&doc);
     for scheme in ["javascript:", "JavaScript:", "data:", "vbscript:"] {
-        assert!(!markdown.contains(scheme), "{scheme} survived in:\n{markdown}");
+        assert!(
+            !markdown.contains(scheme),
+            "{scheme} survived in:\n{markdown}"
+        );
     }
     // The colon is escaped, not deleted: the reader still sees the text.
     assert!(markdown.contains("javascript&#58;"), "{markdown}");
@@ -343,7 +345,10 @@ fn non_ascii_prose_survives_url_neutralization() {
         &hostile("Gravação começou — ação não permitida. [x](javascript:1) 日本語"),
         Locale::En,
     );
-    assert!(doc.contains("Gravação começou — ação não permitida."), "{doc}");
+    assert!(
+        doc.contains("Gravação começou — ação não permitida."),
+        "{doc}"
+    );
     assert!(doc.contains("日本語"), "{doc}");
     assert!(!outside_fences(&doc).contains("javascript:"), "{doc}");
 }

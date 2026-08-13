@@ -99,8 +99,8 @@ pub(crate) fn load_sources(
         }
         total_bytes += size;
 
-        let content = std::fs::read_to_string(path)
-            .map_err(|err| ParseError::Io(path.to_path_buf(), err))?;
+        let content =
+            std::fs::read_to_string(path).map_err(|err| ParseError::Io(path.to_path_buf(), err))?;
         // Before `syn`, not after: it recurses over nesting, and its stack
         // overflow would abort the process instead of returning an error.
         if nesting_exceeds(&content, limits.max_nesting) {
@@ -113,8 +113,8 @@ pub(crate) fn load_sources(
             });
             continue;
         }
-        let ast = syn::parse_file(&content)
-            .map_err(|err| ParseError::Syntax(path.to_path_buf(), err))?;
+        let ast =
+            syn::parse_file(&content).map_err(|err| ParseError::Syntax(path.to_path_buf(), err))?;
         sources.push(SourceFile {
             path: path.to_path_buf(),
             ast,
@@ -142,7 +142,10 @@ fn nesting_exceeds(source: &str, max: usize) -> bool {
     while i < bytes.len() {
         match bytes[i] {
             b'/' if bytes.get(i + 1) == Some(&b'/') => {
-                i += bytes[i..].iter().position(|&b| b == b'\n').unwrap_or(bytes.len() - i);
+                i += bytes[i..]
+                    .iter()
+                    .position(|&b| b == b'\n')
+                    .unwrap_or(bytes.len() - i);
             }
             b'/' if bytes.get(i + 1) == Some(&b'*') => {
                 // Block comments nest in Rust.
@@ -282,10 +285,7 @@ mod tests {
             r#"fn f<'a>(x: &'a str) {}"#,
         ];
         for case in cases {
-            assert!(
-                !nesting_exceeds(case, 5),
-                "false positive on {case:?}"
-            );
+            assert!(!nesting_exceeds(case, 5), "false positive on {case:?}");
         }
     }
 

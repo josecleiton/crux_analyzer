@@ -43,8 +43,10 @@ impl CoreInfo {
             return None;
         }
         let decl = self.effect_enums.get(root)?;
-        let position = (0..decl.variants.len())
-            .find(|index| decl.field_types(*index).any(|field| field == operation_enum))?;
+        let position = (0..decl.variants.len()).find(|index| {
+            decl.field_types(*index)
+                .any(|field| field == operation_enum)
+        })?;
         Some(decl.variants[position].clone())
     }
 }

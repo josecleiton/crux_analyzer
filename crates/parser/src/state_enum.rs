@@ -139,8 +139,14 @@ pub(crate) fn find_state_machines(index: &CrateIndex) -> Detection {
                 .iter()
                 .max_by_key(|decl| decl.variants.len())
                 .cloned();
-            let docs = decl.as_ref().map(|decl| decl.docs.clone()).unwrap_or_default();
-            let file = decl.as_ref().map(|decl| decl.file.clone()).unwrap_or_default();
+            let docs = decl
+                .as_ref()
+                .map(|decl| decl.docs.clone())
+                .unwrap_or_default();
+            let file = decl
+                .as_ref()
+                .map(|decl| decl.file.clone())
+                .unwrap_or_default();
             let declared_default = decl.as_ref().and_then(|decl| decl.default_variant.clone());
             let leaves = decl
                 .map(|decl| expand_leaves(&enum_name, &decl, index, &nested_patterns))
@@ -236,11 +242,7 @@ fn expand_leaves(
 
     for (position, variant) in decl.variants.iter().enumerate() {
         let child = composite_child_enum(decl, position, index).filter(|(child_enum, _)| {
-            nested_patterns.contains(&(
-                enum_name.to_string(),
-                variant.clone(),
-                child_enum.clone(),
-            ))
+            nested_patterns.contains(&(enum_name.to_string(), variant.clone(), child_enum.clone()))
         });
         match child {
             Some((child_enum, child_decl)) => {
@@ -270,7 +272,9 @@ fn composite_child_enum(
     index: &CrateIndex,
 ) -> Option<(String, EnumDecl)> {
     let fields = &decl.variant_fields[position];
-    let [field] = fields.as_slice() else { return None };
+    let [field] = fields.as_slice() else {
+        return None;
+    };
     if field.name.is_some() {
         return None;
     }
@@ -310,7 +314,8 @@ impl<'a> Collector<'a> {
                         crate::ast_util::pattern_variants(element, &mut inner);
                     }
                     for (child_enum, _) in inner {
-                        self.nested_patterns.insert((parent.clone(), variant.clone(), child_enum));
+                        self.nested_patterns
+                            .insert((parent.clone(), variant.clone(), child_enum));
                     }
                 }
                 for element in &tuple.elems {
@@ -477,8 +482,12 @@ impl<'a, 'ast> Visit<'ast> for Collector<'a> {
 
 /// `T::default()` → `T`.
 fn default_call_type(expr: &syn::Expr) -> Option<String> {
-    let syn::Expr::Call(call) = expr else { return None };
-    let syn::Expr::Path(path) = &*call.func else { return None };
+    let syn::Expr::Call(call) = expr else {
+        return None;
+    };
+    let syn::Expr::Path(path) = &*call.func else {
+        return None;
+    };
     let segments: Vec<String> = path
         .path
         .segments

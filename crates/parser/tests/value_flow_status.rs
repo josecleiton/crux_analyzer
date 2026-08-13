@@ -25,7 +25,11 @@ fn detects_a_machine_the_core_never_writes_as_a_literal_variant() {
 
     let machine = &core.machines[0];
     assert_eq!(
-        machine.states.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+        machine
+            .states
+            .iter()
+            .map(|s| s.name.as_str())
+            .collect::<Vec<_>>(),
         ["Pending", "Running", "Done", "Deferred", "Unavailable"]
     );
     assert!(

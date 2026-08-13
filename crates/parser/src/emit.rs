@@ -194,7 +194,10 @@ fn state_decl(name: &str, docs: &DocBlock, is_default: bool) -> StateDecl {
 /// The enum name, disambiguated by field when the same enum drives more than
 /// one machine (e.g. two fields of the same state enum).
 fn machine_name(machine: &StateMachine, machines: &[StateMachine]) -> String {
-    let same_enum = machines.iter().filter(|m| m.enum_name == machine.enum_name).count();
+    let same_enum = machines
+        .iter()
+        .filter(|m| m.enum_name == machine.enum_name)
+        .count();
     if same_enum > 1 {
         format!("{} ({})", machine.enum_name, machine.field_name)
     } else {

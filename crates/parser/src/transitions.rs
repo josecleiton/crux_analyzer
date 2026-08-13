@@ -270,7 +270,9 @@ pub(crate) fn extract(
         });
     }
 
-    out.into_iter().map(|(transition, _, _)| transition).collect()
+    out.into_iter()
+        .map(|(transition, _, _)| transition)
+        .collect()
 }
 
 /// The effects of one event arm that belong to a transition found at `branch`.
@@ -734,7 +736,9 @@ impl<'w, 'a> Walker<'w, 'a> {
             // Each event arm gets its own effect scope and payload bindings.
             self.arm_counter += 1;
             arm_ctx.arm = self.arm_counter;
-            arm_ctx.payload_bindings.extend(self.payload_bindings(arm_pat));
+            arm_ctx
+                .payload_bindings
+                .extend(self.payload_bindings(arm_pat));
             if let Some(guard) = arm_guard {
                 arm_ctx.conditions.push(guard);
                 self.walk_expr(guard, ctx, self_ty, file);
@@ -1306,12 +1310,8 @@ impl<'w, 'a> Walker<'w, 'a> {
                     other => other,
                 }
             }
-            syn::Expr::Paren(paren) => {
-                self.eval_condition(&paren.expr, machine, scope, depth)
-            }
-            syn::Expr::Group(group) => {
-                self.eval_condition(&group.expr, machine, scope, depth)
-            }
+            syn::Expr::Paren(paren) => self.eval_condition(&paren.expr, machine, scope, depth),
+            syn::Expr::Group(group) => self.eval_condition(&group.expr, machine, scope, depth),
             // A block condition (e.g. a closure body) is its trailing expression.
             syn::Expr::Block(block) => match block.block.stmts.last() {
                 Some(syn::Stmt::Expr(trailing, None)) => {
@@ -1357,11 +1357,7 @@ impl<'w, 'a> Walker<'w, 'a> {
 
     /// Nests through `|`, `@`, parens and references, so a pattern of nothing
     /// but `((((…))))` recurses as deep as the input is nested.
-    fn state_leaves_of_pattern_inner(
-        &self,
-        pat: &syn::Pat,
-        machine: &StateMachine,
-    ) -> Vec<String> {
+    fn state_leaves_of_pattern_inner(&self, pat: &syn::Pat, machine: &StateMachine) -> Vec<String> {
         let is_machine_enum = |name: &str| name == machine.enum_name || name == "Self";
         match pat {
             syn::Pat::Path(path) => match enum_variant_path(&path.path) {
@@ -1419,9 +1415,7 @@ impl<'w, 'a> Walker<'w, 'a> {
                 .map(|(_, subpat)| self.state_leaves_of_pattern(subpat, machine))
                 .unwrap_or_default(),
             syn::Pat::Paren(paren) => self.state_leaves_of_pattern(&paren.pat, machine),
-            syn::Pat::Reference(reference) => {
-                self.state_leaves_of_pattern(&reference.pat, machine)
-            }
+            syn::Pat::Reference(reference) => self.state_leaves_of_pattern(&reference.pat, machine),
             _ => Vec::new(),
         }
     }
@@ -1437,7 +1431,9 @@ impl<'w, 'a> Walker<'w, 'a> {
         match machine.child_enum(&variant) {
             None => machine.variants.contains(&variant).then_some(variant),
             Some(child_enum) => {
-                let syn::Expr::Call(call) = expr else { return None };
+                let syn::Expr::Call(call) = expr else {
+                    return None;
+                };
                 let [argument] = call.args.iter().collect::<Vec<_>>()[..] else {
                     return None;
                 };
@@ -1527,17 +1523,25 @@ impl<'w, 'a> Walker<'w, 'a> {
         let subject = receiver_path(&assign.left);
         if let Some(path) = expr_path_string(&assign.right) {
             // Event payload binding of the machine's enum type.
-            if !path.contains('.')
-                && ctx.payload_bindings.get(&path) == Some(&machine.enum_name)
-            {
-                self.emit(machine, ANY_STATE.to_string(), ctx, assign, subject.as_deref(), file);
+            if !path.contains('.') && ctx.payload_bindings.get(&path) == Some(&machine.enum_name) {
+                self.emit(
+                    machine,
+                    ANY_STATE.to_string(),
+                    ctx,
+                    assign,
+                    subject.as_deref(),
+                    file,
+                );
                 return;
             }
 
             // Conditions constraining this exact value expression.
             let mut eval = GuardEval::NoConstraint;
             for condition in &ctx.conditions {
-                eval = and(eval, self.eval_value_condition(condition, &path, machine, 0));
+                eval = and(
+                    eval,
+                    self.eval_value_condition(condition, &path, machine, 0),
+                );
             }
             if let GuardEval::Known(targets) = eval {
                 for to in targets {
@@ -1677,12 +1681,8 @@ impl<'w, 'a> Walker<'w, 'a> {
                 }
                 self.eval_predicate(&call.method.to_string(), machine, depth)
             }
-            syn::Expr::Paren(paren) => {
-                self.eval_value_condition(&paren.expr, path, machine, depth)
-            }
-            syn::Expr::Group(group) => {
-                self.eval_value_condition(&group.expr, path, machine, depth)
-            }
+            syn::Expr::Paren(paren) => self.eval_value_condition(&paren.expr, path, machine, depth),
+            syn::Expr::Group(group) => self.eval_value_condition(&group.expr, path, machine, depth),
             syn::Expr::Block(block) => match block.block.stmts.last() {
                 Some(syn::Stmt::Expr(trailing, None)) => {
                     self.eval_value_condition(trailing, path, machine, depth)
@@ -1696,8 +1696,12 @@ impl<'w, 'a> Walker<'w, 'a> {
     /// Machines reset by an `= T::default()` assignment, with the state each
     /// one lands on.
     fn default_reset_targets(&self, rhs: &syn::Expr) -> Option<Vec<(StateMachine, String)>> {
-        let syn::Expr::Call(call) = rhs else { return None };
-        let syn::Expr::Path(path) = &*call.func else { return None };
+        let syn::Expr::Call(call) = rhs else {
+            return None;
+        };
+        let syn::Expr::Path(path) = &*call.func else {
+            return None;
+        };
         let segments: Vec<String> = path
             .path
             .segments
@@ -1761,7 +1765,13 @@ impl<'w, 'a> Walker<'w, 'a> {
             GuardEval::NoConstraint => {
                 // No state evidence: the transition fires from any state.
                 for event in events {
-                    self.push(machine, ANY_STATE.to_string(), event.clone(), to.clone(), ctx);
+                    self.push(
+                        machine,
+                        ANY_STATE.to_string(),
+                        event.clone(),
+                        to.clone(),
+                        ctx,
+                    );
                 }
             }
             // Contradictory constraints: the conditions in force intersect to

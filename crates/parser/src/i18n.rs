@@ -118,9 +118,9 @@ impl WarningKind {
                 "núcleo {core}: a análise parou no limite de {limit} — o modelo \
                  pode estar incompleto. Aumente o limite se esta fonte é confiável."
             ),
-            WarningKind::FileTooLarge { size, max } => format!(
-                "arquivo ignorado: {size} bytes excede o limite de {max} bytes"
-            ),
+            WarningKind::FileTooLarge { size, max } => {
+                format!("arquivo ignorado: {size} bytes excede o limite de {max} bytes")
+            }
             WarningKind::InputTooLarge { max } => format!(
                 "arquivos restantes ignorados: a execução alcançou o limite total \
                  de {max} bytes de código-fonte"
@@ -133,9 +133,9 @@ impl WarningKind {
                  dispositivo ou FIFO)"
                     .to_string()
             }
-            WarningKind::NestingTooDeep { max } => format!(
-                "arquivo ignorado: os delimitadores aninham mais de {max} níveis"
-            ),
+            WarningKind::NestingTooDeep { max } => {
+                format!("arquivo ignorado: os delimitadores aninham mais de {max} níveis")
+            }
         }
     }
 }
@@ -161,9 +161,7 @@ impl ParseError {
                 ParseError::Syntax(path, err) => {
                     format!("falha ao analisar {}: {err}", path.display())
                 }
-                ParseError::NoCoreFound => {
-                    "nenhum bloco `impl App for ...` encontrado".to_string()
-                }
+                ParseError::NoCoreFound => "nenhum bloco `impl App for ...` encontrado".to_string(),
             },
         }
     }

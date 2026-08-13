@@ -461,7 +461,10 @@ mod tests {
         );
 
         // A fire-and-forget request stays the bare form.
-        assert_eq!(machine.transitions[1].effects, [Effect::bare("AudioOperation::Pause")]);
+        assert_eq!(
+            machine.transitions[1].effects,
+            [Effect::bare("AudioOperation::Pause")]
+        );
 
         // Wildcard source state round-trips untouched.
         let inputs = &recorder.machines[1];
@@ -568,8 +571,8 @@ mod tests {
         );
 
         // False is the absence: a producer never writes `"default": false`.
-        let absent: StateDecl = serde_json::from_str(r#"{"name":"Idle","doc":"Nothing yet."}"#)
-            .unwrap();
+        let absent: StateDecl =
+            serde_json::from_str(r#"{"name":"Idle","doc":"Nothing yet."}"#).unwrap();
         assert!(!absent.is_default);
         assert!(!serde_json::to_string(&absent).unwrap().contains("default"));
     }
@@ -628,7 +631,10 @@ mod tests {
     /// Marker wire names are the stable identifiers tooling keys on.
     #[test]
     fn marker_wire_names_are_stable() {
-        assert_eq!(serde_json::to_string(&Marker::Failure).unwrap(), r#""failure""#);
+        assert_eq!(
+            serde_json::to_string(&Marker::Failure).unwrap(),
+            r#""failure""#
+        );
         assert_eq!(
             serde_json::to_string(&Marker::Deprecated).unwrap(),
             r#""deprecated""#
