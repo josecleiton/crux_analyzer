@@ -49,16 +49,21 @@ impl CoreInfo {
     }
 }
 
-/// `excluded` holds the state-machine enums and `dispatched` the enums whose
-/// variants appear in match patterns somewhere. An enum carried as an event
-/// payload (`Event::Sync(State)`, `Event::Boom(ErrorCode)`) must not join
-/// the event closure — its wrapping variant would be mistaken for a
-/// delegating wrapper — so only enums the code actually dispatches on
-/// qualify as nested event enums.
+/// `excluded` holds the state-machine enums, `dispatched` the enums whose
+/// variants appear in match patterns somewhere, and `delegating` the
+/// `(enum, variant)` pairs whose arm hands its payload straight on.
+///
+/// An enum carried as an event payload (`Event::Sync(State)`,
+/// `Event::SignInRequested(Provider)`) must not join the event closure — its
+/// wrapping variant would be mistaken for a delegating wrapper, and the arm
+/// would silently lose its own label along with every transition it performs.
+/// Dispatch alone does not tell the two apart: a `From` impl over a two-variant
+/// payload is a match like any other. Delegation does.
 pub(crate) fn find_cores(
     index: &CrateIndex,
     excluded: &BTreeSet<String>,
     dispatched: &BTreeSet<String>,
+    delegating: &BTreeSet<(String, String)>,
 ) -> Vec<CoreInfo> {
     index
         .trait_impls
@@ -74,6 +79,7 @@ pub(crate) fn find_cores(
                     imp.file,
                     excluded,
                     Some(dispatched),
+                    Some(delegating),
                 ),
                 effect_enums: enum_closure(
                     index,
@@ -81,6 +87,7 @@ pub(crate) fn find_cores(
                     imp.file,
                     excluded,
                     // Effect operations are constructed, never dispatched on.
+                    None,
                     None,
                 ),
                 effect_root,
@@ -112,6 +119,7 @@ fn enum_closure(
     core_file: &Path,
     excluded: &BTreeSet<String>,
     dispatched: Option<&BTreeSet<String>>,
+    delegating: Option<&BTreeSet<(String, String)>>,
 ) -> BTreeMap<String, EnumDecl> {
     let mut found: BTreeMap<String, EnumDecl> = BTreeMap::new();
     let mut queue: Vec<(String, std::path::PathBuf)> = root
@@ -127,9 +135,13 @@ fn enum_closure(
             continue;
         };
         let decl = decl.clone();
-        for fields in &decl.variant_fields {
+        for (position, fields) in decl.variant_fields.iter().enumerate() {
+            let variant = decl.variants.get(position).cloned().unwrap_or_default();
+            let delegates =
+                delegating.is_none_or(|set| set.contains(&(name.clone(), variant.clone())));
             for field in fields {
-                let qualifies = !found.contains_key(&field.type_name)
+                let qualifies = delegates
+                    && !found.contains_key(&field.type_name)
                     && !excluded.contains(&field.type_name)
                     && dispatched.is_none_or(|set| set.contains(&field.type_name))
                     && !index.enum_decls(&field.type_name).is_empty();

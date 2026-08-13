@@ -1435,3 +1435,109 @@ const UPDATE_GO: &str = r#"
         }
     }
 "#;
+
+/// Two machines can name their field the same thing — `model.recording.state`
+/// and `model.session.state` — and the enum on the right is what says which one
+/// is being driven. Matching on the field name alone judged every transition of
+/// the machine that sorts second against the machine that sorts first, dropped
+/// them as dynamic, and left that machine with nothing.
+const TWO_STATE_FIELDS: &str = r#"
+    pub enum RecordingState { Idle, Running }
+    pub enum SessionState { Unknown, Guest }
+    pub struct Session { state: SessionState }
+    pub struct Model { state: RecordingState, session: Session }
+    pub struct App1;
+    pub enum Event { Start, Dismiss }
+    impl App for App1 {
+        type Event = Event;
+        fn update(&self, event: Event, model: &mut Model) {
+            match event {
+                Event::Start => {
+                    model.state = RecordingState::Running;
+                }
+                Event::Dismiss => {
+                    model.session.state = SessionState::Guest;
+                }
+            }
+        }
+    }
+"#;
+
+fn machine_named(code: &str, name: &str) -> Vec<(String, String, String)> {
+    let sources = sources_from_str(&[("lib.rs", code)]);
+    let outcome = parse_sources(&sources, "test").expect("must parse");
+    outcome.project.cores[0]
+        .machines
+        .iter()
+        .find(|machine| machine.name == name)
+        .unwrap_or_else(|| panic!("no machine named {name}"))
+        .transitions
+        .iter()
+        .map(|t| (t.from.0.clone(), t.event.0.clone(), t.to.0.clone()))
+        .collect()
+}
+
+#[test]
+fn a_shared_field_name_does_not_steal_the_other_machines_transitions() {
+    assert_eq!(
+        machine_named(TWO_STATE_FIELDS, "RecordingState"),
+        vec![triple("*", "Start", "Running")]
+    );
+    assert_eq!(
+        machine_named(TWO_STATE_FIELDS, "SessionState"),
+        vec![triple("*", "Dismiss", "Guest")]
+    );
+}
+
+#[test]
+fn a_shared_field_name_warns_about_neither() {
+    let sources = sources_from_str(&[("lib.rs", TWO_STATE_FIELDS)]);
+    let outcome = parse_sources(&sources, "test").expect("must parse");
+
+    assert!(outcome.warnings.is_empty(), "{:?}", outcome.warnings);
+}
+
+/// An event that *carries* an enum is carrying data, however often the crate
+/// matches on it — a `From` impl over a two-variant payload is a match like any
+/// other. Following the payload into the event closure made its wrapping variant
+/// look like a delegating wrapper, which silently dropped that arm's own label
+/// and with it every transition the arm performed.
+#[test]
+fn an_enum_carried_by_an_event_is_payload_not_a_nested_event() {
+    let code = r#"
+        pub enum State { Idle, Running }
+        pub struct Model { state: State }
+        pub struct App1;
+        pub enum Provider { Google, Microsoft }
+        pub enum Wire { A, B }
+        pub enum Event { Start(Provider), Stop }
+        impl From<Provider> for Wire {
+            fn from(provider: Provider) -> Wire {
+                match provider {
+                    Provider::Google => Wire::A,
+                    Provider::Microsoft => Wire::B,
+                }
+            }
+        }
+        impl App for App1 {
+            type Event = Event;
+            fn update(&self, event: Event, model: &mut Model) {
+                match event {
+                    Event::Start(provider) => {
+                        model.state = State::Running;
+                    }
+                    Event::Stop => {
+                        model.state = State::Idle;
+                    }
+                }
+            }
+        }
+    "#;
+    let (transitions, warnings) = transitions_of(code);
+
+    assert!(warnings.is_empty(), "{warnings:?}");
+    assert_eq!(
+        transitions,
+        vec![triple("*", "Start", "Running"), triple("*", "Stop", "Idle")]
+    );
+}

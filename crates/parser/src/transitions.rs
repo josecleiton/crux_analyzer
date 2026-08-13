@@ -331,6 +331,52 @@ impl<'w, 'a> Walker<'w, 'a> {
         self.machines.iter().find(|m| m.field_name == field)
     }
 
+    /// The machine a field name refers to, disambiguated by an enum named at
+    /// the site.
+    ///
+    /// Two machines may share a field name — `model.recording.state` and
+    /// `model.session.state` — and then the field alone does not say which one
+    /// is being driven. Whatever enum the site mentions does: the variant being
+    /// assigned, or the variants the arms match on. Without this, every
+    /// transition of the machine that sorts second was judged against the one
+    /// that sorts first, dropped as dynamic, and the machine vanished from the
+    /// model for having no transitions left.
+    fn machine_for_field_and_enum(
+        &self,
+        field: &str,
+        enum_name: Option<&str>,
+    ) -> Option<&'w StateMachine> {
+        if let Some(enum_name) = enum_name {
+            let named = self
+                .machines
+                .iter()
+                .find(|m| m.field_name == field && m.enum_name == enum_name);
+            if named.is_some() {
+                return named;
+            }
+        }
+        self.machine_for_field(field)
+    }
+
+    /// The state enum an arm list matches on, when the arms name exactly one
+    /// enum. Two different enums in one match is not evidence about either.
+    fn enum_matched_by(&self, arms: &[syn::Arm]) -> Option<String> {
+        let mut found: Option<String> = None;
+        for arm in arms {
+            let (pat, _) = arm_pattern_and_guard(arm);
+            let mut variants = Vec::new();
+            pattern_variants(pat, &mut variants);
+            for (enum_name, _) in variants {
+                match &found {
+                    Some(seen) if seen != &enum_name => return None,
+                    Some(_) => {}
+                    None => found = Some(enum_name),
+                }
+            }
+        }
+        found
+    }
+
     fn is_event_enum(&self, name: &str) -> bool {
         self.core.is_event_enum(name)
     }
@@ -573,7 +619,8 @@ impl<'w, 'a> Walker<'w, 'a> {
     ) {
         // A match on the state field drives the state facts per arm.
         if let Some(field) = last_field_name(&expr_match.expr) {
-            if let Some(machine) = self.machine_for_field(&field) {
+            let matched = self.enum_matched_by(&expr_match.arms);
+            if let Some(machine) = self.machine_for_field_and_enum(&field, matched.as_deref()) {
                 if self.arms_reference_enum(&expr_match.arms, &machine.enum_name) {
                     self.walk_match_on_state(expr_match, machine.clone(), ctx, self_ty, file);
                     return;
@@ -1434,7 +1481,8 @@ impl<'w, 'a> Walker<'w, 'a> {
         // `*.state = Enum::Variant` — a direct transition target
         // (composite children included: `State::Active(ActiveState::Ready)`).
         if let Some(field) = last_field_name(&assign.left) {
-            if let Some(machine) = self.machine_for_field(&field) {
+            let assigned = enum_variant_of_expr(&assign.right).map(|(enum_name, _)| enum_name);
+            if let Some(machine) = self.machine_for_field_and_enum(&field, assigned.as_deref()) {
                 let machine = machine.clone();
                 if let Some(to) = self.state_leaf_of_expr(&assign.right, &machine) {
                     let subject = receiver_path(&assign.left);

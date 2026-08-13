@@ -92,6 +92,11 @@ impl StateMachine {
 pub(crate) struct Detection {
     pub machines: Vec<StateMachine>,
     pub dispatched_enums: BTreeSet<String>,
+    /// `(enum, variant)` pairs whose arm binds the payload and hands it straight
+    /// on — `Event::Session(event) => Self::update_session(event, …)` or
+    /// `=> match event { … }`. That is what delegation looks like, and it is the
+    /// only thing that makes a payload enum an event enum in its own right.
+    pub delegating_variants: BTreeSet<(String, String)>,
 }
 
 pub(crate) fn find_state_machines(index: &CrateIndex) -> Detection {
@@ -101,6 +106,7 @@ pub(crate) fn find_state_machines(index: &CrateIndex) -> Detection {
         value_flow_fields: BTreeSet::new(),
         nested_patterns: BTreeSet::new(),
         dispatched_enums: BTreeSet::new(),
+        delegating_variants: BTreeSet::new(),
     };
     for fn_info in &index.fns {
         collector.visit_block(fn_info.block);
@@ -108,6 +114,7 @@ pub(crate) fn find_state_machines(index: &CrateIndex) -> Detection {
 
     let nested_patterns = collector.nested_patterns;
     let dispatched_enums = collector.dispatched_enums;
+    let delegating_variants = collector.delegating_variants;
     let value_flow_fields = collector.value_flow_fields;
     let mut assigned = collector.assigned;
 
@@ -156,6 +163,7 @@ pub(crate) fn find_state_machines(index: &CrateIndex) -> Detection {
     Detection {
         machines,
         dispatched_enums,
+        delegating_variants,
     }
 }
 
@@ -286,6 +294,8 @@ struct Collector<'a> {
     nested_patterns: BTreeSet<(String, String, String)>,
     /// Enums whose variants appear in any pattern.
     dispatched_enums: BTreeSet<String>,
+    /// See [`Detection::delegating_variants`].
+    delegating_variants: BTreeSet<(String, String)>,
 }
 
 impl<'a> Collector<'a> {
@@ -323,6 +333,27 @@ impl<'a> Collector<'a> {
         }
     }
 
+    /// Records `E::V(x) => match x { … }` and `E::V(x) => f(x, …)` as
+    /// delegation: the arm does not handle the event, it hands the payload on.
+    fn record_delegation(&mut self, arm: &syn::Arm) {
+        let syn::Pat::TupleStruct(tuple) = strip_pattern(&arm.pat) else {
+            return;
+        };
+        let Some((enum_name, variant)) = enum_variant_path(&tuple.path) else {
+            return;
+        };
+        let elems: Vec<&syn::Pat> = tuple.elems.iter().collect();
+        let [syn::Pat::Ident(binding)] = elems[..] else {
+            return;
+        };
+        if binding.subpat.is_some() {
+            return;
+        }
+        if body_hands_on(&arm.body, &binding.ident.to_string()) {
+            self.delegating_variants.insert((enum_name, variant));
+        }
+    }
+
     fn record_dispatched(&mut self, pat: &syn::Pat) {
         let mut variants = Vec::new();
         crate::ast_util::pattern_variants(pat, &mut variants);
@@ -339,7 +370,54 @@ impl<'a> Collector<'a> {
     }
 }
 
+/// Peels the wrappers a pattern can be written behind.
+fn strip_pattern(pat: &syn::Pat) -> &syn::Pat {
+    match pat {
+        syn::Pat::Paren(paren) => strip_pattern(&paren.pat),
+        syn::Pat::Reference(reference) => strip_pattern(&reference.pat),
+        other => other,
+    }
+}
+
+/// The binding, however it was written on the way out: `inner`, `*inner`,
+/// `&inner`, `inner.clone()`.
+fn is_binding(expr: &syn::Expr, name: &str) -> bool {
+    match expr {
+        syn::Expr::Path(path) => path.path.is_ident(name),
+        syn::Expr::Unary(unary) => is_binding(&unary.expr, name),
+        syn::Expr::Reference(reference) => is_binding(&reference.expr, name),
+        syn::Expr::Paren(paren) => is_binding(&paren.expr, name),
+        syn::Expr::Group(group) => is_binding(&group.expr, name),
+        syn::Expr::MethodCall(call) => is_binding(&call.receiver, name),
+        _ => false,
+    }
+}
+
+/// Whether an arm body matches on `name` or passes it to a call — the two ways
+/// an arm delegates instead of handling.
+fn body_hands_on(body: &syn::Expr, name: &str) -> bool {
+    match body {
+        syn::Expr::Match(expr_match) => is_binding(&expr_match.expr, name),
+        syn::Expr::Call(call) => call.args.iter().any(|arg| is_binding(arg, name)),
+        syn::Expr::MethodCall(call) => {
+            is_binding(&call.receiver, name) || call.args.iter().any(|arg| is_binding(arg, name))
+        }
+        syn::Expr::Block(block) => block.block.stmts.iter().any(|stmt| match stmt {
+            syn::Stmt::Expr(expr, _) => body_hands_on(expr, name),
+            _ => false,
+        }),
+        syn::Expr::Paren(paren) => body_hands_on(&paren.expr, name),
+        syn::Expr::Group(group) => body_hands_on(&group.expr, name),
+        _ => false,
+    }
+}
+
 impl<'a, 'ast> Visit<'ast> for Collector<'a> {
+    fn visit_arm(&mut self, arm: &'ast syn::Arm) {
+        self.record_delegation(arm);
+        syn::visit::visit_arm(self, arm);
+    }
+
     fn visit_pat(&mut self, pat: &'ast syn::Pat) {
         self.record_nested_patterns(pat);
         self.record_dispatched(pat);

@@ -212,7 +212,12 @@ fn parse_loaded(
     // code dispatches on qualify as nested event enums at all.
     let machine_enums: std::collections::BTreeSet<String> =
         machines.iter().map(|m| m.enum_name.clone()).collect();
-    let cores = core_finder::find_cores(&index, &machine_enums, &detection.dispatched_enums);
+    let cores = core_finder::find_cores(
+        &index,
+        &machine_enums,
+        &detection.dispatched_enums,
+        &detection.delegating_variants,
+    );
     if cores.is_empty() {
         return Err(ParseError::NoCoreFound);
     }
