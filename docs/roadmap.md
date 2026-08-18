@@ -606,3 +606,141 @@ Invariants that are easy to flatten by accident:
   of. Deferred rather than refused — it wants a CI budget (a fuzz job is not a
   60-second gate) and a seed corpus to be worth anything, so it belongs after
   distribution rather than squeezed into `just check`.
+
+---
+
+## 8. What adoption found — a 13-machine production core
+
+Running the tool against a real, private Crux application (13 machines, 197
+transitions, 63 states, ~711 effect mentions) produced
+[plans/adoption-findings.md](plans/adoption-findings.md): thirteen findings, six
+of them bugs against behaviour `docs/parser.md` already documents. That document
+is **evidence frozen at `cf4f914`** — its numbers are not re-measured as fixes
+land, and it is not a tracker. Status lives here.
+
+Two rules apply to the whole front. Every finding gets a **tracked fixture
+written before its fix**, with committed expected output — the fixtures use
+invented names, so none of them fall under the untracked-`_hidden` rule, and P1
+is precisely the class of bug that regresses in silence. And the work ships
+**grouped by cause, not by finding**: `{P3a+P3b}`, `{D1+P6}`, `{P1+P2}`,
+`{P4}`, `{D2}`, `{D3+D4}`, `{M1–M3}`, `{D5 provenance}` — each an increment with
+one story a commit message can tell.
+
+The order is cheapest-first as the plan proposes, with **P5 promoted to first**:
+it is the warning keeping one adopter's CI red, which is a live cost rather than
+a queued one. D2 and D3 are re-measured after P1 rather than tuned against
+today's numbers, since much of what degenerates them is a guard clause that
+should have narrowed.
+
+### 8.1 Parser
+
+- **P5 — a callback that resolves in isolation but not in the tree** 🔍. Three
+  fixtures failed to reproduce it, so the real tree is reduced to a fixture in
+  invented names and only the fixture is committed. Start from the observation
+  that the resolution names the *wrapper* variant instead of the wrapped events.
+- **P1 — a guard clause narrows nothing** 🐞. `if <negated condition> { return … }`
+  before the assignment publishes no constraint, so the transition is emitted as
+  wildcard `"*"`: 100 of 197 transitions in that core are wildcard-sourced and 6
+  of 13 machines are entirely so — and adopters were already contorting handlers
+  to satisfy a tool that then dropped the guard anyway. `Ctx.conditions` grows a
+  polarity flag (`{expr, negated}`) and `eval_condition` inverts its `GuardEval`
+  when negated. The negation is published in **two** places: by a diverging
+  then-block, to the rest of the enclosing block (the lifetime the let-else row
+  already promises), and by the `else` of any `if` — the second is a sibling gap
+  the findings do not name, since `Expr::If` pushes the condition into the then
+  branch only.
+- **P2 — a closure parameter is compared by name** 🐞. Guard evidence inside
+  `find(|d| …)` counts only when the parameter is spelled like the binding the
+  result is written through, which makes the analysis rename-sensitive. The
+  parameter of a closure passed to the call whose result is bound *is* the element
+  that binding receives, so the two are unified **positionally, whatever either is
+  called**. Structural identity, so §6's permissive-receiver rule is untouched
+  elsewhere. Decided with P1: shape 6 of the plan's fixture fails under both rules
+  at once.
+- **P3a — the effect closure has no depth bound** 🐞. Payload enums reached
+  transitively become `effect_enums`, so any later mention of one of their
+  variants is recorded as an effect request — 228 of 711 mentions in that core.
+  The recording predicate becomes `name == effect_root || capability_of(name).is_some()`.
+  Note the correction to the plan's own suggestion: `capability_of` returns `None`
+  **both** for a payload enum nothing wraps and for the root itself, which is how
+  crux's `Render` arrives — asking only `capability_of(..).is_some()` would erase
+  `Render` with the noise. Deeper enums simply stop being recorded; documenting
+  them as payload types is a separate decision, and removing a false positive owes
+  no `Warning`.
+- **P3b — associated functions recorded as variants** 🐞. `record_effect_path`
+  takes whatever `enum_variant_path` returns, so `FailureDomain::of` and
+  `ApiFailure::from` are reported as things the shell is asked to perform.
+  Comparing the last segment against `decl.variants` removes 122 mentions with no
+  possible false negative.
+- **P4 — one dynamic branch drops the whole machine** 🐞. `model.filter = if cond
+  { Filter::All } else { filter }` loses both branches, and a machine with no
+  transition never reaches the model: 14 machines in the source, 13 in the output.
+  The literal branch is emitted as a real transition, the unresolvable sibling
+  gets the existing wildcard-target note, and a **new warning kind** fires when a
+  machine ends up with no transitions — today's diagnostic names a transition
+  while the thing lost is a machine.
+- **P6 — warnings emitted more than once** 🐞. Deduplicated on
+  `(file, line, kind)` before reporting: three identical lines read as three
+  problems.
+
+### 8.2 Docgen
+
+- **D1 — byte-identical duplicate edges** 🐞. Transitions identical but for
+  `resolves_with`, which the label does not render, draw two arrows on top of each
+  other. Fixed at both levels: merged in the model (union the answers — two call
+  paths to the same helper are not two transitions) and skipped in
+  `machine_diagram`, because an identical rendered line carries no information
+  whatever the model says. While there, check whether a shared helper reached by
+  two call paths is *walked* twice — the same suspicion behind P6, and if it holds
+  the effect counts are inflated too.
+- **D2 — the `final` role is degenerate on wildcard-driven machines** ⚖️. 30
+  states marked final, three machines marking all of theirs, a state named
+  `Downloading` among them. A machine whose transitions are all wildcard-sourced
+  offers no shape evidence either way, so it gets no `final` role at all;
+  machines with real edges keep today's behaviour. Re-measured after P1.
+- **D3 — edge labels have no cap** ⚖️. Effects in an edge label are capped at 3
+  with a `+n more` suffix, mirroring `ANSWERS_IN_A_CELL`; the table stays complete
+  by contract. Dropping `Render` was **refused**: eliding it by name is a naming
+  convention in a project that refuses those, and eliding it structurally (the
+  root-carried operation) would erase every effect of an app whose root holds
+  operations directly. P3 already removes a third of the noise.
+- **D4 — `\n` as the label line break is renderer-dependent** ⚖️. Emitted as
+  `<br/>` instead, which works on both of mermaid's label paths; the label is
+  built from escaped parts joined by the raw tag, so author prose stays escaped
+  and only the separator is markup.
+- **D5 — a 1027-line document with no index and no provenance** ⚖️. Split, since
+  half of it depends on nothing: the table of contents and per-machine anchors
+  ship on their own, and provenance links plus the prose de-duplication (a state's
+  first paragraph is rendered three times) land on top of M2.
+
+### 8.3 Model — one increment, last
+
+The three fields move the contract **once**, after P1 and P3, so they are designed
+against corrected data rather than today's 51%-wildcard output. All three are
+additive and optional, so no client breaks.
+
+- **M1 — `Transition` has no guard** ⚖️. `guard: Option<String>` carrying the
+  condition as written, rendered as `Event [guard] / effects`. It is untrusted
+  prose: escaped at every boundary, and capped in length with a `Warning` when the
+  cap fires. This is what makes P1 *visible* where one source state fans out on
+  one event.
+- **M2 — no source span** ⚖️. `source: { file, line }`, with `file` relative to
+  the analyzed `src` root — never absolute. Paths come out of an untrusted tree,
+  and a relative path also keeps `model.json` reproducible between machines.
+- **M3 — no path to the machine** ⚖️. A singleton at `flags.identity` and one
+  instance per record at `drafts[].submission.status` render identically today.
+  The parser emits the field path **and** the cardinality it derived from that
+  path crossing a collection: §6b's lesson was that the same derivation written
+  twice in two languages drifts apart.
+- **The web's share.** `apps/web/src/schema/` and the domain model accept all
+  three in the same increment; the Inspector renders **the guard only** — the one
+  a reader misses when three arrows share an event. Span and cardinality wait for
+  a UI decision.
+
+### 8.4 One thing that is only documentation
+
+That run reported 79% documentation coverage with the biggest machine at 0 of 7
+states described, and nothing failed on it: `coverage --min` was never wired into
+the adopter's `check` recipe. `docs/cli.md` and its pt-BR twin gain the wiring
+guidance beside `docs --deny-warnings`, because adoption evidently does not find
+it unaided.

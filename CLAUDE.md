@@ -93,5 +93,8 @@ extracted instead of silently missing), and source evidence carries a **subject*
 so a guard about one record no longer constrains another. Two invariants there are
 easy to flatten by accident — receiver comparison must stay permissive (suffix
 matching, not equality, or aliased guards narrow silently) and the subject differs
-between a direct field write and a `T::default()` reset. After that, the deliberate
-"not yet" list (§7) and whatever adoption teaches next.
+between a direct field write and a `T::default()` reset. **§8** is what adoption
+taught: thirteen findings from a 13-machine production core, six of them bugs
+against documented behaviour, each with a decision already taken — the evidence
+is frozen in `docs/plans/adoption-findings.md` and the status lives in §8. The
+deliberate "not yet" list is §7.

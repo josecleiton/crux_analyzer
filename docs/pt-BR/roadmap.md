@@ -621,3 +621,144 @@ Invariantes fáceis de achatar por acidente:
   ninguém pensou. Adiado, não recusado — precisa de orçamento de CI (um job de
   fuzz não é um gate de 60 segundos) e de um corpus de sementes para valer algo, então fica
   depois da distribuição em vez de espremido no `just check`.
+
+---
+
+## 8. O que a adoção encontrou — um core de produção com 13 máquinas
+
+Rodar a ferramenta contra uma aplicação Crux real e privada (13 máquinas, 197
+transições, 63 estados, ~711 menções de efeito) produziu
+[plans/adoption-findings.md](../plans/adoption-findings.md) — em inglês, como todo
+`docs/plans/`: treze achados, seis deles bugs contra comportamento que o
+`docs/parser.md` já documenta. Esse documento é **evidência congelada em
+`cf4f914`** — os números dele não são re-medidos conforme as correções entram, e
+ele não é um tracker. O status vive aqui.
+
+Duas regras valem para a frente inteira. Cada achado ganha uma **fixture
+versionada escrita antes da correção**, com saída esperada commitada — as fixtures
+usam nomes inventados, então nenhuma cai na regra dos `_hidden` não versionados, e
+o P1 é exatamente a classe de bug que regride em silêncio. E o trabalho entra
+**agrupado por causa, não por achado**: `{P3a+P3b}`, `{D1+P6}`, `{P1+P2}`,
+`{P4}`, `{D2}`, `{D3+D4}`, `{M1–M3}`, `{proveniência do D5}` — cada um um
+incremento com uma história que uma mensagem de commit consegue contar.
+
+A ordem é a mais barata primeiro, como o plano propõe, com o **P5 promovido ao
+primeiro lugar**: é o aviso que mantém o CI de um adotante vermelho, o que é custo
+vivo e não custo enfileirado. D2 e D3 são re-medidos depois do P1 em vez de
+ajustados contra os números de hoje, já que boa parte do que os degenera é um
+guard clause que deveria ter estreitado.
+
+### 8.1 Parser
+
+- **P5 — um callback que resolve isolado mas não na árvore** 🔍. Três fixtures não
+  conseguiram reproduzir, então a árvore real é reduzida a uma fixture em nomes
+  inventados e só a fixture é commitada. Comece pela observação de que a resolução
+  nomeia a variante **envelope** em vez dos eventos envelopados.
+- **P1 — um guard clause não estreita nada** 🐞. `if <condição negada> { return … }`
+  antes da atribuição não publica restrição alguma, então a transição sai como
+  wildcard `"*"`: 100 de 197 transições daquele core têm origem wildcard e 6 de 13
+  máquinas são inteiramente assim — e adotantes já estavam contorcendo handlers
+  para satisfazer uma ferramenta que depois descartava o guard de qualquer jeito. O
+  `Ctx.conditions` ganha um sinal de polaridade (`{expr, negated}`) e o
+  `eval_condition` inverte o `GuardEval` quando negado. A negação é publicada em
+  **dois** lugares: por um bloco `then` que diverge, para o resto do bloco que o
+  contém (o mesmo tempo de vida que a linha do let-else já promete), e pelo `else`
+  de qualquer `if` — a segunda é uma lacuna irmã que os achados não nomeiam, já que
+  o `Expr::If` empurra a condição só para o ramo `then`.
+- **P2 — o parâmetro de um closure é comparado por nome** 🐞. Evidência de guard
+  dentro de `find(|d| …)` só conta quando o parâmetro é escrito igual ao binding
+  pelo qual o resultado é atribuído, o que torna a análise sensível a rename. O
+  parâmetro de um closure passado à chamada cujo resultado é vinculado *é* o
+  elemento que aquele binding recebe, então os dois são unificados **por posição,
+  com qualquer nome**. Identidade estrutural, então a regra permissiva de receiver
+  da §6 fica intacta no resto. Decidido junto com o P1: a forma 6 da fixture do
+  plano falha pelas duas regras ao mesmo tempo.
+- **P3a — o fecho de efeitos não tem limite de profundidade** 🐞. Enums de payload
+  alcançados transitivamente entram em `effect_enums`, então qualquer menção
+  posterior a uma variante deles é registrada como pedido de efeito — 228 de 711
+  menções naquele core. O predicado de registro passa a ser
+  `name == effect_root || capability_of(name).is_some()`. Note a correção à
+  sugestão do próprio plano: `capability_of` devolve `None` **tanto** para um enum
+  de payload que ninguém envolve **quanto** para a própria raiz, que é como o
+  `Render` do crux chega — perguntar só `capability_of(..).is_some()` apagaria o
+  `Render` junto com o ruído. Enums mais profundos simplesmente deixam de ser
+  registrados; documentá-los como tipos de payload é decisão separada, e remover um
+  falso positivo não deve nenhum `Warning`.
+- **P3b — funções associadas registradas como variantes** 🐞. O
+  `record_effect_path` aceita o que o `enum_variant_path` devolver, então
+  `FailureDomain::of` e `ApiFailure::from` são reportados como coisas que a shell é
+  pedida a executar. Comparar o último segmento com `decl.variants` remove 122
+  menções sem nenhum falso negativo possível.
+- **P4 — um ramo dinâmico derruba a máquina inteira** 🐞. `model.filter = if cond
+  { Filter::All } else { filter }` perde os dois ramos, e uma máquina sem transição
+  nunca chega ao modelo: 14 máquinas na fonte, 13 na saída. O ramo literal é
+  emitido como transição real, o irmão irresolúvel recebe a nota de alvo wildcard
+  que já existe, e um **novo tipo de aviso** dispara quando uma máquina termina sem
+  transições — o diagnóstico de hoje nomeia uma transição enquanto o que se perde é
+  uma máquina.
+- **P6 — avisos emitidos mais de uma vez** 🐞. Deduplicados em
+  `(arquivo, linha, tipo)` antes do relato: três linhas idênticas se leem como três
+  problemas.
+
+### 8.2 Docgen
+
+- **D1 — arestas duplicadas byte a byte** 🐞. Transições idênticas a não ser pelo
+  `resolves_with`, que o rótulo não renderiza, desenham duas setas uma sobre a
+  outra. Corrigido nos dois níveis: fundidas no modelo (união das respostas — dois
+  caminhos de chamada até o mesmo helper não são duas transições) e ignoradas no
+  `machine_diagram`, porque uma linha renderizada idêntica não carrega informação,
+  diga o modelo o que disser. De passagem, verificar se um helper compartilhado
+  alcançado por dois caminhos é *caminhado* duas vezes — a mesma suspeita por trás
+  do P6, e se ela se confirmar as contagens de efeito também estão infladas.
+- **D2 — o papel `final` é degenerado em máquinas movidas por wildcard** ⚖️. 30
+  estados marcados como finais, três máquinas marcando todos os seus, um estado
+  chamado `Downloading` entre eles. Uma máquina cujas transições são todas de
+  origem wildcard não oferece evidência de forma em nenhuma direção, então não
+  recebe papel `final` algum; máquinas com arestas reais mantêm o comportamento de
+  hoje. Re-medido depois do P1.
+- **D3 — rótulos de aresta sem limite** ⚖️. Os efeitos em um rótulo de aresta são
+  limitados a 3 com o sufixo `+n more`, espelhando o `ANSWERS_IN_A_CELL`; a tabela
+  segue completa por contrato. Descartar o `Render` foi **recusado**: elidi-lo por
+  nome é uma convenção de nomes em um projeto que recusa convenções de nome, e
+  elidi-lo estruturalmente (a operação carregada pela raiz) apagaria todo efeito de
+  um app cuja raiz carrega operações direto. O P3 já remove um terço do ruído.
+- **D4 — `\n` como quebra de linha do rótulo depende do renderizador** ⚖️. Emitido
+  como `<br/>`, que funciona nos dois caminhos de rótulo do mermaid; o rótulo é
+  montado a partir de partes escapadas unidas pela tag crua, então a prosa do autor
+  segue escapada e só o separador é markup.
+- **D5 — um documento de 1027 linhas sem índice e sem proveniência** ⚖️. Dividido,
+  já que metade não depende de nada: o sumário e as âncoras por máquina entram por
+  conta própria, e os links de proveniência mais a de-duplicação da prosa (o
+  primeiro parágrafo de um estado é renderizado três vezes) entram sobre o M2.
+
+### 8.3 Modelo — um incremento, por último
+
+Os três campos movem o contrato **uma vez**, depois do P1 e do P3, para serem
+desenhados contra dados corrigidos em vez da saída de hoje com 51% de wildcard.
+Todos os três são aditivos e opcionais, então nenhum cliente quebra.
+
+- **M1 — `Transition` não tem guard** ⚖️. `guard: Option<String>` carregando a
+  condição como escrita, renderizada como `Event [guard] / effects`. É prosa não
+  confiável: escapada em toda fronteira e limitada em tamanho, com um `Warning`
+  quando o limite dispara. É isto que torna o P1 *visível* onde um único estado de
+  origem se abre em leque sobre um evento.
+- **M2 — sem span de origem** ⚖️. `source: { file, line }`, com `file` relativo à
+  raiz `src` analisada — nunca absoluto. Caminhos saem de uma árvore não confiável,
+  e um caminho relativo também mantém o `model.json` reproduzível entre máquinas.
+- **M3 — sem caminho até a máquina** ⚖️. Um singleton em `flags.identity` e uma
+  instância por registro em `drafts[].submission.status` renderizam idênticos hoje.
+  O parser emite o caminho do campo **e** a cardinalidade que derivou de esse
+  caminho atravessar uma coleção: a lição da §6b foi que a mesma derivação escrita
+  duas vezes em duas linguagens se desencontra.
+- **A parte do web.** `apps/web/src/schema/` e o modelo de domínio aceitam os três
+  no mesmo incremento; o Inspector renderiza **só o guard** — o que falta ao leitor
+  quando três setas compartilham um evento. Span e cardinalidade esperam uma
+  decisão de UI.
+
+### 8.4 Uma coisa que é só documentação
+
+Aquela execução reportou 79% de cobertura de documentação com a maior máquina em 0
+de 7 estados descritos, e nada falhou por isso: o `coverage --min` nunca foi ligado
+ao recipe `check` do adotante. O `docs/cli.md` e seu gêmeo pt-BR ganham a
+orientação de ligação ao lado do `docs --deny-warnings`, porque a adoção
+evidentemente não descobre isso sozinha.
