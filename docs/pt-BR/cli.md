@@ -184,6 +184,23 @@ completa, então um projeto vazio nunca falha.
 Esta é a catraca: coloque no CI com um `--min` no número de hoje, e a documentação
 pode subir mas não descer. `just coverage <src> <nome> [min]` embrulha o comando.
 
+### Os dois portões, ou nenhum é catraca
+
+`docs --deny-warnings` e `coverage --min` falham por motivos diferentes, e um
+projeto que liga só o primeiro não ganha catraca alguma: a primeira adoção desta
+ferramenta rodava `docs --deny-warnings` no CI e estava em 79% de cobertura, com a
+maior máquina em 0 de 7 estados descritos, sem nada falhar. Os avisos pegam o que o
+parser não conseguiu ler; a cobertura pega o que ninguém escreveu. Ligue os dois:
+
+```sh
+crux-analyzer docs --src shared/src --name MyApp --deny-warnings --out docs/machines.md
+crux-analyzer coverage --src shared/src --name MyApp --min 79 --list
+```
+
+Suba o `--min` no mesmo commit que documenta um estado — é este o mecanismo
+inteiro, e ele só funciona se o número estiver no repositório em vez de na memória
+de alguém.
+
 ## Escolhendo o locale
 
 Precedência, do maior para o menor:

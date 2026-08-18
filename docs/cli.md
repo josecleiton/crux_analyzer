@@ -182,6 +182,23 @@ This is the ratchet: put it in CI with a `--min` at today's number, and the
 documentation can go up but not down. `just coverage <src> <name> [min]` wraps
 it.
 
+### Both gates, or neither is a ratchet
+
+`docs --deny-warnings` and `coverage --min` fail on different things, and a
+project that wires only the first gets no ratchet at all: the first adoption of
+this tool ran `docs --deny-warnings` in CI and sat at 79% coverage with its
+biggest machine at 0 of 7 states described, failing nothing. Warnings catch what
+the parser could not read; coverage catches what nobody wrote. Wire both:
+
+```sh
+crux-analyzer docs --src shared/src --name MyApp --deny-warnings --out docs/machines.md
+crux-analyzer coverage --src shared/src --name MyApp --min 79 --list
+```
+
+Raise the `--min` in the same commit that documents a state — that is the whole
+mechanism, and it only works if the number is in the repository rather than in
+someone's memory.
+
 ## Choosing the locale
 
 Precedence, highest first:
