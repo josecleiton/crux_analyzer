@@ -31,6 +31,43 @@ impl CoreInfo {
         self.effect_enums.contains_key(name)
     }
 
+    /// Whether `Enum::Variant` on this enum is something the *shell is asked to
+    /// do*, as opposed to data travelling inside such a request.
+    ///
+    /// [`Self::is_effect_enum`] answers a wider question — membership of the
+    /// closure — and the closure is deliberately transitive, because that is what
+    /// finds `Effect::Audio(AudioOperation)` at all. Followed without a bound it
+    /// keeps going: an operation's payload joins, and that payload's payload, until
+    /// a classifier mentioned on every branch of an update reads as a request on
+    /// every one of them. A request is only ever what the root wraps *directly*.
+    ///
+    /// The root itself counts, and that clause is load-bearing rather than
+    /// defensive: [`Self::capability_of`] answers `None` both for a payload enum
+    /// nothing wraps and for the root, so a predicate asking only whether a
+    /// capability could be named would erase every effect of an app whose root
+    /// carries its operations as its own variants.
+    ///
+    /// The closure keeps its full membership — `emit` reads it to find the doc
+    /// comment authored on a variant, and payload types are worth documenting even
+    /// though nothing requests them. What narrows is what may be *recorded*.
+    pub fn is_effect_request_enum(&self, name: &str) -> bool {
+        self.is_effect_enum(name)
+            && (self.effect_root.as_deref() == Some(name) || self.capability_of(name).is_some())
+    }
+
+    /// Whether `variant` is a variant this enum declares.
+    ///
+    /// A path is not evidence of a variant. `AudioOperation::of` and
+    /// `ApiFailure::from` are an associated function and a `From` impl, spelled
+    /// exactly like one — and reported as things the shell performs until someone
+    /// asks the declaration. Nothing is guessed here and nothing is warned about:
+    /// a call is not an unreadable construct, it is simply not a request.
+    pub fn declares_variant(&self, name: &str, variant: &str) -> bool {
+        self.effect_enums
+            .get(name)
+            .is_some_and(|decl| decl.variants.iter().any(|declared| declared == variant))
+    }
+
     /// The capability an operation enum travels through: the root effect
     /// variant that wraps it (`Effect::Audio(AudioOperation)` → `Audio`).
     ///

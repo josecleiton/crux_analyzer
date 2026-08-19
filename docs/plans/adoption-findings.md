@@ -7,15 +7,22 @@ own idiom**, so nothing here needs access to that application: the fixtures are
 inline and each one is small enough to paste into
 `crates/parser/fixtures/` as a regression test.
 
-**Status is not tracked here.** This document is evidence, frozen at the commit
-below; every finding's decision and progress lives in
+**Status is not tracked here.** This document is evidence measured against the
+commit below; every finding's decision and progress lives in
 [`docs/roadmap.md` §8](../roadmap.md#8-what-adoption-found--a-13-machine-production-core).
+
+It has been corrected once since it was written, which is a different thing from
+being re-measured as fixes land: two arithmetic errors in its own effect counts
+(P3a and P3b overlap almost entirely and their numbers were being added), and two
+pieces of evidence added — the `else`-branch sibling gap under P1, and the
+per-state measurement under D2 that reopened it. What is *not* updated here is
+anything a fix changes. Those numbers describe `cf4f914` and stay that way.
 
 Read this as a triage list, not a design document. Findings are split by where
 the fix belongs — parser, docgen, model — and each says what is a **bug against
 documented behaviour** versus a **design question that needs a decision**. That
-distinction is the whole point of the split: three of the parser items claim to
-work in `docs/parser.md` today.
+distinction is the whole point of the split: two of the parser items (P1, P2)
+claim to work in `docs/parser.md` today.
 
 Two conventions carried from the rest of `docs/`: prose explains the failure a
 change prevents, and identifiers from the analyzed application are data. The
@@ -181,6 +188,40 @@ Suspected area: source-evidence collection in `crates/parser/src/transitions.rs`
 wants the negation of a guard clause to survive to the end of the enclosing
 block, which is the same lifetime the let-else row already promises.
 
+**A sibling gap, same cause.** `Expr::If` pushes the condition into the then
+branch only, so an `else` receives no negation either — and unlike the guard
+clause, the equivalent spelling *does* work, which is what makes the pair worth
+fixing together:
+
+```rust
+// then narrows, else does not
+if model.status == Status::Queued {
+    model.status = Status::Done;
+} else {
+    model.status = Status::Failed;
+}
+
+// the same decision as a match: `_` resolves to the complement, as documented
+match model.status {
+    Status::Queued => model.status = Status::Done,
+    _ => model.status = Status::Failed,
+}
+```
+
+```
+    Queued    --> Done:   IfElse     ✅
+    any_state --> Failed: IfElse     ❌ expected {Idle, Done, Failed}
+    Queued    --> Done:   MatchArm   ✅
+    Idle      --> Failed: MatchArm   ✅
+    Done      --> Failed: MatchArm   ✅
+    Failed    --> Failed: MatchArm   ✅
+```
+
+Two spellings of one decision, and only one of them survives extraction. A
+polarity flag on the collected condition serves both: the negation is published
+by a diverging then-block to the rest of the enclosing block, and by the `else`
+of any `if` to its own branch.
+
 ### P2 — A closure-parameter receiver is compared by name  🐞
 
 Guard evidence inside a `find(|…| …)` closure counts only when the closure's
@@ -298,16 +339,47 @@ first:
 **P3a — no depth bound.** Only enums the `Effect` root wraps *directly* are
 requests; anything deeper is payload. `capability_of` already computes exactly
 that distinction (`core_finder.rs:40-51`), so the recording predicate can ask it
-rather than asking `is_effect_enum`. Deeper enums should stay in the model as
-payload types — they are worth documenting, just not as things the shell is
-asked to do.
+rather than asking `is_effect_enum` — but it has to ask for the root as well:
+
+```rust
+name == effect_root || capability_of(name).is_some()
+```
+
+because `capability_of` returns `None` for two different things — a payload enum
+nothing wraps, and the root itself (`core_finder.rs:41-43`). Without the first
+clause, an app whose root carries operations as its own variants
+(`Effect::StartAudio { .. }`) loses every effect it has.
+
+`Render` is *not* the reason for that clause, and a fixture asserting "`Render`
+survives" would pass either way. It never reaches `record_effect_path`: a bare
+`render()` is recognized as an unresolved external call and recorded by
+`record_effect` (`crates/parser/src/transitions.rs:603`) with a literal label and
+no capability. This core declares `Effect::Render(RenderOperation)` and its model
+still carries `Render` as a bare, capability-less name, which is that path
+showing. The fixture that discriminates is a root with an operation variant of
+its own.
+
+Deeper enums should stay in the model as payload types — they are worth
+documenting, just not as things the shell is asked to do.
 
 **P3b — associated functions are recorded as variants.** `record_effect_path`
 (`crates/parser/src/transitions.rs:828`) takes whatever `enum_variant_path`
 returns without checking that the last segment is a variant the enum declares.
 `FailureDomain::of` and `ApiFailure::from` are function calls. The parser already
-holds `decl.variants`; comparing against it removes 122 mentions with no
-possible false negative, and it is a few lines.
+holds `decl.variants`; comparing against it is a few lines and cannot produce a
+false negative. Its *yield* is a separate question — see the overlap note
+below.
+
+**The two overlap almost entirely — do not add their numbers.** Applying P3a's
+predicate to this core's model keeps 441 of 711 mentions and removes **270
+(37%)**: the 228 above plus `TelemetrySignal`'s 42, which is payload of one
+request rather than a sibling of it. All five names P3b targets are payload enums
+at depth ≥ 2 (this core's `Effect` root wraps `RenderOperation`, `AudioOperation`,
+`TelemetryOperation`, `ApiRequest` and nine more — none of them), so P3a already
+removes every one of P3b's 122. **P3b's marginal contribution after P3a, in this
+core, is zero.** It is still worth doing on its own terms — an associated
+function on a *depth-1* operation enum (`AudioOperation::of(..)`) passes P3a and
+is exactly as wrong — but the 122 is P3a's number, not evidence of P3b's reach.
 
 Both are also honesty-rule issues, not only noise: a document asserting that a
 transition asks the shell to perform `FailureDomain::of` is a guess presented as
@@ -380,10 +452,18 @@ shape the real file uses. All three resolved. Worth noting what they resolved
 back as `Storage`, the **outer** variant, not the three `StorageEvent` variants
 the closure actually returns.
 
-So this one needs a repro built from the real tree before it can be fixed, and
-it is the warning currently keeping that project's CI red — `--deny-warnings` is
-wired into its docs recipe. Whoever picks it up should start from the resolution
-naming the wrapper instead of the wrapped events.
+So this one needs a repro built from the real tree before it can be fixed.
+Whoever picks it up should start from the resolution naming the wrapper instead
+of the wrapped events.
+
+It is *one of two* warnings failing that project's `docs --deny-warnings`, and
+fixing it does not turn that build green: P4's site keeps emitting
+`dynamic-target`, which is a `WarningKind` (`crates/parser/src/lib.rs:78`) and
+counts like any other — deliberately, since that branch really does assign a
+runtime value, so the warning is correct and permanent. Unblocking that CI is the
+adopter's move (a recipe that generates and a separate gate that checks), not
+this front's. Worth stating because it is easy to sequence lib work against a
+red build that lib work cannot turn green.
 
 ### P6 — Warnings are emitted more than once  🐞
 
@@ -420,18 +500,49 @@ escapes from "leaves this state" — deliberately, and the reasoning in the modu
 doc is sound in isolation: counting them "would erase every final state of every
 machine that has one". Applied to a real core it inverts:
 
-- **30 states across 13 machines are marked `final`**;
-- one machine marks 8 of its 9 states final, and three mark *all* of theirs;
+- **34 states across 13 machines are marked `final`**;
+- one machine marks 8 of its 9 states final, and four mark *all* of theirs;
 - a state named `Downloading` is marked final;
 - six states come out as `initial, final` at once, drawing `[*] --> X` and
   `X --> [*]` in the same diagram.
 
 `Downloading` being terminal is worse than a machine reporting no terminal
 state, because the second is a shape a reader can interpret and the first is
-simply false. Options, in increasing conservatism: count wildcard escapes (then
-this core honestly has almost no final states); or suppress the role entirely
-for a machine whose transitions are all wildcard-sourced, on the grounds that
-its shape offers no evidence either way.
+simply false.
+
+**The degeneracy is per state, not per machine.** Measured on this core, both
+candidate rules and what each keeps:
+
+| Rule | Marks kept |
+| --- | --- |
+| today — nothing leaves it *by name* | 34 |
+| no role for a machine that is entirely wildcard-sourced | 11, of which **8 are one machine** |
+| no role for any state a wildcard can leave | 0 |
+
+The middle rule is per machine, so it leaves the worst offender untouched: the
+machine marking 8 of 9 states final has only 1 wildcard transition out of 7, so
+it is not "entirely wildcard-sourced" — and that one transition is
+
+```
+* -- InsightsUpdated -> *
+```
+
+wildcard in the source *and* the target. Every state can leave through it, so
+none of the 8 is final in any sense, and 8 of the 11 survivors are exactly the
+marks worth removing. The strict rule is honest and empties the feature: every
+machine in this core has at least one wildcard-sourced transition, so it keeps
+nothing anywhere.
+
+Which suggests the role is not binary. "Nothing leaves this state by name" is a
+real fact and a different one from "terminal"; keeping it in the states table
+under a word that says so, while `X --> [*]` is drawn only where no wildcard can
+leave, fixes `Downloading` without emptying the feature.
+
+One coupling to fix with it: the diagram draws roles unconditionally while the
+states table is gated on `has_documented_states`. The machine holding 7 of these
+34 marks has no states table at all (0 of 7 states described), so its `X --> [*]`
+arrows are asserted in the one place a reader cannot check them against a
+description.
 
 Interacts with P1: much of the wildcard traffic that degenerates this is a guard
 clause that should have narrowed. Worth re-measuring after P1 rather than tuning
@@ -536,10 +647,10 @@ For calibration, and worth re-measuring after P1 and P3 land:
 | wildcard-sourced | 100 (51%) |
 | machines 100% wildcard | 6 of 13 |
 | states | 63 |
-| effect mentions | 711, of which 228 are not effects (P3) |
+| effect mentions | 711, of which 270 are not requests (P3) |
 | `Render` share of mentions | 195 (27%) |
 | duplicate `(from, event, to)` | 20 |
-| states marked `final` | 30 |
+| states marked `final` | 34, seven of them in a machine with no states table |
 | generated document | 134 KB, 1027 lines, 36 KB of mermaid |
 | largest single diagram | 10.5 KB, longest edge label 473 chars |
 
@@ -553,12 +664,14 @@ on it. Worth a line in `docs/cli.md` about wiring `coverage` into CI beside
 
 Cheapest-first, and each one is independently shippable:
 
-1. **P3b** — variant check in `record_effect_path`. A few lines, removes 122
-   false effect mentions, no false negatives.
+1. **P3b** — variant check in `record_effect_path`. A few lines, no possible
+   false negative. Cheap rather than high-yield: in this core P3a subsumes all
+   122 of its mentions, and what it catches on its own is an associated function
+   on a depth-1 operation enum.
 2. **D1** — dedupe edges in `machine_diagram`, then merge in the model. Small,
    and the worst diagram improves immediately.
-3. **P3a** — depth bound on the effect closure. Removes the other ~106
-   mentions, shortens every label.
+3. **P3a** — depth bound on the effect closure. This is the one that removes the
+   noise: 270 of 711 mentions, and it shortens every label.
 4. **P1** — guard clauses. The largest correctness win, and the one that stops
    adopters contorting their code for the tool.
 5. **P2** — rename-invariant closure receivers. Decide with P1.

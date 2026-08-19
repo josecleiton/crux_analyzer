@@ -629,10 +629,15 @@ Invariantes fáceis de achatar por acidente:
 Rodar a ferramenta contra uma aplicação Crux real e privada (13 máquinas, 197
 transições, 63 estados, ~711 menções de efeito) produziu
 [plans/adoption-findings.md](../plans/adoption-findings.md) — em inglês, como todo
-`docs/plans/`: treze achados, seis deles bugs contra comportamento que o
-`docs/parser.md` já documenta. Esse documento é **evidência congelada em
-`cf4f914`** — os números dele não são re-medidos conforme as correções entram, e
-ele não é um tracker. O status vive aqui.
+`docs/plans/`: treze achados, seis deles bugs — e desses seis, **dois** (P1, P2)
+contradizem comportamento que o `docs/parser.md` já documenta, o que é o que os
+torna os que valem desconfiar da documentação. Esse documento é **evidência**, não
+um tracker: os números dele não são re-medidos conforme as correções entram, e o
+status vive aqui. Ele foi corrigido uma vez depois de escrito — dois erros de
+aritmética nas próprias contagens de efeito, e duas evidências acrescentadas (a
+lacuna irmã do ramo `else`, no P1, e a medição por estado, no D2) — então não está
+congelado em `cf4f914` no sentido literal, só no sentido de descrever o
+comportamento daquele commit.
 
 Duas regras valem para a frente inteira. Cada achado ganha uma **fixture
 versionada escrita antes da correção**, com saída esperada commitada — as fixtures
@@ -643,10 +648,18 @@ o P1 é exatamente a classe de bug que regride em silêncio. E o trabalho entra
 incremento com uma história que uma mensagem de commit consegue contar.
 
 A ordem é a mais barata primeiro, como o plano propõe, com o **P5 promovido ao
-primeiro lugar**: é o aviso que mantém o CI de um adotante vermelho, o que é custo
-vivo e não custo enfileirado. D2 e D3 são re-medidos depois do P1 em vez de
-ajustados contra os números de hoje, já que boa parte do que os degenera é um
-guard clause que deveria ter estreitado.
+primeiro lugar**, pelo motivo de ser o único achado sem reprodução: reduzir a
+árvore real a uma fixture é o passo que decai, porque depende de um checkout que
+outra pessoa controla. Não por destravar nada — a leitura anterior, de que era "o
+aviso que mantém o CI de um adotante vermelho", não sobrevive à checagem. Dois
+avisos reprovam aquele build, e o outro é o `dynamic-target` do sítio do P4, que a
+correção do P4 mantém de propósito: aquele ramo realmente atribui um valor de
+runtime. Nenhuma sequência de correções aqui deixa aquele build verde; um recipe
+que gera mais um gate separado que checa é a jogada do adotante.
+
+D2 e D3 são re-medidos depois do P1 em vez de ajustados contra os números de hoje,
+já que boa parte do que os degenera é um guard clause que deveria ter
+estreitado.
 
 ### 8.1 Parser
 
@@ -673,22 +686,48 @@ guard clause que deveria ter estreitado.
   com qualquer nome**. Identidade estrutural, então a regra permissiva de receiver
   da §6 fica intacta no resto. Decidido junto com o P1: a forma 6 da fixture do
   plano falha pelas duas regras ao mesmo tempo.
+- **P3a + P3b ✅ feito.** `is_effect_request_enum` e `declares_variant`
+  (`crates/parser/src/core_finder.rs`) estreitam o que o `record_effect_path` pode
+  registrar; o fecho mantém a associação inteira, já que o `emit` a lê para achar o
+  doc comment escrito numa variante. Fixture primeiro, como a regra manda:
+  `crates/parser/fixtures/effect_requests/` com `tests/effect_requests.rs`, cujos
+  quatro casos são as duas formas que têm de sair (variante de payload em
+  profundidade 2 e em 3, função associada num enum de operação) e as duas que têm
+  de sobreviver (operação carregada pela raiz, `render()` pelado). Re-medido contra
+  o core de onde os achados vieram: **711 → 441 menções, exatamente as 270
+  previstas**, 23 nomes descartados, nenhum novo registrado, nenhuma máquina
+  perdida. O documento caiu de 131 KB para 106 KB, o maior diagrama de 10,6 KB para
+  5,9 KB, e o rótulo de aresta mais longo de 473 para 302 caracteres — que é para o
+  que o limite do D3 continua servindo.
 - **P3a — o fecho de efeitos não tem limite de profundidade** 🐞. Enums de payload
   alcançados transitivamente entram em `effect_enums`, então qualquer menção
-  posterior a uma variante deles é registrada como pedido de efeito — 228 de 711
-  menções naquele core. O predicado de registro passa a ser
-  `name == effect_root || capability_of(name).is_some()`. Note a correção à
-  sugestão do próprio plano: `capability_of` devolve `None` **tanto** para um enum
-  de payload que ninguém envolve **quanto** para a própria raiz, que é como o
-  `Render` do crux chega — perguntar só `capability_of(..).is_some()` apagaria o
-  `Render` junto com o ruído. Enums mais profundos simplesmente deixam de ser
-  registrados; documentá-los como tipos de payload é decisão separada, e remover um
-  falso positivo não deve nenhum `Warning`.
+  posterior a uma variante deles é registrada como pedido de efeito — **270 de
+  711** menções naquele core (as 228 de enums de dados e funções associadas mais as
+  42 do `TelemetrySignal`, que é payload de um pedido e não irmão dele). O
+  predicado de registro passa a ser
+  `name == effect_root || capability_of(name).is_some()`. A primeira cláusula
+  sustenta o resto porque `capability_of` devolve `None` para duas coisas
+  diferentes — um enum de payload que ninguém envolve, e a própria raiz — então sem
+  ela um app cuja raiz carrega operações como variantes próprias
+  (`Effect::StartAudio { .. }`) perde todo efeito que tem. Não, como estava escrito
+  aqui antes, por causa do `Render`: um `render()` pelado nunca chega ao
+  `record_effect_path`, sendo registrado pelo `record_effect` em
+  `transitions.rs:603` com rótulo literal. A fixture que discrimina é uma raiz com
+  variante-operação própria, e uma que afirme "o `Render` sobrevive" passaria de
+  qualquer jeito. Enums mais profundos simplesmente deixam de ser registrados;
+  documentá-los como tipos de payload é decisão separada, e remover um falso
+  positivo não deve nenhum `Warning`.
 - **P3b — funções associadas registradas como variantes** 🐞. O
   `record_effect_path` aceita o que o `enum_variant_path` devolver, então
   `FailureDomain::of` e `ApiFailure::from` são reportados como coisas que a shell é
-  pedida a executar. Comparar o último segmento com `decl.variants` remove 122
-  menções sem nenhum falso negativo possível.
+  pedida a executar. Comparar o último segmento com `decl.variants` corrige isso
+  sem nenhum falso negativo possível. Barato, e não de alto retorno — o que corrige
+  o argumento de ordenação do plano: os cinco nomes que ele pega naquele core são
+  todos enums de payload em profundidade ≥ 2, então o P3a já remove cada uma das
+  122, e a contribuição marginal dele ali é zero. O que ele pega sozinho é uma
+  função associada num enum de operação de *profundidade 1*
+  (`AudioOperation::of(..)`), que é igualmente errado e simplesmente não ocorre
+  nesta amostra.
 - **P4 — um ramo dinâmico derruba a máquina inteira** 🐞. `model.filter = if cond
   { Filter::All } else { filter }` perde os dois ramos, e uma máquina sem transição
   nunca chega ao modelo: 14 máquinas na fonte, 13 na saída. O ramo literal é
@@ -710,12 +749,38 @@ guard clause que deveria ter estreitado.
   diga o modelo o que disser. De passagem, verificar se um helper compartilhado
   alcançado por dois caminhos é *caminhado* duas vezes — a mesma suspeita por trás
   do P6, e se ela se confirmar as contagens de efeito também estão infladas.
-- **D2 — o papel `final` é degenerado em máquinas movidas por wildcard** ⚖️. 30
-  estados marcados como finais, três máquinas marcando todos os seus, um estado
-  chamado `Downloading` entre eles. Uma máquina cujas transições são todas de
-  origem wildcard não oferece evidência de forma em nenhuma direção, então não
-  recebe papel `final` algum; máquinas com arestas reais mantêm o comportamento de
-  hoje. Re-medido depois do P1.
+- **D2 — o papel `final` é degenerado em máquinas movidas por wildcard** ⚖️
+  **reaberto**. 34 estados marcados como finais, quatro máquinas marcando todos os
+  seus, um estado chamado `Downloading` entre eles. A primeira decisão aqui —
+  nenhum papel `final` para máquina cujas transições são todas de origem wildcard,
+  as outras mantêm o comportamento de hoje — foi medida contra o core depois e
+  mantém 11 das 34 marcas, **8 delas numa única máquina**: a que marca 8 dos seus 9
+  estados como finais tem uma única transição wildcard em 7, então a regra não se
+  aplica a ela, e essa transição é `* -- InsightsUpdated -> *`, wildcard na origem
+  *e* no destino. Todo estado sai por ali. A regra é por máquina e a degeneração é
+  por estado. A leitura estrita por estado (nenhum papel para estado de que um
+  wildcard possa sair) mantém 0 das 34 aqui, já que toda máquina daquele core tem
+  ao menos uma transição de origem wildcard — ou seja, esvazia o recurso em vez de
+  corrigi-lo. O que aponta para o papel não ser binário: "nada sai deste estado
+  **por nome**" é um fato real e diferente de "terminal", então pertence à tabela de
+  estados sob uma palavra que diga isso, enquanto o `X --> [*]` só é desenhado onde
+  nenhum wildcard pode sair. Um acoplamento a corrigir junto — o diagrama desenha
+  papéis sem condição alguma enquanto a tabela de estados é gated em
+  `has_documented_states`, então a máquina que detém 7 dessas marcas as afirma no
+  único lugar em que um leitor não pode conferi-las. Segue re-medido depois do
+  P1.
+
+  **Decidido: vocabulário de dois níveis.** A tabela de estados mantém o fato sob
+  uma palavra que o enuncia — nada sai deste estado *por nome* — e o `X --> [*]` só
+  é desenhado onde nada sai, wildcard incluído. As duas leituras são verdadeiras e
+  são leituras diferentes, e é por isso que uma palavra só não dava conta: o fato é
+  evidência que a forma realmente fornece, e "terminal" é uma inferência que a
+  forma contradiz no instante em que existe um wildcard. Mantém as 34 marcas, como
+  afirmações verdadeiras, e não desenha nenhuma das setas falsas. A regra estrita
+  foi recusada por esvaziar o recurso (0 de 34 aqui) e a por-máquina por perder
+  exatamente a máquina que mais precisa dela. Custa um rótulo nos dois catálogos de
+  locale e a mudança correspondente em `apps/web/src/domain/stateRole.ts` — o
+  `roles.rs` diz mude um, mude os dois, e esta é a mudança que mostra por quê.
 - **D3 — rótulos de aresta sem limite** ⚖️. Os efeitos em um rótulo de aresta são
   limitados a 3 com o sufixo `+n more`, espelhando o `ANSWERS_IN_A_CELL`; a tabela
   segue completa por contrato. Descartar o `Render` foi **recusado**: elidi-lo por

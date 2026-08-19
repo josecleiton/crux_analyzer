@@ -614,9 +614,14 @@ Invariants that are easy to flatten by accident:
 Running the tool against a real, private Crux application (13 machines, 197
 transitions, 63 states, ~711 effect mentions) produced
 [plans/adoption-findings.md](plans/adoption-findings.md): thirteen findings, six
-of them bugs against behaviour `docs/parser.md` already documents. That document
-is **evidence frozen at `cf4f914`** — its numbers are not re-measured as fixes
-land, and it is not a tracker. Status lives here.
+of them bugs — and of those six, **two** (P1, P2) contradict behaviour
+`docs/parser.md` already documents, which is what makes them the ones worth
+distrusting the docs over. That document is **evidence**, not a tracker: its
+numbers are not re-measured as fixes land, and status lives here. It was
+corrected once after being written — two arithmetic errors in its own effect
+counts, and two pieces of evidence added (the `else`-branch sibling gap under P1,
+and the per-state measurement under D2) — so it is not frozen at `cf4f914` in the
+literal sense, only in the sense that it describes that commit's behaviour.
 
 Two rules apply to the whole front. Every finding gets a **tracked fixture
 written before its fix**, with committed expected output — the fixtures use
@@ -626,11 +631,19 @@ is precisely the class of bug that regresses in silence. And the work ships
 `{P4}`, `{D2}`, `{D3+D4}`, `{M1–M3}`, `{D5 provenance}` — each an increment with
 one story a commit message can tell.
 
-The order is cheapest-first as the plan proposes, with **P5 promoted to first**:
-it is the warning keeping one adopter's CI red, which is a live cost rather than
-a queued one. D2 and D3 are re-measured after P1 rather than tuned against
-today's numbers, since much of what degenerates them is a guard clause that
-should have narrowed.
+The order is cheapest-first as the plan proposes, with **P5 promoted to first**,
+for the reason that it is the one finding with no reproduction: reducing the real
+tree to a fixture is the step that decays, because it depends on a checkout
+somebody else controls. Not because it unblocks anything — the earlier reading,
+that it was "the warning keeping one adopter's CI red", does not survive
+checking. Two warnings fail that build, and the other one is `dynamic-target`
+from P4's site, which P4's fix deliberately keeps: that branch really does assign
+a runtime value. No sequence of fixes here turns that build green; a recipe that
+generates plus a separate gate that checks is the adopter's move.
+
+D2 and D3 are re-measured after P1 rather than tuned against today's numbers,
+since much of what degenerates them is a guard clause that should have
+narrowed.
 
 ### 8.1 Parser
 
@@ -657,21 +670,44 @@ should have narrowed.
   called**. Structural identity, so §6's permissive-receiver rule is untouched
   elsewhere. Decided with P1: shape 6 of the plan's fixture fails under both rules
   at once.
+- **P3a + P3b ✅ done.** `is_effect_request_enum` and `declares_variant`
+  (`crates/parser/src/core_finder.rs`) narrow what `record_effect_path` may record;
+  the closure keeps its full membership, since `emit` reads it for the doc comment
+  authored on a variant. Fixture first, as the rule says:
+  `crates/parser/fixtures/effect_requests/` with `tests/effect_requests.rs`, whose
+  four cases are the two shapes that must go (a payload variant at depth 2 and at
+  depth 3, an associated function on an operation enum) and the two that must
+  survive (a root-carried operation, a bare `render()`). Re-measured against the
+  core the findings came from: **711 → 441 mentions, exactly the 270 predicted**,
+  23 names dropped, none newly recorded, no machine lost. The document went from
+  131 KB to 106 KB, its largest diagram from 10.6 KB to 5.9 KB, and its longest
+  edge label from 473 to 302 characters — which is what D3's cap is still for.
 - **P3a — the effect closure has no depth bound** 🐞. Payload enums reached
   transitively become `effect_enums`, so any later mention of one of their
-  variants is recorded as an effect request — 228 of 711 mentions in that core.
-  The recording predicate becomes `name == effect_root || capability_of(name).is_some()`.
-  Note the correction to the plan's own suggestion: `capability_of` returns `None`
-  **both** for a payload enum nothing wraps and for the root itself, which is how
-  crux's `Render` arrives — asking only `capability_of(..).is_some()` would erase
-  `Render` with the noise. Deeper enums simply stop being recorded; documenting
-  them as payload types is a separate decision, and removing a false positive owes
-  no `Warning`.
+  variants is recorded as an effect request — **270 of 711** mentions in that core
+  (the 228 data-enum and associated-function mentions plus `TelemetrySignal`'s 42,
+  which is payload of one request rather than a sibling of it). The recording
+  predicate becomes `name == effect_root || capability_of(name).is_some()`. The
+  first clause is load-bearing because `capability_of` returns `None` for two
+  different things — a payload enum nothing wraps, and the root itself — so
+  without it an app whose root carries operations as its own variants
+  (`Effect::StartAudio { .. }`) loses every effect it has. Not, as first written
+  here, because of `Render`: a bare `render()` never reaches `record_effect_path`
+  at all, being recorded by `record_effect` at `transitions.rs:603` with a literal
+  label. The fixture that discriminates is a root with an operation variant of its
+  own, and one asserting "`Render` survives" would pass either way. Deeper enums
+  simply stop being recorded; documenting them as payload types is a separate
+  decision, and removing a false positive owes no `Warning`.
 - **P3b — associated functions recorded as variants** 🐞. `record_effect_path`
   takes whatever `enum_variant_path` returns, so `FailureDomain::of` and
   `ApiFailure::from` are reported as things the shell is asked to perform.
-  Comparing the last segment against `decl.variants` removes 122 mentions with no
-  possible false negative.
+  Comparing the last segment against `decl.variants` fixes it with no possible
+  false negative. Cheap rather than high-yield, which is the correction to the
+  plan's ordering argument: all five names it catches in that core are payload
+  enums at depth ≥ 2, so P3a already removes every one of the 122 — its marginal
+  contribution there is zero. What it catches alone is an associated function on a
+  *depth-1* operation enum (`AudioOperation::of(..)`), which is exactly as wrong
+  and simply does not occur in this sample.
 - **P4 — one dynamic branch drops the whole machine** 🐞. `model.filter = if cond
   { Filter::All } else { filter }` loses both branches, and a machine with no
   transition never reaches the model: 14 machines in the source, 13 in the output.
@@ -693,11 +729,37 @@ should have narrowed.
   whatever the model says. While there, check whether a shared helper reached by
   two call paths is *walked* twice — the same suspicion behind P6, and if it holds
   the effect counts are inflated too.
-- **D2 — the `final` role is degenerate on wildcard-driven machines** ⚖️. 30
-  states marked final, three machines marking all of theirs, a state named
-  `Downloading` among them. A machine whose transitions are all wildcard-sourced
-  offers no shape evidence either way, so it gets no `final` role at all;
-  machines with real edges keep today's behaviour. Re-measured after P1.
+- **D2 — the `final` role is degenerate on wildcard-driven machines** ⚖️
+  **reopened**. 34 states marked final, four machines marking all of theirs, a
+  state named `Downloading` among them. The first decision here — no `final` role
+  for a machine whose transitions are all wildcard-sourced, others keep today's
+  behaviour — was measured against the core afterwards and keeps 11 of the 34
+  marks, **8 of them in one machine**: the one marking 8 of its 9 states final has
+  a single wildcard transition out of 7, so the rule does not apply to it, and
+  that transition is `* -- InsightsUpdated -> *`, wildcard in source *and* target.
+  Every state leaves through it. The rule is per machine and the degeneracy is per
+  state. The strict per-state reading (no role for any state a wildcard can leave)
+  keeps 0 of 34 here, since every machine in that core has at least one
+  wildcard-sourced transition, so it empties the feature instead of fixing it.
+  Which points at the role not being binary: "nothing leaves this state by name"
+  is a real fact and a different one from "terminal", so it belongs in the states
+  table under a word that says so, while `X --> [*]` is drawn only where no
+  wildcard can leave. One coupling to fix with it — the diagram draws roles
+  unconditionally while the states table is gated on `has_documented_states`, so
+  the machine holding 7 of these marks asserts them in the only place a reader
+  cannot check them. Still re-measured after P1.
+
+  **Decided: a two-tier vocabulary.** The states table keeps the fact under a word
+  that states it — nothing leaves this state *by name* — and `X --> [*]` is drawn
+  only where nothing leaves it at all, wildcards included. Both readings are true
+  and they are different readings, which is why one word could not carry them: the
+  fact is evidence the shape actually supplies, and "terminal" is an inference the
+  shape contradicts the moment a wildcard exists. It keeps all 34 marks, as true
+  statements, and draws none of the false arrows. The strict rule was refused for
+  emptying the feature (0 of 34 here) and the per-machine rule for missing the
+  machine that needs it most. Costs a label in both locale catalogs and the
+  matching change in `apps/web/src/domain/stateRole.ts` — `roles.rs` says change
+  one, change both, and this is the change that proves why.
 - **D3 — edge labels have no cap** ⚖️. Effects in an edge label are capped at 3
   with a `+n more` suffix, mirroring `ANSWERS_IN_A_CELL`; the table stays complete
   by contract. Dropping `Render` was **refused**: eliding it by name is a naming

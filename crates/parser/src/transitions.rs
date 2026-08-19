@@ -823,13 +823,21 @@ impl<'w, 'a> Walker<'w, 'a> {
 
     // ---- effect collection ----------------------------------------------
 
-    /// Records `Enum::Variant` as an effect when `Enum` belongs to the core's
-    /// effect closure, with the capability its declaration puts it under.
+    /// Records `Enum::Variant` as an effect when the path names a request: a
+    /// variant, declared, on an enum the `Effect` root wraps directly.
+    ///
+    /// Two things this deliberately does not record, both of which spell
+    /// themselves the same way a request does — a variant of a payload enum
+    /// reached deeper in the closure, and an associated function on an operation
+    /// enum. See [`CoreInfo::is_effect_request_enum`] and
+    /// [`CoreInfo::declares_variant`].
     fn record_effect_path(&mut self, path: &syn::Path, ctx: &Ctx<'a>) {
         let Some((enum_name, variant)) = enum_variant_path(path) else {
             return;
         };
-        if self.core.is_effect_enum(&enum_name) {
+        if self.core.is_effect_request_enum(&enum_name)
+            && self.core.declares_variant(&enum_name, &variant)
+        {
             let capability = self.core.capability_of(&enum_name);
             self.record(ctx, format!("{enum_name}::{variant}"), capability);
         }
