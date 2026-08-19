@@ -613,8 +613,8 @@ Invariants that are easy to flatten by accident:
 
 Running the tool against a real, private Crux application (13 machines, 197
 transitions, 63 states, ~711 effect mentions) produced
-[plans/adoption-findings.md](plans/adoption-findings.md): thirteen findings, six
-of them bugs — and of those six, **two** (P1, P2) contradict behaviour
+[plans/adoption-findings.md](plans/adoption-findings.md): fourteen findings, seven
+of them bugs — and of those seven, **two** (P1, P2) contradict behaviour
 `docs/parser.md` already documents, which is what makes them the ones worth
 distrusting the docs over. That document is **evidence**, not a tracker: its
 numbers are not re-measured as fixes land, and status lives here. It was
@@ -647,6 +647,20 @@ narrowed.
 
 ### 8.1 Parser
 
+- **P7 — an effect behind an `if/else` disappears, in context only** 🐞🔍
+  **first**. Found while regenerating that core against the P3 fix, which is the
+  argument for regenerating an adopter's documents as part of shipping one: a
+  notification the source plainly requests
+  (`NotificationOperation::MeetingReady`, behind an `if Self::is_watching_drafts`
+  gate) is in neither document and nothing is warned about. It outranks everything
+  below because it is the only class of error a reader cannot catch — the document
+  looks complete and silently does not mention that finishing a submission
+  notifies the user. Bisected in the plan: the `if/else` in that position is the
+  trigger, the predicate in its condition is not, and no budget is involved; three
+  fixtures reproducing the shape in isolation all record it correctly, so this is
+  reduced *from* the real tree, not built up from a guess. Then the branch that
+  loses its effects owes a `Warning` either way, which is the honesty rule as
+  written.
 - **P5 — a callback that resolves in isolation but not in the tree** 🔍. Three
   fixtures failed to reproduce it, so the real tree is reduced to a fixture in
   invented names and only the fixture is committed. Start from the observation

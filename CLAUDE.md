@@ -94,7 +94,7 @@ so a guard about one record no longer constrains another. Two invariants there a
 easy to flatten by accident — receiver comparison must stay permissive (suffix
 matching, not equality, or aliased guards narrow silently) and the subject differs
 between a direct field write and a `T::default()` reset. **§8** is what adoption
-taught: thirteen findings from a 13-machine production core — six bugs, two of
+taught: fourteen findings from a 13-machine production core — seven bugs, two of
 which contradict what `docs/parser.md` documents — each with a decision taken,
 one of them (D2) already reopened by measuring it. The evidence lives in
 `docs/plans/adoption-findings.md` and the status in §8. The deliberate "not yet"

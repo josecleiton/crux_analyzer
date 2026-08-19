@@ -465,6 +465,66 @@ adopter's move (a recipe that generates and a separate gate that checks), not
 this front's. Worth stating because it is easy to sequence lib work against a
 red build that lib work cannot turn green.
 
+### P7 — An effect behind an `if/else` disappears, in context only  🐞🔍
+
+Found after the rest, while regenerating that core's documents against the P3
+fix. A notification the source plainly requests is in neither document, and
+nothing is warned about:
+
+```rust
+// app/drafts/submission.rs, the poll's Ready branch
+render()
+    .and(Self::persist_submission(model, id, 0))
+    .and(Self::meeting_became_unread(model, &meeting_id))          // recorded
+    .and(if Self::is_watching_drafts(model) {
+        Command::done()
+    } else {
+        Self::notification_command(NotificationOperation::MeetingReady {
+            meeting_id,
+            title,
+        })                                                          // NOT recorded
+    })
+    .and(Self::telemetry_command(TelemetrySignal::SubmissionCompleted))  // recorded
+    .and(Self::audio_command(AudioOperation::DeleteDraftAudio(id.to_owned())))  // recorded
+```
+
+**This is the worst class of error this tool can make.** Every other finding here
+adds something false, which a reader can notice and distrust. A missing effect
+cannot be noticed by reading: the document is complete-looking and simply does not
+mention that finishing a submission notifies the user. It also went unnoticed for
+a release, because the *previous* committed document had it — the notification was
+unconditional then, and the gate is what lost it.
+
+Bisected against the real tree, since none of it reproduces in isolation:
+
+| Variant tried | `MeetingReady` recorded? |
+| --- | --- |
+| as committed | **no** |
+| the `if/else` removed, request made unconditionally | yes |
+| the `if/else` kept, condition replaced by a plain `bool` field | **no** |
+| `--max-steps` raised tenfold (2 M → 20 M) | **no**, and no `analysis-truncated` |
+
+So the trigger is the `if/else` in that position and not the predicate in its
+condition, and it is not an analysis budget.
+
+What does *not* reproduce it — three fixtures, all of which record the request
+correctly, so all three are wrong turns for whoever picks this up:
+
+- an `if/else` expression as the argument of `.and(..)`, request in the `else`;
+- the same with a `Self::` predicate over the model as the condition;
+- the same where that predicate is `matches!` over an enum belonging to *another*
+  machine (the real `is_watching_drafts` reads `Tab::Drafts`).
+
+The untried variables, in the order worth trying: the request is a **struct
+variant with moved local bindings** (`{ meeting_id, title }`) rather than a unit
+variant, and it sits mid-way along a **seven-link `.and(..)` chain**. Reduce from
+the real tree rather than building up from a fixture — the bisect above is cheap
+to repeat and each step is one edit.
+
+Whatever the cause, the outcome owes a `Warning` under the honesty rule as it
+stands: a branch whose effects are discarded is not something to discover by
+grepping a generated document.
+
 ### P6 — Warnings are emitted more than once  🐞
 
 The `DraftFilter` warning appears twice and the `storage.rs:87` one three times,

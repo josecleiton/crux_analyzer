@@ -629,7 +629,7 @@ Invariantes fáceis de achatar por acidente:
 Rodar a ferramenta contra uma aplicação Crux real e privada (13 máquinas, 197
 transições, 63 estados, ~711 menções de efeito) produziu
 [plans/adoption-findings.md](../plans/adoption-findings.md) — em inglês, como todo
-`docs/plans/`: treze achados, seis deles bugs — e desses seis, **dois** (P1, P2)
+`docs/plans/`: catorze achados, sete deles bugs — e desses sete, **dois** (P1, P2)
 contradizem comportamento que o `docs/parser.md` já documenta, o que é o que os
 torna os que valem desconfiar da documentação. Esse documento é **evidência**, não
 um tracker: os números dele não são re-medidos conforme as correções entram, e o
@@ -663,6 +663,19 @@ estreitado.
 
 ### 8.1 Parser
 
+- **P7 — um efeito atrás de um `if/else` desaparece, só em contexto** 🐞🔍
+  **primeiro**. Achado ao regenerar aquele core contra a correção do P3, o que é o
+  argumento para regenerar os documentos de um adotante como parte de entregar uma:
+  uma notificação que a fonte pede às claras (`NotificationOperation::MeetingReady`,
+  atrás de um gate `if Self::is_watching_drafts`) não está em nenhum dos dois
+  documentos e nada é avisado. Passa na frente de tudo abaixo porque é a única
+  classe de erro que um leitor não pega — o documento parece completo e simplesmente
+  não menciona que concluir um envio notifica o usuário. Bissecado no plano: o
+  `if/else` naquela posição é o gatilho, o predicado na condição dele não é, e não há
+  orçamento envolvido; três fixtures que reproduzem a forma isolada gravam o pedido
+  corretamente, então este se reduz *a partir* da árvore real, não se constrói a
+  partir de um chute. E o ramo que perde os efeitos deve um `Warning` de qualquer
+  jeito, que é a regra de honestidade como está escrita.
 - **P5 — um callback que resolve isolado mas não na árvore** 🔍. Três fixtures não
   conseguiram reproduzir, então a árvore real é reduzida a uma fixture em nomes
   inventados e só a fixture é commitada. Comece pela observação de que a resolução
