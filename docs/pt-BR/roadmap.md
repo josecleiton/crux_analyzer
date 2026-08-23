@@ -621,6 +621,10 @@ Invariantes fáceis de achatar por acidente:
   ninguém pensou. Adiado, não recusado — precisa de orçamento de CI (um job de
   fuzz não é um gate de 60 segundos) e de um corpus de sementes para valer algo, então fica
   depois da distribuição em vez de espremido no `just check`.
+- **Executar o código analisado.** Compilar o Core do usuário para WASM e dirigi-lo
+  a partir da UI, ou linkar o Core em um runner nativo. Adiado, não recusado, mas é
+  a entrada daqui com mais condições penduradas: duas delas são emendas a regras,
+  não trabalho. A §9 é o registro completo.
 
 ---
 
@@ -840,3 +844,118 @@ de 7 estados descritos, e nada falhou por isso: o `coverage --min` nunca foi lig
 ao recipe `check` do adotante. O `docs/cli.md` e seu gêmeo pt-BR ganham a
 orientação de ligação ao lado do `docs --deny-warnings`, porque a adoção
 evidentemente não descobre isso sozinha.
+
+---
+
+## 9. Executar o código analisado — o oráculo, não o runtime
+
+Foi escrito um plano propondo que o analisador parasse de ler o código e passasse
+a rodá-lo: o usuário compila seu Core para WASM, um novo `crux-analyzer serve` o
+hospeda ao lado da UI, o motor de simulação o dirige pela ponte do Crux, e um novo
+crate `crux-analyzer-runner` linka o mesmo Core nativamente para fuzzá-lo. O
+problema por trás disso é real — os catorze achados da §8 foram obtidos lendo
+documentos gerados *à mão* —, mas a forma está errada, e está errada contra coisas
+que este repositório já decidiu. Registrado aqui para que a pergunta seja
+respondida uma vez.
+
+### 9.1 O que bloqueia
+
+Três conflitos. Nenhum deles é de engenharia.
+
+- **A metade nativa precisa depender do Crux.** Dirigir o `App` do usuário
+  nativamente significa `crux_core::App` em um `Cargo.toml` nosso, e *"o projeto
+  não pode depender do próprio Crux"* é a única regra que o `CLAUDE.md` e o
+  [architecture.md](architecture.md#regras-rígidas) soletram os dois. As saídas são
+  um template de teste gerado (regra intacta), um trait nosso para o usuário
+  implementar (regra intacta, alto custo de integração) ou um crate à parte fora do
+  workspace (regra **emendada**, e a emenda tem de ser escrita como tal).
+- **A metade web apaga uma frase do threat model.** O
+  [security.md](security.md) afirma que o crux_analyzer nunca executa o código que
+  lê. Executá-lo é uma promessa a menos, para sempre, e aquele documento já diz que
+  remover uma propriedade garantida é mudança de projeto, não refatoração. E cai na
+  §8 dele: CSP compõe por interseção, então a tag `<meta>` assada no `index.html`
+  em tempo de build não pode ser afrouxada por um header que o servidor mande. O
+  `WebAssembly.instantiate` exige `'wasm-unsafe-eval'`, o que significa um segundo
+  bundle ou um `index.html` reescrito — e a concessão não pode vazar para o `dist/`
+  do `just site` nem para o `media/web` do VSIX, que hoje são o mesmo artefato.
+  Servir a saída do `wasm-pack` seria pior ainda: o shim de `wasm-bindgen` dele é
+  JS arbitrário na nossa origem, com o nosso `localStorage` e o nosso DOM.
+- **Fundir o typegen no modelo quebra o contrato.** O `crux-model.schema.json` é
+  `additionalProperties: false` na raiz e abaixo dela, e o web cai no exemplo
+  embutido quando a validação falha — ou seja, a fusão trocaria o projeto do
+  usuário pela demonstração, em silêncio. Layout de serialização também não é algo
+  lido da fonte analisada, que é o que o [schema.md](schema.md) diz ser toda string
+  do modelo. E a fusão não é 1:1 de qualquer forma: rótulos de evento são nomes de
+  variante **folha**, com o caminho do wrapper descartado de propósito
+  ([parser.md](parser.md#eventos)), e `Event` não carrega payload nenhum — então
+  reconstruir um valor de evento serializável exige informação que o modelo jogou
+  fora por decisão. No que isso vier a virar, é um **segundo** documento com um
+  segundo esquema, nunca um `model.json` mais largo.
+
+Mais duas coisas que o plano assumiu e que não se sustentam, e que qualquer
+revisita tem de checar primeiro: a ponte do Crux usa **bincode** por padrão, não
+BCS — um decodificador escrito contra o formato errado não falha, devolve lixo
+plausível — e o `crux_core::typegen` emite *código-fonte* por linguagem a partir de
+um registro de reflexão, não um `types.json` de layout de memória. É também a parte
+do Crux que mais se move (`process_event`/`handle_response` depreciados, `typegen`
+movido para baixo de `type_generation`, serde-reflection cedendo lugar ao facet), o
+que é custo de manutenção permanente para um projeto cujo argumento é não depender
+do Crux.
+
+### 9.2 O que vale guardar
+
+Não o runtime — o **oráculo**. Confrontar o que um Core *fez* com o que o modelo
+*declara* é a única coisa aqui que mais ninguém pode fazer, e é exatamente a
+evidência que a §8 teve de juntar à mão. Nenhuma das duas metades precisa executar
+nada nosso:
+
+- **Um teste de conformidade gerado.** O CLI imprime um `tests/conformance.rs` que
+  o usuário commita e possui; ele percorre o Core dele com o harness que já existe
+  e afirma que toda transição observada existe no `model.json`. Nossa dependência
+  do Crux fica em zero, não há nada a publicar ou versionar, e rodado contra o core
+  de 13 máquinas ele responde às duas direções de uma vez: quais das 197 transições
+  declaradas nunca acontecem, e quais transições reais o parser nunca viu.
+- **Replay de trace no web.** Os testes que o usuário já tem emitem um JSONL de
+  eventos, estados por máquina, efeitos solicitados e resoluções; o CLI passa a
+  aceitar `--trace` e o painel de simulação ganha um modo de execução gravada. O
+  threat model sobrevive palavra por palavra, porque continuamos não executando
+  nada.
+
+Os dois precisam de um vocabulário que o modelo ainda não tem: uma execução que
+tomou uma transição não declarada e uma transição declarada que nunca rodou são
+afirmações diferentes, e nenhuma pode ser renderizada como verdade estática — a
+regra de honestidade aplicada à procedência. Esse vocabulário fica ao lado do
+`source: { file, line }` do M2 (§8.3), não antes dele.
+
+### 9.3 O que falta ao plano de qualquer jeito
+
+O que ele nunca menciona: **quem resolve os efeitos**. Um shell simulado não
+observa solicitações, ele as responde, e responder significa construir um valor
+tipado por solicitação. Sem isso um Core para depois de dois ou três eventos e
+nunca chega ao ramo interessante — o que é a maior parte do trabalho de UI da
+metade web, e a razão pela qual "disparar milhares de sequências aleatórias" também
+não iria longe nativamente. O `InFlightEffect.answers` do motor de hoje modela esse
+retorno de forma simbólica, e essa modelagem não se transfere.
+
+Mais três, em resumo. Nada amarra o `.wasm` compilado à árvore analisada, então
+divergência de versão seria reportada ao leitor como descoberta. Time travel por
+re-execução assume um Core determinístico, o que `Instant::now()` ou `rand` quebram
+em silêncio — e re-executar para comparar é como se detecta isso, não algo a
+assumir. E "estados inválidos" não quer dizer nada sem uma invariante fornecida
+pelo usuário: o único oráculo que um passeio aleatório tem sozinho é `panic`, que o
+`proptest` já dá ao usuário sem crate nenhum nosso.
+
+### 9.4 A ordem
+
+Atrás da §5. Uma feature que pede ao usuário `wasm-pack`, um passo de typegen, uma
+dev-dependency e um alvo em `bin/` não tem público enquanto o passo zero — instalar
+a ferramenta — não existir, e o passo travado da §5.3 piora materialmente com mais
+um crate publicado no acordo. A tese no topo deste documento é o mesmo argumento:
+defensável antes de alcançar mais longe, e a §8 ainda tem bugs de parser abertos,
+incluindo a única classe de erro que o leitor não tem como pegar.
+
+Se algum dia for retomado, o primeiro movimento é um spike descartável contra um
+Core real, antes de qualquer decisão: dá para materializar o registro de tipos como
+JSON? O formato JSON da ponte serve como fronteira, no lugar de um codec binário
+escrito à mão? E que fração dos nomes de evento do `model.json` casa 1:1 com um tipo
+gerado? Uma taxa baixa encerra a metade web ali, barato.

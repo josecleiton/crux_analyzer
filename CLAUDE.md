@@ -85,9 +85,9 @@ adoption fronts (ratchet, tag filtering, VS Code extension), and the §4 smaller
 gaps (composite nesting, URL selection, event/effect docs, per-state effects,
 wildcard-target notes, Markdown rendering). The open front is **§5
 distribution**: nothing outside this checkout can install the tool, so the plan
-there covers crates.io, prebuilt binaries and the Marketplace, in that order —
-plus two license obligations (§5.5) that are already overdue rather than
-planned. **§6** closed the one *parsing* gap adoption found: value-flow assignment
+there covers crates.io, prebuilt binaries and the Marketplace, in that order.
+The two license obligations that were overdue rather than planned are closed
+(§5.5). **§6** closed the one *parsing* gap adoption found: value-flow assignment
 into a model-reachable field is now machine evidence (a status the shell drives is
 extracted instead of silently missing), and source evidence carries a **subject**
 so a guard about one record no longer constrains another. Two invariants there are
@@ -98,4 +98,7 @@ taught: fourteen findings from a 13-machine production core — seven bugs, two 
 which contradict what `docs/parser.md` documents — each with a decision taken,
 one of them (D2) already reopened by measuring it. The evidence lives in
 `docs/plans/adoption-findings.md` and the status in §8. The deliberate "not yet"
-list is §7.
+list is §7, and **§9** is the record behind its heaviest entry: executing the
+analyzed code (WASM in the browser, a native runner) is deferred, and the part of
+it worth keeping is the conformance *oracle* — what a run did versus what the
+model declares — not a runtime of ours.
