@@ -15,8 +15,19 @@ web-test:
     pnpm --filter web test
 
 # Type-check + production build of the web UI
+#
+# `CRUX_BASE=./` because this build is the one committed to `apps/web/dist` and
+# embedded in the binary, and the binary's job is to emit a directory somebody
+# drops wherever they like. Built at the default `/`, the exported site asks for
+# `/assets/…` and works at the root of a domain and nowhere else: published under
+# `/analyzer/` next to a documentation site, every asset 404s and the page is
+# blank. Relative URLs resolve correctly at the root too, so `./` is the base
+# that costs nothing and travels.
+#
+# `just site` still takes an explicit base for a deployment that wants absolute
+# URLs — a CDN origin, say. This is only the default the binary carries.
 web-build:
-    pnpm --filter web build
+    CRUX_BASE=./ pnpm --filter web build
 
 # --- VS Code extension -------------------------------------------------------
 
