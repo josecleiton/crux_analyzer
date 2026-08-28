@@ -61,6 +61,7 @@ fn guard_plus_assignment() {
         pub enum Event {{ Start, Finish }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::Start if matches!(model.state, State::Idle) => {{
@@ -93,6 +94,7 @@ fn multi_pattern_guard_fans_out() {
         pub enum Event {{ Stop }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::Stop
@@ -122,6 +124,7 @@ fn multi_event_arm_fans_out() {
         pub enum Event {{ Cancel, Fail }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     event @ (Event::Cancel | Event::Fail)
@@ -151,6 +154,7 @@ fn helper_delegation_across_files() {
         pub enum Event {{ Start }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::Start if matches!(model.state, State::Idle) => {{
@@ -186,6 +190,7 @@ fn nested_event_enum_unwraps_to_leaf() {
         pub enum Event {{ Wrapped(Inner) }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::Wrapped(inner) => Self::update_inner(inner, model),
@@ -215,6 +220,7 @@ fn match_on_state_with_wildcard_complement() {
         pub enum Event {{ Reset }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::Reset => {{
@@ -244,18 +250,19 @@ fn match_on_state_with_wildcard_complement() {
 #[test]
 fn payload_variants_normalize_to_name() {
     let code = r#"
-        pub enum State { Idle, Busy { automatic: bool } }
+        pub enum State { Idle, Running { automatic: bool } }
         pub struct Model { state: State }
         pub struct App1;
         pub enum Event { Work, Done }
         impl App for App1 {
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {
                 match event {
                     Event::Work if matches!(model.state, State::Idle) => {
-                        model.state = State::Busy { automatic: false };
+                        model.state = State::Running { automatic: false };
                     }
-                    Event::Done if matches!(model.state, State::Busy { .. }) => {
+                    Event::Done if matches!(model.state, State::Running { .. }) => {
                         model.state = State::Idle;
                     }
                     _ => {}
@@ -267,8 +274,8 @@ fn payload_variants_normalize_to_name() {
     assert_eq!(
         transitions,
         vec![
-            triple("Idle", "Work", "Busy"),
-            triple("Busy", "Done", "Idle")
+            triple("Idle", "Work", "Running"),
+            triple("Running", "Done", "Idle")
         ]
     );
 }
@@ -280,6 +287,7 @@ fn unknown_source_state_warns_instead_of_emitting() {
         pub enum Event {{ Kill }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::Kill if model.state.is_active() => {{
@@ -312,6 +320,7 @@ fn predicate_method_guard_resolves_source_states() {
         pub enum Event {{ Kill, Revive }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::Kill if model.state.is_active() => {{
@@ -352,6 +361,7 @@ fn negated_predicate_with_negated_body_resolves() {
         pub enum Event {{ Reset }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::Reset if !model.state.has_anything() => {{
@@ -382,6 +392,7 @@ fn default_reset_lands_on_default_variant() {
         pub enum Event { Discard }
         impl App for App1 {
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {
                 match event {
                     Event::Discard if matches!(model.session.state, State::Done) => {
@@ -404,6 +415,7 @@ fn unguarded_assignment_fires_from_any_state() {
         pub enum Event {{ Panic }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::Panic => {{
@@ -430,6 +442,7 @@ fn mirror_enum_is_not_a_state_machine() {
         pub enum Event {{ Start }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::Start if matches!(model.state, State::Idle) => {{
@@ -472,6 +485,7 @@ fn if_matches_narrows_source_state() {
         pub enum Event {{ Tick }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::Tick => {{
@@ -495,6 +509,7 @@ fn cfg_test_modules_are_ignored() {
         pub enum Event {{ Start }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::Start if matches!(model.state, State::Idle) => {{
@@ -530,6 +545,7 @@ fn multiple_state_machines_become_regions() {
         pub enum Event { Start, Connected }
         impl App for App1 {
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {
                 match event {
                     Event::Start if matches!(model.state, State::Idle) => {
@@ -565,6 +581,7 @@ fn equality_guard_resolves_source_states() {
         pub enum Event {{ Start, Abort }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::Start if model.state == State::Idle => {{
@@ -598,6 +615,7 @@ fn let_else_find_closure_narrows_the_rest_of_the_block() {
         pub enum Event {{ Pick }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::Pick => {{
@@ -625,6 +643,7 @@ fn event_payload_target_becomes_wildcard() {
         pub enum Event {{ Sync(State), Reset }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::Sync(status) => {{
@@ -655,6 +674,7 @@ fn value_flow_resolves_predicate_constrained_targets() {
         pub enum Event {{ CarryOver, Reset }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::CarryOver => {{
@@ -693,6 +713,7 @@ fn dynamic_target_without_evidence_still_warns() {
         pub enum Event {{ Restore, Reset }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
                     Event::Restore => {{
@@ -725,6 +746,7 @@ fn composite_states_expand_to_slash_paths() {
         pub enum Event { Start, Loaded, Stop }
         impl App for App1 {
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {
                 match event {
                     Event::Start if matches!(model.state, State::Idle) => {
@@ -780,6 +802,7 @@ fn effects_attach_to_their_event_arm() {
         pub enum Event {{ Go, Halt }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             type Effect = Effect;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
@@ -843,6 +866,7 @@ fn effect_callbacks_and_branches_are_read_from_the_request_site() {
         pub enum Event {{ Go, Halt, Started, Stopped }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             type Effect = Effect;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
@@ -911,6 +935,7 @@ fn an_unreadable_effect_callback_warns() {
         pub enum Event {{ Go }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             type Effect = Effect;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
@@ -956,6 +981,7 @@ fn documented_events_and_effects_reach_the_core_catalogs() {
         }}
         impl App for App1 {{
             type Event = Event;
+            type Model = Model; type Model = Model;
             type Effect = Effect;
             fn update(&self, event: Event, model: &mut Model) {{
                 match event {{
@@ -1007,6 +1033,7 @@ fn same_enum_in_two_fields_is_two_machines() {
         pub enum Event { StartLeft, StartRight }
         impl App for App1 {
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {
                 match event {
                     Event::StartLeft if matches!(model.left, State::Idle) => {
@@ -1047,20 +1074,21 @@ fn same_enum_in_two_fields_is_two_machines() {
 
 #[test]
 fn payload_data_enum_is_not_a_composite_state() {
-    // `Failed(ErrorCode)` carries data — no nested variant pattern exists,
-    // so Failed stays a plain leaf and the runtime payload does not warn.
+    // `Done(ErrorCode)` carries data — no nested variant pattern exists,
+    // so Done stays a plain leaf and the runtime payload does not warn.
     let code = r#"
         pub enum ErrorCode { NotFound, Timeout }
-        pub enum State { Idle, Failed(ErrorCode) }
+        pub enum State { Idle, Done(ErrorCode) }
         pub struct Model { state: State }
         pub struct App1;
         pub enum Event { Boom(ErrorCode) }
         impl App for App1 {
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {
                 match event {
                     Event::Boom(code) if matches!(model.state, State::Idle) => {
-                        model.state = State::Failed(code);
+                        model.state = State::Done(code);
                     }
                     _ => {}
                 }
@@ -1077,11 +1105,11 @@ fn payload_data_enum_is_not_a_composite_state() {
             .iter()
             .map(|s| s.name.as_str())
             .collect::<Vec<_>>(),
-        ["Idle", "Failed"],
+        ["Idle", "Done"],
         "ErrorCode must not expand into fake sub-states"
     );
     assert_eq!(machine.transitions.len(), 1);
-    assert_eq!(machine.transitions[0].to.0, "Failed");
+    assert_eq!(machine.transitions[0].to.0, "Done");
     assert!(outcome.warnings.is_empty(), "{:?}", outcome.warnings);
 }
 
@@ -1095,6 +1123,7 @@ fn boxed_nested_event_enum_still_delegates() {
         pub enum Event { Wrapped(Box<Inner>) }
         impl App for App1 {
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {
                 match event {
                     Event::Wrapped(inner) => Self::update_inner(*inner, model),
@@ -1152,6 +1181,7 @@ fn variant_docs_become_state_documentation() {
         pub enum Event { Go }
         impl App for App1 {
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {
                 match event {
                     Event::Go if matches!(model.state, State::Idle) => {
@@ -1259,6 +1289,7 @@ fn composite_children_inherit_the_parent_documentation() {
         pub enum Event { Go }
         impl App for App1 {
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {
                 match event {
                     Event::Go if matches!(model.state, State::Active(Phase::Loading)) => {
@@ -1305,6 +1336,7 @@ fn the_declared_default_variant_reaches_the_state() {
         pub enum Event { Go, Back }
         impl App for App1 {
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {
                 match event {
                     Event::Go if matches!(model.state, State::Running) => {
@@ -1359,6 +1391,7 @@ fn a_composite_default_variant_marks_no_leaf() {
         pub enum Event { Go }
         impl App for App1 {
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {
                 match event {
                     Event::Go if matches!(model.state, State::Active(Phase::Loading)) => {
@@ -1463,6 +1496,7 @@ fn an_aliased_enum_does_not_duplicate_its_warning() {
             pub enum Event { Go }
             impl App for App1 {
                 type Event = Event;
+            type Model = Model; type Model = Model;
                 fn update(&self, event: Event, model: &mut Model) {
                     match event {
                         Event::Go if matches!(model.state, RecorderState::Idle) => {
@@ -1505,6 +1539,7 @@ const UPDATE_GO: &str = r#"
     pub enum Event { Go }
     impl App for App1 {
         type Event = Event;
+            type Model = Model; type Model = Model;
         fn update(&self, event: Event, model: &mut Model) {
             match event {
                 Event::Go if matches!(model.state, State::Idle) => {
@@ -1530,6 +1565,7 @@ const TWO_STATE_FIELDS: &str = r#"
     pub enum Event { Start, Dismiss }
     impl App for App1 {
         type Event = Event;
+            type Model = Model; type Model = Model;
         fn update(&self, event: Event, model: &mut Model) {
             match event {
                 Event::Start => {
@@ -1601,6 +1637,7 @@ fn an_enum_carried_by_an_event_is_payload_not_a_nested_event() {
         }
         impl App for App1 {
             type Event = Event;
+            type Model = Model; type Model = Model;
             fn update(&self, event: Event, model: &mut Model) {
                 match event {
                     Event::Start(provider) => {
@@ -1620,4 +1657,77 @@ fn an_enum_carried_by_an_event_is_payload_not_a_nested_event() {
         transitions,
         vec![triple("*", "Start", "Running"), triple("*", "Stop", "Idle")]
     );
+}
+
+#[test]
+fn if_else_assignments_resolve_to_multiple_transitions() {
+    let code = format!(
+        r#"{PREAMBLE}
+        pub enum Event {{ Resolve(bool) }}
+        impl App for App1 {{
+            type Event = Event;
+            type Model = Model; type Model = Model;
+            fn update(&self, event: Event, model: &mut Model) {{
+                match event {{
+                    Event::Resolve(success) if matches!(model.state, State::Idle) => {{
+                        model.state = if success {{
+                            State::Running
+                        }} else {{
+                            State::Idle
+                        }};
+                    }}
+                }}
+            }}
+        }}
+    "#
+    );
+    let (mut transitions, warnings) = transitions_of(&code);
+
+    transitions.sort();
+    assert_eq!(
+        transitions,
+        vec![
+            triple("Idle", "Resolve", "Idle"),
+            triple("Idle", "Resolve", "Running"),
+        ]
+    );
+    assert!(warnings.is_empty(), "{warnings:?}");
+}
+
+#[test]
+fn match_assignments_resolve_to_multiple_transitions() {
+    let code = format!(
+        r#"{PREAMBLE}
+        pub enum Event {{ Resolve(u8) }}
+        impl App for App1 {{
+            type Event = Event;
+            type Model = Model; type Model = Model;
+            fn update(&self, event: Event, model: &mut Model) {{
+                match event {{
+                    Event::Resolve(status) if matches!(model.state, State::Idle) => {{
+                        model.state = match status {{
+                            0 => State::Idle,
+                            1 => State::Running,
+                            _ => {{
+                                State::Done
+                            }}
+                        }};
+                    }}
+                }}
+            }}
+        }}
+    "#
+    );
+    let (mut transitions, warnings) = transitions_of(&code);
+
+    transitions.sort();
+    assert_eq!(
+        transitions,
+        vec![
+            triple("Idle", "Resolve", "Done"),
+            triple("Idle", "Resolve", "Idle"),
+            triple("Idle", "Resolve", "Running"),
+        ]
+    );
+    assert!(warnings.is_empty(), "{warnings:?}");
 }

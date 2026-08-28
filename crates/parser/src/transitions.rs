@@ -1455,6 +1455,82 @@ impl<'w, 'a> Walker<'w, 'a> {
 
     /// Resolves a predicate method on the state enum by analyzing its body
     /// (e.g. `fn has_capture(&self) -> bool { !matches!(self, Self::Idle) }`).
+
+    /// If an expression is a branch (`if` or `match`) and all of its final
+    /// values are literal states, returns all of them. Returns an empty vector
+    /// if any branch cannot be resolved statically.
+    fn state_leaves_of_branching_expr(
+        &self,
+        expr: &syn::Expr,
+        machine: &StateMachine,
+    ) -> Vec<String> {
+        let mut leaves = Vec::new();
+        let mut valid = true;
+        self.collect_branching_leaves(expr, machine, &mut leaves, &mut valid);
+        if valid && !leaves.is_empty() {
+            leaves
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn collect_branching_leaves(
+        &self,
+        expr: &syn::Expr,
+        machine: &StateMachine,
+        out: &mut Vec<String>,
+        valid: &mut bool,
+    ) {
+        if !*valid {
+            return;
+        }
+        match expr {
+            syn::Expr::If(expr_if) => {
+                if let Some(then_expr) = Self::trailing_expr(&expr_if.then_branch) {
+                    self.collect_branching_leaves(then_expr, machine, out, valid);
+                } else {
+                    *valid = false;
+                }
+                if let Some((_, else_branch)) = &expr_if.else_branch {
+                    self.collect_branching_leaves(else_branch, machine, out, valid);
+                } else {
+                    *valid = false;
+                }
+            }
+            syn::Expr::Match(expr_match) => {
+                for arm in &expr_match.arms {
+                    self.collect_branching_leaves(&arm.body, machine, out, valid);
+                }
+            }
+            syn::Expr::Block(expr_block) => {
+                if let Some(trailing) = Self::trailing_expr(&expr_block.block) {
+                    self.collect_branching_leaves(trailing, machine, out, valid);
+                } else {
+                    *valid = false;
+                }
+            }
+            syn::Expr::Paren(expr_paren) => {
+                self.collect_branching_leaves(&expr_paren.expr, machine, out, valid);
+            }
+            _ => {
+                if let Some(leaf) = self.state_leaf_of_expr(expr, machine) {
+                    if !out.contains(&leaf) {
+                        out.push(leaf);
+                    }
+                } else {
+                    *valid = false;
+                }
+            }
+        }
+    }
+
+    fn trailing_expr(block: &syn::Block) -> Option<&syn::Expr> {
+        match block.stmts.last() {
+            Some(syn::Stmt::Expr(expr, None)) => Some(expr),
+            _ => None,
+        }
+    }
+
     fn eval_predicate(&self, method: &str, machine: &StateMachine, depth: usize) -> GuardEval {
         if depth >= MAX_PREDICATE_DEPTH {
             return GuardEval::Unresolved;
@@ -1493,6 +1569,17 @@ impl<'w, 'a> Walker<'w, 'a> {
                     self.emit(&machine, to, ctx, assign, subject.as_deref(), file);
                     return;
                 }
+
+                // If it's a branching expression (if/match) and all branches resolve statically
+                let dynamic_leaves = self.state_leaves_of_branching_expr(&assign.right, &machine);
+                if !dynamic_leaves.is_empty() {
+                    let subject = receiver_path(&assign.left);
+                    for to in dynamic_leaves {
+                        self.emit(&machine, to.clone(), ctx, assign, subject.as_deref(), file);
+                    }
+                    return;
+                }
+
                 // Not a literal construction: try value-flow before warning.
                 if self.default_reset_targets(&assign.right).is_none() {
                     self.handle_dynamic_assignment(&machine, assign, ctx, file);
