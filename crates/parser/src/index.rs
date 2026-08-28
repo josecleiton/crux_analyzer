@@ -8,7 +8,7 @@
 //! `#[cfg(test)]` modules are skipped so test helpers never contribute
 //! spurious states or transitions.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::annotations::{doc_block, DocBlock};
@@ -73,6 +73,7 @@ pub(crate) struct StructField {
 /// A struct declaration: its named fields, in declaration order.
 #[derive(Debug, Clone)]
 pub(crate) struct StructDecl {
+    pub file: PathBuf,
     pub fields: Vec<StructField>,
 }
 
@@ -110,13 +111,34 @@ struct UseRename {
     alias: String,
 }
 
+/// `use path::Name;` — the plain import, which names the module a file means
+/// when it writes `Name` bare.
+///
+/// Collected because it is the answer to the question `resolve_*` was guessing
+/// at. `use crate::app::{Event, Model}` says which `Event` this file is talking
+/// about; without it, a name declared in two modules was resolved by whichever
+/// declaration happened to be indexed first.
+struct UseImport {
+    /// Path segments before the imported ident (e.g. `["crate", "app"]`).
+    prefix: Vec<String>,
+    name: String,
+}
+
 pub(crate) struct CrateIndex<'a> {
     /// Every declaration known by a given name — declared idents plus aliases.
-    pub enums: HashMap<String, Vec<EnumDecl>>,
-    /// Struct declarations by name (used to resolve `T::default()` resets).
-    pub structs: HashMap<String, StructDecl>,
+    ///
+    /// `BTreeMap`, and each `Vec` kept sorted by the declaring file's path, so
+    /// that iteration and positional tie-breaks are a property of the crate
+    /// rather than of the filesystem that happened to hold it.
+    pub enums: BTreeMap<String, Vec<EnumDecl>>,
+    /// Struct declarations by name, every one of them — `Model` is routinely
+    /// declared once per module, and which one is meant is a question only the
+    /// referencing file can answer.
+    pub structs: BTreeMap<String, Vec<StructDecl>>,
     pub fns: Vec<FnInfo<'a>>,
     pub trait_impls: Vec<TraitImplInfo<'a>>,
+    /// Per file, the module path each bare name was imported from.
+    imports: BTreeMap<PathBuf, BTreeMap<String, Vec<String>>>,
 }
 
 impl<'a> CrateIndex<'a> {
@@ -132,28 +154,87 @@ impl<'a> CrateIndex<'a> {
         self.enums.get(name).map_or(&[], Vec::as_slice)
     }
 
-    /// The declaration for `name`, preferring one in `file` (same-file
-    /// declarations shadow same-named enums from other modules).
+    /// The declaration for `name` as read from `file`, in three steps.
+    ///
+    /// 1. A declaration in `file` itself — a local item shadows a same-named one
+    ///    from another module, as it does in Rust.
+    /// 2. The module `file` imported the name from. `use crate::app::{Event}`
+    ///    states which `Event` this file means, and the whole module path is
+    ///    matched, not its last segment: `crate::app::session` is `app/session.rs`
+    ///    and nothing else.
+    /// 3. Failing both, the first declaration — which is now the first by sorted
+    ///    file path, not by arrival.
+    ///
+    /// Step 2 is the one that was missing. `Event` and `Model` are commonly
+    /// declared once per module in a Crux app, and resolving them positionally
+    /// meant the analysis of a crate depended on the order its filesystem
+    /// returned directory entries: the same sources produced different state
+    /// machines on two machines, each stable, neither reproducible on the other.
     pub fn resolve_enum(&self, name: &str, file: &Path) -> Option<&EnumDecl> {
         let decls = self.enum_decls(name);
         decls
             .iter()
             .find(|d| d.file == file)
+            .or_else(|| {
+                let prefix = self.import_prefix(file, name)?;
+                decls
+                    .iter()
+                    .find(|d| file_matches_module_path(&d.file, prefix))
+            })
             .or_else(|| decls.first())
+    }
+
+    /// All struct declarations known by `name`.
+    pub fn struct_decls(&self, name: &str) -> &[StructDecl] {
+        self.structs.get(name).map_or(&[], Vec::as_slice)
+    }
+
+    /// The struct `name` as read from `file` — same three steps as
+    /// [`Self::resolve_enum`], and for the same reason.
+    pub fn resolve_struct(&self, name: &str, file: &Path) -> Option<&StructDecl> {
+        let decls = self.struct_decls(name);
+        decls
+            .iter()
+            .find(|d| d.file == file)
+            .or_else(|| {
+                let prefix = self.import_prefix(file, name)?;
+                decls
+                    .iter()
+                    .find(|d| file_matches_module_path(&d.file, prefix))
+            })
+            .or_else(|| decls.first())
+    }
+
+    /// The module path `file` imported `name` from, if it did.
+    fn import_prefix(&self, file: &Path, name: &str) -> Option<&[String]> {
+        self.imports
+            .get(file)
+            .and_then(|by_name| by_name.get(name))
+            .map(Vec::as_slice)
     }
 }
 
 pub(crate) fn build_index<'a>(sources: &'a [SourceFile]) -> CrateIndex<'a> {
     let mut index = CrateIndex {
-        enums: HashMap::new(),
-        structs: HashMap::new(),
+        enums: BTreeMap::new(),
+        structs: BTreeMap::new(),
         fns: Vec::new(),
         trait_impls: Vec::new(),
+        imports: BTreeMap::new(),
     };
     let mut renames: Vec<UseRename> = Vec::new();
 
     for source in sources {
         index_items(&source.ast.items, &source.path, &mut index, &mut renames);
+    }
+    // Sorted by declaring file before any alias is registered, so that every
+    // positional tie-break below — here and in `resolve_enum` — reads the crate
+    // rather than the order the filesystem returned its directories.
+    for decls in index.enums.values_mut() {
+        decls.sort_by(|a, b| a.file.cmp(&b.file));
+    }
+    for decls in index.structs.values_mut() {
+        decls.sort_by(|a, b| a.file.cmp(&b.file));
     }
     register_aliases(&mut index, &renames);
     index
@@ -198,9 +279,18 @@ fn index_items<'a>(
                     });
             }
             syn::Item::Struct(item_struct) => {
-                index.structs.insert(
-                    item_struct.ident.to_string(),
-                    StructDecl {
+                // Pushed, not inserted. `insert` kept one declaration per name,
+                // so a crate with `Model` in two modules — the ordinary shape of
+                // a Crux app — kept whichever module was indexed last. Which
+                // module that was depended on the order the filesystem returned
+                // its directories, and `Model` is where the state machines are
+                // found, so the whole model changed with it.
+                index
+                    .structs
+                    .entry(item_struct.ident.to_string())
+                    .or_default()
+                    .push(StructDecl {
+                        file: file.to_path_buf(),
                         fields: item_struct
                             .fields
                             .iter()
@@ -218,11 +308,18 @@ fn index_items<'a>(
                                 })
                             })
                             .collect(),
-                    },
-                );
+                    });
             }
             syn::Item::Use(item_use) => {
                 collect_renames(&item_use.tree, &mut Vec::new(), renames);
+                let mut imports = Vec::new();
+                collect_imports(&item_use.tree, &mut Vec::new(), &mut imports);
+                let by_name = index.imports.entry(file.to_path_buf()).or_default();
+                for import in imports {
+                    // First import wins, which is the only reading Rust allows:
+                    // two `use`s of the same bare name in one file do not compile.
+                    by_name.entry(import.name).or_insert(import.prefix);
+                }
             }
             syn::Item::Fn(item_fn) => {
                 index.fns.push(FnInfo {
@@ -281,10 +378,18 @@ fn register_aliases(index: &mut CrateIndex, renames: &[UseRename]) {
         if decls.is_empty() {
             continue;
         }
-        let module_hint = rename.prefix.last().map(String::as_str);
+        // The whole prefix, not its last segment: `crate::app::session::Event as
+        // SessionEvent` means `app/session.rs`, and matching only `session`
+        // accepted a top-level `session.rs` with equal confidence.
         let chosen = decls
             .iter()
-            .find(|decl| module_hint.is_some_and(|hint| file_matches_module(&decl.file, hint)))
+            .find(|decl| file_matches_module_path(&decl.file, &rename.prefix))
+            .or_else(|| {
+                let hint = rename.prefix.last().map(String::as_str);
+                decls
+                    .iter()
+                    .find(|decl| hint.is_some_and(|hint| file_matches_module(&decl.file, hint)))
+            })
             .or_else(|| decls.first())
             .cloned();
         if let Some(decl) = chosen {
@@ -311,6 +416,71 @@ fn file_matches_module(file: &Path, hint: &str) -> bool {
             .and_then(|p| p.file_name())
             .and_then(|n| n.to_str())
             == Some(hint)
+}
+
+/// Plain `use` imports, the counterpart to [`collect_renames`]. `Glob` is left
+/// out on purpose: `use crate::app::*` names no ident, so it cannot say which
+/// module a bare `Event` came from, and guessing would be worse than the
+/// fallback.
+fn collect_imports(tree: &syn::UseTree, prefix: &mut Vec<String>, out: &mut Vec<UseImport>) {
+    match tree {
+        syn::UseTree::Path(path) => {
+            prefix.push(path.ident.to_string());
+            collect_imports(&path.tree, prefix, out);
+            prefix.pop();
+        }
+        syn::UseTree::Group(group) => {
+            for item in &group.items {
+                collect_imports(item, prefix, out);
+            }
+        }
+        syn::UseTree::Name(name) => out.push(UseImport {
+            prefix: prefix.clone(),
+            name: name.ident.to_string(),
+        }),
+        // A rename is already carried by `collect_renames`, and the alias it
+        // introduces is indexed as a declaration of its own.
+        syn::UseTree::Rename(_) | syn::UseTree::Glob(_) => {}
+    }
+}
+
+/// Whether `file` is the module a `use` prefix names, matched over the whole
+/// path rather than its last segment: `crate::app::session` is `app/session.rs`
+/// (or `app/session/mod.rs`) and nothing else, where matching only `session`
+/// would have accepted a top-level `session.rs` just as happily.
+///
+/// `self` and `super` are relative to the importing module, which this index
+/// deliberately does not model, so they match nothing and fall through.
+fn file_matches_module_path(file: &Path, prefix: &[String]) -> bool {
+    let Some((first, rest)) = prefix.split_first() else {
+        return false;
+    };
+    if first != "crate" {
+        return false;
+    }
+    let components: Vec<&str> = file
+        .components()
+        .filter_map(|c| c.as_os_str().to_str())
+        .collect();
+    if rest.is_empty() {
+        return matches!(components.last().copied(), Some("lib.rs" | "main.rs"));
+    }
+
+    let ends_with = |tail: &[String]| {
+        components.len() >= tail.len()
+            && components[components.len() - tail.len()..]
+                .iter()
+                .zip(tail)
+                .all(|(component, want)| *component == want.as_str())
+    };
+
+    let (last, parents) = rest.split_last().expect("rest is not empty");
+    let mut as_file = parents.to_vec();
+    as_file.push(format!("{last}.rs"));
+    let mut as_mod = rest.to_vec();
+    as_mod.push("mod.rs".to_string());
+
+    ends_with(&as_file) || ends_with(&as_mod)
 }
 
 fn collect_renames(tree: &syn::UseTree, prefix: &mut Vec<String>, out: &mut Vec<UseRename>) {

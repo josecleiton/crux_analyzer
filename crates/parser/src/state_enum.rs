@@ -189,25 +189,34 @@ pub(crate) fn find_state_machines(index: &CrateIndex) -> Detection {
 fn model_reachable_enum_fields(index: &CrateIndex) -> BTreeSet<(String, String)> {
     let mut found = BTreeSet::new();
     let mut visited = BTreeSet::new();
-    let mut queue: Vec<String> = index
+    // Each type is carried with the file that referred to it, because `Model`
+    // means different things in different modules and the name alone cannot say
+    // which. The walk starts at the `impl App`, so the first answer is the Model
+    // that impl names, read from the file the impl is written in — and every step
+    // after resolves against the file of the struct it just came from.
+    let mut queue: Vec<(String, std::path::PathBuf)> = index
         .trait_impls
         .iter()
         .filter(|imp| imp.trait_name == "App")
-        .filter_map(|imp| crate::core_finder::associated_type(imp.item, "Model"))
+        .filter_map(|imp| {
+            crate::core_finder::associated_type(imp.item, "Model")
+                .map(|model| (model, imp.file.to_path_buf()))
+        })
         .collect();
 
-    while let Some(type_name) = queue.pop() {
+    while let Some((type_name, referenced_from)) = queue.pop() {
         if !visited.insert(type_name.clone()) {
             continue;
         }
-        let Some(strct) = index.structs.get(&type_name) else {
+        let Some(strct) = index.resolve_struct(&type_name, &referenced_from) else {
             continue;
         };
+        let declared_in = strct.file.clone();
         for field in &strct.fields {
             if !index.enum_decls(&field.reachable).is_empty() {
                 found.insert((field.reachable.clone(), field.name.clone()));
             }
-            queue.push(field.reachable.clone());
+            queue.push((field.reachable.clone(), declared_in.clone()));
         }
     }
     found
@@ -464,7 +473,13 @@ impl<'a, 'ast> Visit<'ast> for Collector<'a> {
 
         // Reset: `*.x = T::default()` assigns every enum-typed field of `T`.
         if let Some(type_name) = default_call_type(&assign.right) {
-            if let Some(strct) = self.index.structs.get(&type_name) {
+            // `first()` over declarations sorted by path: deterministic, but
+            // still a guess when the name collides. The collector visits every
+            // function without tracking which file it is in, so there is no
+            // referencing file to resolve against here — unlike the model walk,
+            // which carries one. Worth closing if a crate ever has two colliding
+            // structs that both get reset by `default()`.
+            if let Some(strct) = self.index.struct_decls(&type_name).first() {
                 for field in &strct.fields {
                     // The declared type, not the reachable one: `default()` on
                     // an `Option<E>` field is `None`, not a variant of `E`.

@@ -1721,7 +1721,11 @@ impl<'w, 'a> Walker<'w, 'a> {
             return None;
         }
 
-        let strct = self.index.structs.get(type_name)?;
+        // Deterministic by sorted path — see the note on the same call in
+        // `state_enum.rs`. The walker does know a file, but it is the file of the
+        // function being walked rather than of the expression's type, so it is
+        // not the referencing file this needs.
+        let strct = self.index.struct_decls(type_name).first()?;
         let targets: Vec<(StateMachine, String)> = self
             .machines
             .iter()

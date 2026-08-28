@@ -33,8 +33,18 @@ pub(crate) fn load_sources(
     let mut sources = Vec::new();
     let mut total_bytes: u64 = 0;
 
+    // Sorted, because the order files arrive in is the order declarations land
+    // in the index, and the index's tie-breaks are positional. Unsorted, the
+    // walk hands back whatever `readdir` returns — stable on one filesystem and
+    // different on another — so the same crate analysed on two machines gave two
+    // different models, each reproducible on its own machine and neither
+    // reproducible on the other.
+    //
+    // This is necessary and not sufficient: it makes the answer the same
+    // everywhere, and `resolve_*` below is what makes it the right one.
     for entry in WalkDir::new(src_dir)
         .follow_links(false)
+        .sort_by_file_name()
         .into_iter()
         .filter_entry(|e| e.file_name() != "target")
     {
