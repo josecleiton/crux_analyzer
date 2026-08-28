@@ -252,7 +252,11 @@ fn machine_diagram(machine: &Machine, labels: &Labels) -> String {
             "    {} --> {}: {}",
             ids.id(&transition.from.0),
             ids.id(&transition.to.0),
-            mermaid_label(&transition_label(transition)),
+            // Not wrapped in `mermaid_label`: the function escapes its own
+            // parts, because the `<br>` it writes between them is markup this
+            // code authors and escaping the whole string turns it back into four
+            // visible characters.
+            transition_label(transition),
         ));
     }
 
@@ -396,23 +400,38 @@ fn answers_cell(events: &[crux_analyzer_model::Event], labels: &Labels) -> Strin
 /// Deliberately terser than the table cell: a conditional request is marked with
 /// a `?` and the callback event is left to the table, because a diagram edge has
 /// to stay readable at a glance.
+///
+/// **Returns an escaped label.** Every piece of model text goes through
+/// [`mermaid_label`] here, and the caller must not escape the result again — the
+/// `<br>` between the event and its effects is markup this function writes, and
+/// escaping the whole string turns it back into four visible characters.
+///
+/// The break is `<br>` and not `\n` because Mermaid reads no escape sequence
+/// inside a state diagram's edge label: it draws the two characters. Every edge
+/// of every generated diagram carried a visible `\n`. Squeezed into a page it
+/// passed for noise; the moment a reader could zoom, it was the first thing they
+/// saw. Measured against the bundled Mermaid: `\n` gives a one-line label 24px
+/// tall and 189px wide with the escape shown, `<br>` gives two lines at 48px and
+/// 126px — narrower as well as correct, which is the point of a break on an edge.
 fn transition_label(transition: &Transition) -> String {
+    let event = mermaid_label(&transition.event.0);
     if transition.effects.is_empty() {
-        return transition.event.0.clone();
+        return event;
     }
     let effects = transition
         .effects
         .iter()
         .map(|effect| {
+            let name = mermaid_label(&effect.name);
             if effect.conditional {
-                format!("{}?", effect.name)
+                format!("{name}?")
             } else {
-                effect.name.clone()
+                name
             }
         })
         .collect::<Vec<_>>()
         .join(", ");
-    format!("{}\\n/ {}", transition.event.0, effects)
+    format!("{event}<br>/ {effects}")
 }
 
 #[cfg(test)]
@@ -901,7 +920,7 @@ mod tests {
         // callback events stay out of the diagram.
         assert!(
             body.contains(
-                "Stopped --> Playing: Play\\n/ Render, Audio#58;#58;Start, Http#58;#58;Report?"
+                "Stopped --> Playing: Play<br>/ Render, Audio#58;#58;Start, Http#58;#58;Report?"
             ),
             "{body}"
         );
