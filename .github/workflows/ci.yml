@@ -66,6 +66,12 @@ jobs:
       - name: Generated examples are current
         run: just docs-current
 
+      # So are the web assets `crates/cli` embeds, and for a sharper reason: a
+      # stale `dist` ships a `site` command that renders an older app than the
+      # sources it was built from, and says nothing about it.
+      - name: Embedded web assets are current
+        run: just web-current
+
   # A living preview of the tool on GitHub Pages: the bundled fixture
   # analyzed by the freshly built analyzer and published as a static site —
   # the same `just site` recipe users run, pointed at the public fixture.

@@ -1,6 +1,13 @@
 # Node
 node_modules/
 dist/
+# …except the web app's, which `crates/cli` embeds with `rust_embed`.
+# `cargo install --git` never runs pnpm, so a binary installed that way embedded
+# an empty directory and `site` failed with "embedded web assets are missing" —
+# the interactive view existed and could not be shipped. `just web-current`
+# keeps the committed build from going stale.
+!apps/web/dist/
+!apps/web/dist/**
 
 # Rust
 target/

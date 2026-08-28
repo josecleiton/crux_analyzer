@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-Lzn4X5vbIdPcvF5a1Q4q0CPgn0x51ovwc1ShU53F2MI='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'" />
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>crux_analyzer</title>
+    <script>
+      // Applies the theme before first paint, so no light flash on reload.
+      // The storage key must match THEME_STORAGE_KEY in src/theme/theme.ts.
+      (function () {
+        var stored = null;
+        try {
+          stored = localStorage.getItem('crux-analyzer:theme');
+        } catch (error) {
+          /* storage disabled: fall back to the OS preference */
+        }
+        document.documentElement.dataset.theme =
+          stored === 'light' || stored === 'dark'
+            ? stored
+            : window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light';
+      })();
+
+      // Same idea for the language: resolve it before first paint so the UI
+      // never renders in English and then swaps. The storage key must match
+      // LOCALE_STORAGE_KEY in src/i18n/locale.ts, and `data-locale` is what
+      // currentLocale() reads back — the hardcoded lang="en" above is only the
+      // no-JavaScript fallback.
+      (function () {
+        var stored = null;
+        try {
+          stored = localStorage.getItem('crux-analyzer:locale');
+        } catch (error) {
+          /* storage disabled: fall back to the browser preference */
+        }
+        var locale = stored === 'en' || stored === 'pt-BR' ? stored : null;
+        if (!locale) {
+          var preferences = navigator.languages && navigator.languages.length
+            ? navigator.languages
+            : [navigator.language || 'en'];
+          for (var i = 0; i < preferences.length && !locale; i++) {
+            var language = String(preferences[i]).toLowerCase().split('-')[0];
+            if (language === 'pt') locale = 'pt-BR';
+            else if (language === 'en') locale = 'en';
+          }
+        }
+        locale = locale || 'en';
+        document.documentElement.dataset.locale = locale;
+        document.documentElement.lang = locale;
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-DcslTQE1.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-Dd_uD5pT.js">
+    <link rel="modulepreload" crossorigin href="/assets/elk-BIkR-HNT.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-_JPAl9uG.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

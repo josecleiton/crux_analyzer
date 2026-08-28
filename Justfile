@@ -115,6 +115,19 @@ docs-current: example-docs
     @git diff --exit-code -- docs/examples docs/pt-BR/examples \
       || { echo "docs/examples is stale — commit the regenerated files"; exit 1; }
 
+# `apps/web/dist` is committed because `crates/cli` embeds it, and the same
+# ratchet applies: rebuilding must change nothing. Without this, a binary built
+# from the repository could ship a `site` older than the sources it came from,
+# and nothing would say so — the failure would be a stale page, which is the
+# kind nobody reports.
+#
+# Safe as a gate because the build is reproducible: two runs of
+# `pnpm --filter web build` from a clean `dist` produce byte-identical output,
+# hashed asset names included.
+web-current: web-build
+    @git diff --exit-code -- apps/web/dist \
+      || { echo "apps/web/dist is stale — commit the rebuilt assets"; exit 1; }
+
 # --- Analyzer --------------------------------------------------------------
 
 # Emit the model JSON for a crate: just generate path/to/app/src MyApp

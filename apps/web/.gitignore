@@ -8,7 +8,14 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+# `dist` is committed rather than ignored. `crates/cli` embeds it with
+# `rust_embed`, and `cargo install --git` — which is how this tool reaches a CI
+# image — never runs pnpm, so a binary installed that way embedded an empty
+# directory and `site` failed at runtime with "embedded web assets are missing".
+# The interactive view existed and could not be shipped.
+#
+# A committed build can go stale, so `just web-current` holds it: rebuilding must
+# be a no-op, the same ratchet as `docs-current` and `notices-current`.
 dist-ssr
 *.local
 
