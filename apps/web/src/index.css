@@ -636,7 +636,7 @@ button.tree-twisty:hover {
 }
 
 /* A composite parent labels its children and selects nothing — clicking it
-   folds them. */
+   reads the family alone. */
 .tree-label.container {
   color: var(--text-muted);
   font-style: italic;

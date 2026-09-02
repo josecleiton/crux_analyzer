@@ -149,16 +149,26 @@ máquina → família composta → estado. A detecção de compostos é comparti
 o canvas em vez de derivada de novo (`src/domain/hierarchy.ts`), então uma linha
 do sumário e um nó nunca podem discordar sobre a qual família um estado pertence.
 
-**Um clique, um significado.** Uma linha que tem filhos os dobra — sua seta e seu
-nome fazem a mesma coisa, nos três níveis: um core, uma máquina, uma família
-composta (cujo nome em itálico é de um contêiner, não de um estado: um pai
-composto não é um estado e não seleciona nada). Clicar em um core que não está em
-tela o seleciona e o abre; no core que já está em tela, o nome o dobra de volta.
-A linha folha é a que seleciona: seleciona aquele estado, e em um core que não é
-o ativo troca para aquele core primeiro — o mesmo salto que um link direto faz.
+**Um clique, um significado.** Dentro do sumário de um core, o nome e a caixa de
+seleção de uma linha significam coisas diferentes, e a seta significa uma
+terceira: **o nome isola** o que aquela linha governa — aquele estado, aquela
+família composta, aquela máquina inteira, e nada mais do core continua no canvas
+— enquanto a caixa ao lado liga e desliga aquela linha sozinha, sem tocar nas
+outras, e a seta dobra. É um nível por vez: o nome de uma máquina deixa o core
+mostrando aquela máquina, o de uma família aquela família, o de uma folha aquele
+único estado. A folha também é a linha que seleciona, então seu nome preenche o
+inspetor junto, e em um core que não é o ativo troca para aquele core primeiro —
+o mesmo salto que um link direto faz. As linhas de core acima seguem como
+estavam: clicar em um core que não está em tela o seleciona e o abre, e no core
+que já está em tela o nome o dobra de volta.
+
+Um clique que isola não é cumulativo — ele é lido como "só isto", a partir do
+core inteiro a cada vez, nunca "só isto dentro do que sobrou" — então ler uma
+segunda linha traz a primeira de volta, e **Mostrar todos os estados**, abaixo do
+sumário, é o caminho de volta ao core inteiro.
 
 Dobrar é só apresentação. Uma máquina dobrada mantém cada um de seus estados no
-canvas; o que é desenhado é assunto da caixa de seleção, abaixo.
+canvas; o que é desenhado é assunto do nome e da caixa de seleção, abaixo.
 
 Toda linha também carrega uma caixa de seleção, e este é o segundo canal de
 controle do leitor sobre o canvas: **um estado desmarcado sai do canvas**, junto

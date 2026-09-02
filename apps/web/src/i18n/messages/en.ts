@@ -37,6 +37,9 @@ export const en = {
   // application — a proper name, substituted untranslated.
   'sidebar.hideFromCanvas': 'Hide {name} from the canvas',
   'sidebar.showOnCanvas': 'Show {name} on the canvas',
+  // What a row's name does, as opposed to its checkbox: everything else the
+  // core declares leaves the canvas.
+  'sidebar.showOnly': 'Show only {name} on the canvas',
   'sidebar.showAll': 'Show all states',
   // "GitHub" is a proper name and stays as it is; only the description of
   // where the link goes is translated.

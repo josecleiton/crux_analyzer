@@ -27,6 +27,7 @@ export const ptBR: Catalog = {
   'sidebar.collapse': 'Recolher',
   'sidebar.hideFromCanvas': 'Ocultar {name} do diagrama',
   'sidebar.showOnCanvas': 'Mostrar {name} no diagrama',
+  'sidebar.showOnly': 'Mostrar apenas {name} no diagrama',
   'sidebar.showAll': 'Mostrar todos os estados',
   'sidebar.sourceCode': 'Código-fonte no GitHub',
 

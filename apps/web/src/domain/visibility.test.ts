@@ -4,11 +4,13 @@ import { parseProjectJson } from '../schema/parserJson';
 import { fromParserJson } from './fromParserJson';
 import {
   NOTHING_HIDDEN,
+  coreStateIds,
   groupVisibility,
   hiddenInCore,
   isOnCanvas,
   machineStateIds,
   withHidden,
+  withOnlyVisible,
 } from './visibility';
 
 const project = fromParserJson(parseProjectJson(rawProject));
@@ -47,6 +49,36 @@ describe('withHidden', () => {
     const hidden = new Set([ids[0]]);
     withHidden(hidden, [ids[1]], true);
     expect([...hidden]).toEqual([ids[0]]);
+  });
+});
+
+describe('withOnlyVisible', () => {
+  it('leaves only the given states on the canvas, across the whole core', () => {
+    const kept = ids[0];
+    const hidden = withOnlyVisible(NOTHING_HIDDEN, core, [kept]);
+    expect([...hidden].sort()).toEqual(coreStateIds(core).filter((id) => id !== kept).sort());
+  });
+
+  it('shows again what a previous reading had hidden', () => {
+    // Isolating twice is not cumulative: the second row is read whole, not
+    // read inside what the first one left behind.
+    const first = withOnlyVisible(NOTHING_HIDDEN, core, [ids[0]]);
+    const second = withOnlyVisible(first, core, [ids[1]]);
+    expect(second.has(ids[1])).toBe(false);
+    expect(second.has(ids[0])).toBe(true);
+  });
+
+  it('is a no-op when that is already what is visible', () => {
+    const hidden = withOnlyVisible(NOTHING_HIDDEN, core, [ids[0]]);
+    expect(withOnlyVisible(hidden, core, [ids[0]])).toBe(hidden);
+    // The whole core visible is the default set, unchanged.
+    expect(withOnlyVisible(NOTHING_HIDDEN, core, coreStateIds(core))).toBe(NOTHING_HIDDEN);
+  });
+
+  it('does not touch another core', () => {
+    const other = project.cores[1].machines[0].states[0].id;
+    const hidden = withOnlyVisible(new Set([other]), core, [ids[0]]);
+    expect(hidden.has(other)).toBe(true);
   });
 });
 

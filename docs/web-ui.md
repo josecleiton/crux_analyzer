@@ -138,16 +138,26 @@ machine → composite family → state. Composite detection is shared with the
 canvas rather than re-derived (`src/domain/hierarchy.ts`), so an outline row and
 a node can never disagree about which family a state belongs to.
 
-**One click, one meaning.** A row that has children folds it — its arrow and its
-name do the same thing, at all three levels: a core, a machine, a composite
-family (whose italic name is a container's, not a state's: a composite parent is
-not a state and selects nothing). Clicking a core that is not on screen selects
-it and opens it; on the core already on screen the name folds it back. A leaf row
-is the one that selects: it selects that state, and in a core that is not the
-active one it switches to that core first — the same jump a deep link makes.
+**One click, one meaning.** Inside a core's outline the name and the checkbox of
+a row mean different things, and the arrow means a third: **the name isolates**
+what its row governs — that state, that composite family, that whole machine,
+and nothing else of the core stays on the canvas — while the checkbox next to it
+turns that one row off and on without touching the others, and the arrow folds.
+It is a level at a time: a machine's name leaves the core showing that machine,
+a family's name that family, a leaf's name that single state. A leaf is also the
+row that selects, so its name fills the inspector as well, and in a core that is
+not the active one it switches to that core first — the same jump a deep link
+makes. The core rows above are unchanged: clicking a core that is not on screen
+selects it and opens it, and on the core already on screen the name folds it
+back.
+
+An isolating click is not cumulative — it is read as "only this", from the whole
+core each time, never "only this among what is left" — so reading a second row
+brings the first one back, and **Show all states** below the outline is the way
+back to the whole core.
 
 Folding is presentation only. A folded machine keeps every one of its states on
-the canvas; what is drawn is the checkbox's business, below.
+the canvas; what is drawn is the name's and the checkbox's business, below.
 
 Every row also carries a checkbox, and this is the second channel of reader
 control over the canvas: **a deselected state leaves the canvas**, along with

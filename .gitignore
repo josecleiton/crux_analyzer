@@ -8,6 +8,10 @@ dist/
 # keeps the committed build from going stale.
 !apps/web/dist/
 !apps/web/dist/**
+# …except the model a local build copies in: that is the analyzed application's
+# own data, never this repository's. `public/model.json` is ignored for the same
+# reason, and un-ignoring the whole `dist/` tree would otherwise let it in.
+apps/web/dist/model.json
 
 # Rust
 target/

@@ -29,6 +29,7 @@ interface SidebarProps {
   onToggleGroup: (groupId: string) => void;
   onSelect: (selection: Selection) => void;
   onSetStatesHidden: (stateIds: string[], hidden: boolean) => void;
+  onIsolateStates: (coreId: string, stateIds: string[]) => void;
 }
 
 /**
@@ -41,9 +42,12 @@ interface SidebarProps {
  * Everything is visible by default and the checkbox is what the reader turns
  * *off*: the panel opens showing the whole core, never a partial one.
  *
- * One click, one meaning: a row that has children folds it (its name and its
- * arrow do the same thing), a leaf row selects. Folding is presentation only —
- * a folded machine keeps every one of its states on the canvas.
+ * One click, one meaning, and inside the outline the name and the checkbox mean
+ * different things: **the name isolates** what its row governs — that state,
+ * that family, that machine, and nothing else of the core — while the checkbox
+ * next to it turns that one row off and on without touching the others. Folding
+ * is the arrow's alone, and presentation only: a folded machine keeps every one
+ * of its states on the canvas.
  */
 export function Sidebar({
   cores,
@@ -57,6 +61,7 @@ export function Sidebar({
   onToggleGroup,
   onSelect,
   onSetStatesHidden,
+  onIsolateStates,
 }: SidebarProps) {
   const t = useTranslate();
   return (
@@ -102,6 +107,7 @@ export function Sidebar({
                       onToggleGroup={onToggleGroup}
                       onSelect={onSelect}
                       onSetStatesHidden={onSetStatesHidden}
+                      onIsolateStates={onIsolateStates}
                       t={t}
                     />
                   ))}
@@ -145,6 +151,7 @@ interface MachineOutlineProps {
   onToggleGroup: (groupId: string) => void;
   onSelect: (selection: Selection) => void;
   onSetStatesHidden: (stateIds: string[], hidden: boolean) => void;
+  onIsolateStates: (coreId: string, stateIds: string[]) => void;
   t: Translate;
 }
 
@@ -159,18 +166,26 @@ function MachineOutline({
   onToggleGroup,
   onSelect,
   onSetStatesHidden,
+  onIsolateStates,
   t,
 }: MachineOutlineProps) {
   const tree = machineTree(machine);
   const allIds = machineStateIds(machine);
 
   /**
-   * Reading a state means reading it in its core: clicking one in a core that
-   * is not the active one switches to it, the same jump a deep link makes.
+   * Reading something means reading it in its core, and alone: the rest of the
+   * core leaves the canvas, and a row in a core that is not the active one
+   * switches to it first — the same jump a deep link makes.
    */
-  const select = (selected: Selection) => {
+  const isolate = (ids: string[]) => {
     onSelectCore(core.id);
-    onSelect(selected);
+    onIsolateStates(core.id, ids);
+  };
+
+  /** A leaf also fills the inspector — it is the row that has one. */
+  const readState = (id: string) => {
+    isolate([id]);
+    onSelect({ kind: 'state', id });
   };
 
   const rows = (entries: TreeEntry[]) =>
@@ -191,10 +206,11 @@ function MachineOutline({
             />
             <button
               className={selected ? 'tree-label selected' : 'tree-label'}
-              // the outline is narrow, so a long name is elided in CSS and
-              // spelled out on hover — the whole name, as declared
-              title={entry.state.name}
-              onClick={() => select({ kind: 'state', id: entry.state.id })}
+              // The outline is narrow, so a long name is elided in CSS: the
+              // tooltip says what the click does *and* spells the name out —
+              // the whole name, as declared.
+              title={t('sidebar.showOnly', { name: entry.state.name })}
+              onClick={() => readState(entry.state.id)}
             >
               {entry.label}
             </button>
@@ -204,20 +220,22 @@ function MachineOutline({
 
       const id = familyId(machine.id, entry.name);
       const open = !collapsedGroupIds.has(id);
+      const familyIds = entry.children.map((leaf) => leaf.state.id);
       return (
         <li key={id} className="tree-family">
           <FoldableRow
             open={open}
             onToggle={() => onToggleGroup(id)}
-            // A composite parent is a container, not a state: it labels its
-            // children and has nothing of its own to select, so its name folds
-            // them instead.
+            // A composite parent is a container, not a state: it has nothing of
+            // its own to select, so its name reads the family — every child of
+            // it, and nothing else of the core.
+            onIsolate={() => isolate(familyIds)}
             labelClassName="tree-label container"
             name={entry.name}
             t={t}
           >
             <VisibilityToggle
-              ids={entry.children.map((leaf) => leaf.state.id)}
+              ids={familyIds}
               name={entry.name}
               hiddenStateIds={hiddenStateIds}
               onSetStatesHidden={onSetStatesHidden}
@@ -239,6 +257,7 @@ function MachineOutline({
       <FoldableRow
         open={open}
         onToggle={() => onToggleGroup(machine.id)}
+        onIsolate={() => isolate(allIds)}
         labelClassName="tree-label machine"
         name={machine.name}
         t={t}
@@ -259,6 +278,8 @@ function MachineOutline({
 interface FoldableRowProps {
   open: boolean;
   onToggle: () => void;
+  /** What the name does: read this group alone, the rest of the core off. */
+  onIsolate: () => void;
   labelClassName: string;
   /** Name of the machine or family — analyzed-app data, never translated. */
   name: string;
@@ -268,26 +289,31 @@ interface FoldableRowProps {
 }
 
 /**
- * A row that has children: its arrow and its name both fold it, so the whole
- * row means one thing. Folding says nothing about what is drawn — that is the
- * checkbox's job.
+ * A row that has children: the arrow folds it, the name reads it alone. The two
+ * are deliberately not the same click — folding says nothing about what is
+ * drawn, while the name is the group-sized version of what a leaf's name does.
  */
 function FoldableRow({
   open,
   onToggle,
+  onIsolate,
   labelClassName,
   name,
   t,
   children,
 }: FoldableRowProps) {
-  const title = t(open ? 'sidebar.collapse' : 'sidebar.expand');
+  const fold = t(open ? 'sidebar.collapse' : 'sidebar.expand');
   return (
     <div className="tree-row">
-      <button className="tree-twisty" aria-expanded={open} title={title} onClick={onToggle}>
+      <button className="tree-twisty" aria-expanded={open} title={fold} onClick={onToggle}>
         <Chevron open={open} />
       </button>
       {children}
-      <button className={labelClassName} title={title} onClick={onToggle}>
+      <button
+        className={labelClassName}
+        title={t('sidebar.showOnly', { name })}
+        onClick={onIsolate}
+      >
         {name}
       </button>
     </div>

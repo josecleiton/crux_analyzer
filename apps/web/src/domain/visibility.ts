@@ -53,6 +53,34 @@ export function withHidden(
   return next;
 }
 
+/**
+ * The set with only `stateIds` visible inside `core`: what a row's *name* does
+ * in the outline — read this, and nothing else. The scope is the core and not
+ * the clicked row's machine, because the canvas draws a whole core: leaving
+ * another machine untouched would not read as "only this".
+ *
+ * Same identity contract as `withHidden`: the set it was given comes back when
+ * nothing changes.
+ */
+export function withOnlyVisible(
+  hidden: ReadonlySet<string>,
+  core: DomainCore,
+  stateIds: readonly string[],
+): ReadonlySet<string> {
+  const keep = new Set(stateIds);
+  const ids = coreStateIds(core);
+  const shown = withHidden(
+    hidden,
+    ids.filter((id) => !keep.has(id)),
+    true,
+  );
+  return withHidden(
+    shown,
+    ids.filter((id) => keep.has(id)),
+    false,
+  );
+}
+
 /** Ids of the core's states that are currently hidden. */
 export function hiddenInCore(core: DomainCore, hidden: ReadonlySet<string>): string[] {
   return core.machines.flatMap((machine) =>
@@ -63,6 +91,11 @@ export function hiddenInCore(core: DomainCore, hidden: ReadonlySet<string>): str
 /** Every state id of a machine — what a region-level toggle acts on. */
 export function machineStateIds(machine: DomainMachine): string[] {
   return machine.states.map((state) => state.id);
+}
+
+/** Every state id the core declares — what a core-wide operation acts on. */
+export function coreStateIds(core: DomainCore): string[] {
+  return core.machines.flatMap((machine) => machineStateIds(machine));
 }
 
 /**

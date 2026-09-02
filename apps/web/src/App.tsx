@@ -3,7 +3,13 @@ import { loadProject } from './data/loadProject';
 import type { DomainProject } from './domain/types';
 import { machineOf } from './domain/fromParserJson';
 import { declaredTags, focusFor } from './domain/focus';
-import { NOTHING_HIDDEN, isOnCanvas, machineStateIds, withHidden } from './domain/visibility';
+import {
+  NOTHING_HIDDEN,
+  isOnCanvas,
+  machineStateIds,
+  withHidden,
+  withOnlyVisible,
+} from './domain/visibility';
 import { toFlowModel } from './flow/toFlowModel';
 import type { LayoutEngine, LayoutResult } from './layout/LayoutEngine';
 import { ElkLayoutEngine } from './layout/ElkLayoutEngine';
@@ -241,14 +247,28 @@ export default function App() {
     setCollapsedGroupIds((collapsed) => toggled(collapsed, groupId));
   }
 
-  function setStatesHidden(stateIds: string[], hidden: boolean) {
-    const next = withHidden(hiddenStateIds, stateIds, hidden);
+  /**
+   * What follows from a change in visibility: the canvas is laid out again, and
+   * a selection that lost what it pointed at is dropped.
+   */
+  function commitHidden(next: ReadonlySet<string>) {
     if (next === hiddenStateIds) return;
     setHiddenStateIds(next);
     setLayoutVersion((version) => version + 1);
     if (activeCore && selection && !isOnCanvas(activeCore, selection.kind, selection.id, next)) {
       setSelection(null);
     }
+  }
+
+  function setStatesHidden(stateIds: string[], hidden: boolean) {
+    commitHidden(withHidden(hiddenStateIds, stateIds, hidden));
+  }
+
+  /** Read these states alone: the rest of the core leaves the canvas. */
+  function isolateStates(coreId: string, stateIds: string[]) {
+    const core = project?.cores.find((candidate) => candidate.id === coreId);
+    if (!core) return;
+    commitHidden(withOnlyVisible(hiddenStateIds, core, stateIds));
   }
 
   function toggleSimulation() {
@@ -321,6 +341,7 @@ export default function App() {
           onToggleGroup={toggleGroup}
           onSelect={setSelection}
           onSetStatesHidden={setStatesHidden}
+          onIsolateStates={isolateStates}
         />
         <main className="graph-area">
           <Graph
