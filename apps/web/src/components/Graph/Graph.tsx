@@ -32,6 +32,14 @@ const edgeTypes = { routed: RoutedEdge };
 const GROUP_TYPES = new Set(['machineGroup', 'compositeGroup']);
 /** Room left around the framed content, on load and on every framing. */
 const FIT_PADDING = 0.15;
+/**
+ * How far out the canvas may zoom. React Flow's default floor is 0.5, which a
+ * real core outgrows: a 16-machine one lays out around 8000×5600px, and framing
+ * it in a 960px pane needs about 0.10. Clamped at 0.5 the opening view was an
+ * eighth of the graph, usually the empty space between two machine sections —
+ * an app that looks blank on the model it is meant to read.
+ */
+const MIN_ZOOM = 0.02;
 
 /**
  * Ids to emphasize. The simulation drives three tiers of emphasis, so the
@@ -225,6 +233,7 @@ export function Graph({
       ariaLabelConfig={ariaLabelConfig}
       fitView
       fitViewOptions={{ padding: FIT_PADDING }}
+      minZoom={MIN_ZOOM}
       proOptions={{ hideAttribution: true }}
     >
       <Background gap={20} />
