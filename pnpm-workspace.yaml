@@ -25,7 +25,7 @@ packages:
 catalog:
   "@types/node": ^24.13.3
   typescript: ~7.0.2
-  vitest: ^4.1.10
+  vitest: ^4.1.11
 
 # Node 24 (the active LTS) is the only supported major, and a mismatch is an
 # error rather than the default warning — a version nobody tested is not
