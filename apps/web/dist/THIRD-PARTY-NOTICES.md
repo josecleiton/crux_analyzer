@@ -28,8 +28,8 @@ The full text of the EPL-2.0 appears in the license texts below.
 | Package | Version | License | Copyright |
 | --- | --- | --- | --- |
 | [@ungap/structured-clone](https://github.com/ungap/structured-clone#readme) | 1.3.3 | ISC | Copyright (c) 2021, Andrea Giammarchi, @WebReflection |
-| [@xyflow/react](https://reactflow.dev) | 12.11.2 | MIT | Copyright (c) 2019-2025 webkid GmbH |
-| @xyflow/system | 0.0.79 | MIT | Copyright (c) 2019-2025 webkid GmbH |
+| [@xyflow/react](https://reactflow.dev) | 12.12.0 | MIT | Copyright (c) 2019-2025 webkid GmbH |
+| @xyflow/system | 0.0.83 | MIT | Copyright (c) 2019-2025 webkid GmbH |
 | bail | 2.0.2 | MIT | Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com> |
 | classcat | 5.0.5 | MIT | Copyright © Jorge Bucaran <<https://jorgebucaran.com>> |
 | comma-separated-tokens | 2.0.3 | MIT | Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com> |
@@ -74,12 +74,12 @@ The full text of the EPL-2.0 appears in the license texts below.
 | micromark-util-sanitize-uri | 2.0.1 | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> |
 | micromark-util-subtokenize | 2.1.0 | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> |
 | property-information | 7.2.0 | MIT | Copyright (c) Titus Wormer <mailto:tituswormer@gmail.com> |
-| [react](https://react.dev/) | 19.2.8 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
-| [react-dom](https://react.dev/) | 19.2.8 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
+| [react](https://react.dev/) | 19.3.0 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
+| [react-dom](https://react.dev/) | 19.3.0 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
 | react-markdown | 10.1.0 | MIT | Copyright (c) Espen Hovlandsdal |
 | [remark-parse](https://remark.js.org) | 11.0.0 | MIT | Copyright (c) 2014 Titus Wormer <tituswormer@gmail.com> |
 | remark-rehype | 11.1.2 | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> |
-| [scheduler](https://react.dev/) | 0.27.0 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
+| [scheduler](https://react.dev/) | 0.28.0 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
 | space-separated-tokens | 2.0.2 | MIT | Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com> |
 | style-to-js | 1.1.21 | MIT | Copyright (c) 2020 Menglin "Mark" Xu <mark@remarkablemark.org> |
 | style-to-object | 1.0.14 | MIT | Copyright (c) 2017 Menglin "Mark" Xu <mark@remarkablemark.org> |
@@ -118,7 +118,7 @@ OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### MIT — @xyflow/react 12.11.2, @xyflow/system 0.0.79
+### MIT — @xyflow/react 12.12.0, @xyflow/system 0.0.83
 
 ```
 MIT License
@@ -736,7 +736,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### MIT — react 19.2.8, react-dom 19.2.8, scheduler 0.27.0, use-sync-external-store 1.6.0
+### MIT — react 19.3.0, react-dom 19.3.0, scheduler 0.28.0, use-sync-external-store 1.6.0
 
 ```
 MIT License

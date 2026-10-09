@@ -28,8 +28,8 @@ The full text of the EPL-2.0 appears in the license texts below.
 | Package | Version | License | Copyright |
 | --- | --- | --- | --- |
 | [@ungap/structured-clone](https://github.com/ungap/structured-clone#readme) | 1.3.3 | ISC | Copyright (c) 2021, Andrea Giammarchi, @WebReflection |
-| [@xyflow/react](https://reactflow.dev) | 12.11.2 | MIT | Copyright (c) 2019-2025 webkid GmbH |
-| @xyflow/system | 0.0.79 | MIT | Copyright (c) 2019-2025 webkid GmbH |
+| [@xyflow/react](https://reactflow.dev) | 12.12.0 | MIT | Copyright (c) 2019-2025 webkid GmbH |
+| @xyflow/system | 0.0.83 | MIT | Copyright (c) 2019-2025 webkid GmbH |
 | bail | 2.0.2 | MIT | Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com> |
 | classcat | 5.0.5 | MIT | Copyright © Jorge Bucaran <<https://jorgebucaran.com>> |
 | comma-separated-tokens | 2.0.3 | MIT | Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com> |
@@ -74,12 +74,12 @@ The full text of the EPL-2.0 appears in the license texts below.
 | micromark-util-sanitize-uri | 2.0.1 | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> |
 | micromark-util-subtokenize | 2.1.0 | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> |
 | property-information | 7.2.0 | MIT | Copyright (c) Titus Wormer <mailto:tituswormer@gmail.com> |
-| [react](https://react.dev/) | 19.2.8 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
-| [react-dom](https://react.dev/) | 19.2.8 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
+| [react](https://react.dev/) | 19.3.0 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
+| [react-dom](https://react.dev/) | 19.3.0 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
 | react-markdown | 10.1.0 | MIT | Copyright (c) Espen Hovlandsdal |
 | [remark-parse](https://remark.js.org) | 11.0.0 | MIT | Copyright (c) 2014 Titus Wormer <tituswormer@gmail.com> |
 | remark-rehype | 11.1.2 | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> |
-| [scheduler](https://react.dev/) | 0.27.0 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
+| [scheduler](https://react.dev/) | 0.28.0 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
 | space-separated-tokens | 2.0.2 | MIT | Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com> |
 | style-to-js | 1.1.21 | MIT | Copyright (c) 2020 Menglin "Mark" Xu <mark@remarkablemark.org> |
 | style-to-object | 1.0.14 | MIT | Copyright (c) 2017 Menglin "Mark" Xu <mark@remarkablemark.org> |
@@ -118,7 +118,7 @@ OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### MIT — @xyflow/react 12.11.2, @xyflow/system 0.0.79
+### MIT — @xyflow/react 12.12.0, @xyflow/system 0.0.83
 
 ```
 MIT License
@@ -736,7 +736,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### MIT — react 19.2.8, react-dom 19.2.8, scheduler 0.27.0, use-sync-external-store 1.6.0
+### MIT — react 19.3.0, react-dom 19.3.0, scheduler 0.28.0, use-sync-external-store 1.6.0
 
 ```
 MIT License
@@ -1033,18 +1033,18 @@ SOFTWARE.
 | [anstyle-parse 1.0.0](https://github.com/rust-cli/anstyle.git) | MIT License |
 | [anstyle-query 1.1.5](https://github.com/rust-cli/anstyle.git) | MIT License |
 | [anstyle 1.0.14](https://github.com/rust-cli/anstyle.git) | MIT License |
-| [clap 4.6.4](https://github.com/clap-rs/clap) | MIT License |
-| [clap_builder 4.6.2](https://github.com/clap-rs/clap) | MIT License |
-| [clap_derive 4.6.4](https://github.com/clap-rs/clap) | MIT License |
+| [clap 4.6.7](https://github.com/clap-rs/clap) | MIT License |
+| [clap_builder 4.6.7](https://github.com/clap-rs/clap) | MIT License |
+| [clap_derive 4.6.7](https://github.com/clap-rs/clap) | MIT License |
 | [clap_lex 1.1.0](https://github.com/clap-rs/clap) | MIT License |
 | [colorchoice 1.0.5](https://github.com/rust-cli/anstyle.git) | MIT License |
 | [is_terminal_polyfill 1.70.2](https://github.com/polyfill-rs/is_terminal_polyfill) | MIT License |
 | [libc 0.2.189](https://github.com/rust-lang/libc) | MIT License |
-| [crux-analyzer-cli 0.1.0](https://crates.io/crates/crux-analyzer-cli) | MIT License |
-| [crux-analyzer-docgen 0.1.0](https://crates.io/crates/crux-analyzer-docgen) | MIT License |
-| [crux-analyzer-i18n 0.1.0](https://crates.io/crates/crux-analyzer-i18n) | MIT License |
-| [crux-analyzer-model 0.1.0](https://crates.io/crates/crux-analyzer-model) | MIT License |
-| [crux-analyzer-parser 0.1.0](https://crates.io/crates/crux-analyzer-parser) | MIT License |
+| [crux-analyzer-cli 0.1.3](https://crates.io/crates/crux-analyzer-cli) | MIT License |
+| [crux-analyzer-docgen 0.1.3](https://crates.io/crates/crux-analyzer-docgen) | MIT License |
+| [crux-analyzer-i18n 0.1.3](https://crates.io/crates/crux-analyzer-i18n) | MIT License |
+| [crux-analyzer-model 0.1.3](https://crates.io/crates/crux-analyzer-model) | MIT License |
+| [crux-analyzer-parser 0.1.3](https://crates.io/crates/crux-analyzer-parser) | MIT License |
 | [itoa 1.0.18](https://github.com/dtolnay/itoa) | MIT License |
 | [proc-macro2 1.0.107](https://github.com/dtolnay/proc-macro2) | MIT License |
 | [quote 1.0.47](https://github.com/dtolnay/quote) | MIT License |
@@ -1053,7 +1053,7 @@ SOFTWARE.
 | [serde_derive 1.0.229](https://github.com/serde-rs/serde) | MIT License |
 | [serde_json 1.0.151](https://github.com/serde-rs/json) | MIT License |
 | [syn 2.0.119](https://github.com/dtolnay/syn) | MIT License |
-| [syn 3.0.3](https://github.com/dtolnay/syn) | MIT License |
+| [syn 3.0.6](https://github.com/dtolnay/syn) | MIT License |
 | [unicode-ident 1.0.24](https://github.com/dtolnay/unicode-ident) | MIT License |
 | [zmij 1.0.23](https://github.com/dtolnay/zmij) | MIT License |
 | [typenum 1.20.1](https://github.com/paholg/typenum) | MIT License |
@@ -1606,7 +1606,7 @@ DEALINGS IN THE SOFTWARE.
 
 ```
 
-#### MIT License — anstream 1.0.0, anstyle-parse 1.0.0, anstyle-query 1.1.5, anstyle 1.0.14, clap 4.6.4, clap_builder 4.6.2, clap_derive 4.6.4, clap_lex 1.1.0, colorchoice 1.0.5, is_terminal_polyfill 1.70.2
+#### MIT License — anstream 1.0.0, anstyle-parse 1.0.0, anstyle-query 1.1.5, anstyle 1.0.14, clap 4.6.7, clap_builder 4.6.7, clap_derive 4.6.7, clap_lex 1.1.0, colorchoice 1.0.5, is_terminal_polyfill 1.70.2
 
 ```
 Copyright (c) Individual contributors
@@ -1662,7 +1662,7 @@ DEALINGS IN THE SOFTWARE.
 
 ```
 
-#### MIT License — crux-analyzer-cli 0.1.0, crux-analyzer-docgen 0.1.0, crux-analyzer-i18n 0.1.0, crux-analyzer-model 0.1.0, crux-analyzer-parser 0.1.0
+#### MIT License — crux-analyzer-cli 0.1.3, crux-analyzer-docgen 0.1.3, crux-analyzer-i18n 0.1.3, crux-analyzer-model 0.1.3, crux-analyzer-parser 0.1.3
 
 ```
 MIT License
@@ -1686,7 +1686,7 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ```
 
-#### MIT License — itoa 1.0.18, proc-macro2 1.0.107, quote 1.0.47, serde 1.0.229, serde_core 1.0.229, serde_derive 1.0.229, serde_json 1.0.151, syn 2.0.119, syn 3.0.3, unicode-ident 1.0.24, zmij 1.0.23
+#### MIT License — itoa 1.0.18, proc-macro2 1.0.107, quote 1.0.47, serde 1.0.229, serde_core 1.0.229, serde_derive 1.0.229, serde_json 1.0.151, syn 2.0.119, syn 3.0.6, unicode-ident 1.0.24, zmij 1.0.23
 
 ```
 Permission is hereby granted, free of charge, to any
