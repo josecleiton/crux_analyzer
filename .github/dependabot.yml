@@ -27,6 +27,11 @@ updates:
       js-dependencies:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+    ignore:
+      # `@types/vscode` is the API the extension may call, so it moves with
+      # `engines.vscode` in apps/vscode/package.json, never ahead of it — vsce
+      # refuses to package when the types are newer. Raise both together, by hand.
+      - dependency-name: "@types/vscode"
 
   - package-ecosystem: github-actions
     directory: /
