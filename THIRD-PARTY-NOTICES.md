@@ -74,8 +74,8 @@ The full text of the EPL-2.0 appears in the license texts below.
 | micromark-util-sanitize-uri | 2.0.1 | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> |
 | micromark-util-subtokenize | 2.1.0 | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> |
 | property-information | 7.2.0 | MIT | Copyright (c) Titus Wormer <mailto:tituswormer@gmail.com> |
-| [react](https://react.dev/) | 19.3.0 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
-| [react-dom](https://react.dev/) | 19.3.0 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
+| [react](https://react.dev/) | 19.3.1 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
+| [react-dom](https://react.dev/) | 19.3.1 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
 | react-markdown | 10.1.0 | MIT | Copyright (c) Espen Hovlandsdal |
 | [remark-parse](https://remark.js.org) | 11.0.0 | MIT | Copyright (c) 2014 Titus Wormer <tituswormer@gmail.com> |
 | remark-rehype | 11.1.2 | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> |
@@ -736,7 +736,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### MIT — react 19.3.0, react-dom 19.3.0, scheduler 0.28.0, use-sync-external-store 1.6.0
+### MIT — react 19.3.1, react-dom 19.3.1, scheduler 0.28.0, use-sync-external-store 1.6.0
 
 ```
 MIT License
@@ -1051,9 +1051,9 @@ SOFTWARE.
 | [serde 1.0.229](https://github.com/serde-rs/serde) | MIT License |
 | [serde_core 1.0.229](https://github.com/serde-rs/serde) | MIT License |
 | [serde_derive 1.0.229](https://github.com/serde-rs/serde) | MIT License |
-| [serde_json 1.0.151](https://github.com/serde-rs/json) | MIT License |
+| [serde_json 1.0.154](https://github.com/serde-rs/json) | MIT License |
 | [syn 2.0.119](https://github.com/dtolnay/syn) | MIT License |
-| [syn 3.0.6](https://github.com/dtolnay/syn) | MIT License |
+| [syn 3.0.8](https://github.com/dtolnay/syn) | MIT License |
 | [unicode-ident 1.0.24](https://github.com/dtolnay/unicode-ident) | MIT License |
 | [zmij 1.0.23](https://github.com/dtolnay/zmij) | MIT License |
 | [typenum 1.20.1](https://github.com/paholg/typenum) | MIT License |
@@ -1061,9 +1061,9 @@ SOFTWARE.
 | [walkdir 2.5.0](https://github.com/BurntSushi/walkdir) | MIT License |
 | [strsim 0.11.1](https://github.com/rapidfuzz/strsim-rs) | MIT License |
 | [same-file 1.0.6](https://github.com/BurntSushi/same-file) | MIT License |
-| [rust-embed-impl 8.12.0](https://pyrossh.dev/repos/rust-embed) | MIT License |
-| [rust-embed-utils 8.12.0](https://pyrossh.dev/repos/rust-embed) | MIT License |
-| [rust-embed 8.12.0](https://pyrossh.dev/repos/rust-embed) | MIT License |
+| [rust-embed-impl 8.13.0](https://pyrossh.dev/repos/rust-embed) | MIT License |
+| [rust-embed-utils 8.13.0](https://pyrossh.dev/repos/rust-embed) | MIT License |
+| [rust-embed 8.13.0](https://pyrossh.dev/repos/rust-embed) | MIT License |
 | [mime_guess 2.0.5](https://github.com/abonander/mime_guess) | MIT License |
 | [unicode-ident 1.0.24](https://github.com/dtolnay/unicode-ident) | Unicode License v3 |
 
@@ -1686,7 +1686,7 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ```
 
-#### MIT License — itoa 1.0.18, proc-macro2 1.0.107, quote 1.0.47, serde 1.0.229, serde_core 1.0.229, serde_derive 1.0.229, serde_json 1.0.151, syn 2.0.119, syn 3.0.6, unicode-ident 1.0.24, zmij 1.0.23
+#### MIT License — itoa 1.0.18, proc-macro2 1.0.107, quote 1.0.47, serde 1.0.229, serde_core 1.0.229, serde_derive 1.0.229, serde_json 1.0.154, syn 2.0.119, syn 3.0.8, unicode-ident 1.0.24, zmij 1.0.23
 
 ```
 Permission is hereby granted, free of charge, to any
@@ -1825,7 +1825,7 @@ THE SOFTWARE.
 
 ```
 
-#### MIT License — rust-embed-impl 8.12.0, rust-embed-utils 8.12.0, rust-embed 8.12.0
+#### MIT License — rust-embed-impl 8.13.0, rust-embed-utils 8.13.0, rust-embed 8.13.0
 
 ```
 The MIT License (MIT)
