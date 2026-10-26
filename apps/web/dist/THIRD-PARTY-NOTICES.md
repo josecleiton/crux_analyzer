@@ -74,8 +74,8 @@ The full text of the EPL-2.0 appears in the license texts below.
 | micromark-util-sanitize-uri | 2.0.1 | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> |
 | micromark-util-subtokenize | 2.1.0 | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> |
 | property-information | 7.2.0 | MIT | Copyright (c) Titus Wormer <mailto:tituswormer@gmail.com> |
-| [react](https://react.dev/) | 19.3.0 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
-| [react-dom](https://react.dev/) | 19.3.0 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
+| [react](https://react.dev/) | 19.3.1 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
+| [react-dom](https://react.dev/) | 19.3.1 | MIT | Copyright (c) Meta Platforms, Inc. and affiliates. |
 | react-markdown | 10.1.0 | MIT | Copyright (c) Espen Hovlandsdal |
 | [remark-parse](https://remark.js.org) | 11.0.0 | MIT | Copyright (c) 2014 Titus Wormer <tituswormer@gmail.com> |
 | remark-rehype | 11.1.2 | MIT | Copyright (c) Titus Wormer <tituswormer@gmail.com> |
@@ -736,7 +736,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### MIT — react 19.3.0, react-dom 19.3.0, scheduler 0.28.0, use-sync-external-store 1.6.0
+### MIT — react 19.3.1, react-dom 19.3.1, scheduler 0.28.0, use-sync-external-store 1.6.0
 
 ```
 MIT License
